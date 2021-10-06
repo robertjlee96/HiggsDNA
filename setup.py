@@ -21,6 +21,9 @@ setuptools.setup(
         "higgs_dna/systematics",
         "higgs_dna/utils"
     ],
+    scripts=["scripts/run_taggers.py", "scripts/runner.py"],
     install_requires=get_dependencies("environment.yml"),
+    # for metaconditions and JSON files in general
+    include_package_data=True,
     python_requires=">=3.6",
 )

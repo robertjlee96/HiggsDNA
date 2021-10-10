@@ -13,6 +13,7 @@ class DYStudiesProcessor(HggBaseProcessor):
         apply_trigger: bool = False,
         output_location: Optional[str] = None,
         taggers: Optional[List[Any]] = None,
+        skipCQR: bool = False
     ) -> None:
         super().__init__(
             metaconditions,
@@ -22,6 +23,7 @@ class DYStudiesProcessor(HggBaseProcessor):
             taggers=taggers,
             trigger_group=".*DoubleEG.*",
             analysis="mainAnalysis",
+            skipCQR=skipCQR
         )
         self.trigger_group = ".*DoubleEG.*"
         self.analysis = "mainAnalysis"

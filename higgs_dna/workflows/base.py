@@ -41,6 +41,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         taggers: Optional[List[Any]],
         trigger_group: str,
         analysis: str,
+        skipCQR: bool = False,
     ) -> None:
         self.meta = metaconditions
         self.do_systematics = do_systematics
@@ -48,6 +49,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.output_location = output_location
         self.trigger_group = trigger_group
         self.analysis = analysis
+        self.skipCQR = skipCQR
 
         # diphoton preselection cuts
         self.min_pt_photon = 25.0
@@ -86,13 +88,14 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.prefixes = {"pho_lead": "lead", "pho_sublead": "sublead"}
 
         # build the chained quantile regressions
-        try:
-            self.chained_quantile: Optional[
-                ChainedQuantileRegression
-            ] = ChainedQuantileRegression(**self.meta["PhoIdInputCorrections"])
-        except Exception as e:
-            warnings.warn(f"Could not instantiate ChainedQuantileRegression: {e}")
-            self.chained_quantile = None
+        self.chained_quantile = None
+        if not self.skipCQR:
+            try:
+                self.chained_quantile: Optional[
+                    ChainedQuantileRegression
+                ] = ChainedQuantileRegression(**self.meta["PhoIdInputCorrections"])
+            except Exception as e:
+                warnings.warn(f"Could not instantiate ChainedQuantileRegression: {e}")
 
         # initialize photonid_mva
         photon_id_mva_dir = os.path.dirname(photon_id_mva_weights.__file__)
@@ -110,6 +113,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
 
         # initialize diphoton mva
         diphoton_weights_dir = os.path.dirname(diphoton_mva_dir.__file__)
+        logger.debug(f"Base path to look for IDMVA weight files: {diphoton_weights_dir}")
         self.diphoton_mva = load_diphoton_mva(
             os.path.join(diphoton_weights_dir, self.meta["flashggDiPhotonMVA"]["weightFile"])
         )

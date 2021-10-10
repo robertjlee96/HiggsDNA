@@ -119,13 +119,6 @@ def get_main_parser():
         help="JSON file containing dataset and file locations (default: %(default)s)",
     )
 
-    parser.add_argument(
-        "--debug",
-        default=False,
-        action="store_true",
-        help="Print debug information with a logger"
-    )
-
     # Scale out
     parser.add_argument(
         "--executor",
@@ -211,6 +204,19 @@ def get_main_parser():
         metavar="N",
         help="Max number of chunks to run in total",
     )
+    parser.add_argument(
+        "--skipCQR",
+        default=False,
+        action="store_true",
+        help="Do not apply chained quantile regression (CQR) corrections"
+    )
+    parser.add_argument(
+        "--debug",
+        default=False,
+        action="store_true",
+        help="Print debug information with a logger"
+    )
+
     return parser
 
 
@@ -274,6 +280,7 @@ if __name__ == "__main__":
 
     # Scan if files can be opened
     if args.validate:
+        logger.info("Performing sanity check on files")
         start = time.time()
         from p_tqdm import p_map
 
@@ -316,6 +323,7 @@ if __name__ == "__main__":
                 args.use_trigger,
                 args.dump,
                 wf_taggers,
+                args.skipCQR
             )  # additional args can go here to configure a processor
     else:
         raise NotImplementedError

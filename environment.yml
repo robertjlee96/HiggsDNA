@@ -17,3 +17,6 @@ dependencies:
   - tqdm
   - coffea
   - xgboost
+  - dask
+  - distributed
+  - dask-jobqueue

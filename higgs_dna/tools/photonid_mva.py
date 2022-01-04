@@ -42,6 +42,9 @@ def calculate_photonid_mva(
     """
     photonid_mva, var_order = mva
 
+    if photonid_mva is None:
+        return awkward.ones_like(photon.pt)
+
     bdt_inputs = {}
     bdt_inputs = numpy.column_stack(
         [awkward.to_numpy(photon[name]) for name in var_order]
@@ -51,7 +54,6 @@ def calculate_photonid_mva(
     mvaID = photonid_mva.predict(tempmatrix)
 
     # Only needed to compare to TMVA
-    mvaID = -numpy.log(1.0 / mvaID - 1.0)
-    mvaID = 2.0 / (1.0 + numpy.exp(-2.0 * mvaID)) - 1.0
+    mvaID = 1.0 - 2.0 / (1.0 + numpy.exp(2.0 * mvaID))
 
     return mvaID

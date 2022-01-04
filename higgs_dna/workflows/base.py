@@ -15,10 +15,8 @@ from coffea import processor
 
 from higgs_dna.tools.chained_quantile import ChainedQuantileRegression
 
-from higgs_dna.tools.diphoton_mva import (  # isort:skip
-    calculate_diphoton_mva,
-    load_diphoton_mva,
-)
+from higgs_dna.tools.diphoton_mva import calculate_diphoton_mva
+from higgs_dna.tools.xgb_loader import load_bdt
 
 from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_mva
 from higgs_dna.metaconditions import photon_id_mva_weights
@@ -114,7 +112,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         # initialize diphoton mva
         diphoton_weights_dir = os.path.dirname(diphoton_mva_dir.__file__)
         logger.debug(f"Base path to look for IDMVA weight files: {diphoton_weights_dir}")
-        self.diphoton_mva = load_diphoton_mva(
+        self.diphoton_mva = load_bdt(
             os.path.join(diphoton_weights_dir, self.meta["flashggDiPhotonMVA"]["weightFile"])
         )
 

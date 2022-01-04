@@ -30,7 +30,7 @@ python setup.py install
   
 For **developers**, the suggested way to install is:  
 ```  
-pip install -e .  
+pip install -e .[dev]  
 ```  
 this prevents the need to run the installation step every time a change is performed.
 

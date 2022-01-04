@@ -1,22 +1,11 @@
-import unittest
+import pytest
+from higgs_dna.utils.logger_utils import setup_logger
 
-from higgs_dna.utils import setup_logger
 
-
-class TestUtils(unittest.TestCase):
+def test_logger():
     """
-    Test main utilities provided in the utils submodule
+    Test main aspects of setup_logger function
     """
-    def setUp(self):
-        pass
-
-    def test_logger(self):
-        """
-        Test main aspects of setup_logger function
-        """
-        null_info_level = "NOT_ALLOWED"
-        self.assertRaises(ValueError, setup_logger, level=null_info_level)
-
-
-if __name__ == '__main__':
-    unittest.main()
+    null_info_level = "NOT_ALLOWED"
+    with pytest.raises(ValueError):
+        setup_logger(null_info_level)

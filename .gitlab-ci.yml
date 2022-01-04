@@ -1,0 +1,11 @@
+stages:          # List of stages for jobs, and their order of execution
+  - build
+
+build-job:       # This job runs in the build stage, which runs first.
+  stage: build
+  image: continuumio/miniconda3:latest
+  before_script:
+    - conda env create -f environment.yml
+    - source activate higgs-dna
+  script:
+    - pip install -e .[dev]

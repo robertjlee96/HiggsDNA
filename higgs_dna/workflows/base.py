@@ -94,10 +94,13 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 ] = ChainedQuantileRegression(**self.meta["PhoIdInputCorrections"])
             except Exception as e:
                 warnings.warn(f"Could not instantiate ChainedQuantileRegression: {e}")
+        else:
+            logger.info("Skipping CQR as required")
 
         # initialize photonid_mva
         photon_id_mva_dir = os.path.dirname(photon_id_mva_weights.__file__)
         try:
+            logger.debug(f"Looking for {self.meta['flashggPhotons']['photonIdMVAweightfile_EB']} in {photon_id_mva_dir}")
             self.photonid_mva_EB = load_photonid_mva(
                 os.path.join(photon_id_mva_dir, self.meta["flashggPhotons"]["photonIdMVAweightfile_EB"])
             )

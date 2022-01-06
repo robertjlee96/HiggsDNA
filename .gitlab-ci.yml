@@ -1,18 +1,15 @@
-image: continuumio/miniconda3:latest
-
-before_script:
-  - conda env create -f environment.yml
-  - source activate higgs-dna
-  - conda install flake8
-  - conda install pytest
+image: "python:3.9"
 
 stages:
   - build
   - static analysis
   - test
+  - conda build
 
 static_analysis:
   stage: static analysis
+  before_script:
+    - pip install flake8
   script:
     - flake8 higgs_dna/*
 
@@ -23,9 +20,20 @@ build:
 
 unit_test:
   stage: test
+  before_script:
+    - pip install -e .[dev]
   script:
     - pwd
     - ls -l
     - export PYTHONPATH="$PYTHONPATH:."
     - python -c "import sys;print(sys.path)"
     - pytest
+
+conda_build:
+  stage: conda build
+  image: continuumio/miniconda3:latest
+  before_script:
+  - conda env create -f environment.yml
+  - source activate higgs-dna
+  script:
+    - pip install -e .

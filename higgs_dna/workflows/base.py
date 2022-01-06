@@ -1,3 +1,10 @@
+from higgs_dna.tools.chained_quantile import ChainedQuantileRegression
+from higgs_dna.tools.diphoton_mva import calculate_diphoton_mva
+from higgs_dna.tools.xgb_loader import load_bdt
+from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_mva
+from higgs_dna.metaconditions import photon_id_mva_weights
+from higgs_dna.metaconditions import diphoton as diphoton_mva_dir
+
 import functools
 import json
 import operator
@@ -6,27 +13,17 @@ import pathlib
 import shutil
 import warnings
 from typing import Any, Dict, List, Optional
-
 import awkward
 import numpy
 import pandas
 import vector
 from coffea import processor
 
-from higgs_dna.tools.chained_quantile import ChainedQuantileRegression
+import logging
 
-from higgs_dna.tools.diphoton_mva import calculate_diphoton_mva
-from higgs_dna.tools.xgb_loader import load_bdt
-
-from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_mva
-from higgs_dna.metaconditions import photon_id_mva_weights
-from higgs_dna.metaconditions import diphoton as diphoton_mva_dir
-
+logger = logging.getLogger(__name__)
 
 vector.register_awkward()
-
-import logging
-logger = logging.getLogger(__name__)
 
 
 class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
@@ -71,7 +68,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.max_sieie_EE_low_r9 = 0.035
         self.max_pho_iso_EB_low_r9 = 4.0
         self.max_pho_iso_EE_low_r9 = 4.0
-        
+
         self.eta_rho_corr = 1.5
         self.low_eta_rho_corr = 0.16544
         self.high_eta_rho_corr = 0.13212
@@ -100,12 +97,20 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         # initialize photonid_mva
         photon_id_mva_dir = os.path.dirname(photon_id_mva_weights.__file__)
         try:
-            logger.debug(f"Looking for {self.meta['flashggPhotons']['photonIdMVAweightfile_EB']} in {photon_id_mva_dir}")
+            logger.debug(
+                f"Looking for {self.meta['flashggPhotons']['photonIdMVAweightfile_EB']} in {photon_id_mva_dir}"
+            )
             self.photonid_mva_EB = load_photonid_mva(
-                os.path.join(photon_id_mva_dir, self.meta["flashggPhotons"]["photonIdMVAweightfile_EB"])
+                os.path.join(
+                    photon_id_mva_dir,
+                    self.meta["flashggPhotons"]["photonIdMVAweightfile_EB"],
+                )
             )
             self.photonid_mva_EE = load_photonid_mva(
-                os.path.join(photon_id_mva_dir, self.meta["flashggPhotons"]["photonIdMVAweightfile_EE"])
+                os.path.join(
+                    photon_id_mva_dir,
+                    self.meta["flashggPhotons"]["photonIdMVAweightfile_EE"],
+                )
             )
         except Exception as e:
             warnings.warn(f"Could not instantiate PhotonID MVA on the fly: {e}")
@@ -114,53 +119,79 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
 
         # initialize diphoton mva
         diphoton_weights_dir = os.path.dirname(diphoton_mva_dir.__file__)
-        logger.debug(f"Base path to look for IDMVA weight files: {diphoton_weights_dir}")
+        logger.debug(
+            f"Base path to look for IDMVA weight files: {diphoton_weights_dir}"
+        )
         self.diphoton_mva = load_bdt(
-            os.path.join(diphoton_weights_dir, self.meta["flashggDiPhotonMVA"]["weightFile"])
+            os.path.join(
+                diphoton_weights_dir, self.meta["flashggDiPhotonMVA"]["weightFile"]
+            )
         )
 
-    def photon_preselection(self, photons: awkward.Array, events: awkward.Array) -> awkward.Array:
+    def photon_preselection(
+        self, photons: awkward.Array, events: awkward.Array
+    ) -> awkward.Array:
         # hlt-mimicking cuts
-        rho = events.fixedGridRhoAll * awkward.ones_like(
-            photons.pt
-        )
+        rho = events.fixedGridRhoAll * awkward.ones_like(photons.pt)
         photon_abs_eta = numpy.abs(photons.eta)
-        isEB_high_r9 = (photon_abs_eta < self.gap_barrel_eta) \
-                    & (photons.r9 > self.min_full5x5_r9_EB_high_r9)
-        isEE_high_r9 = (photon_abs_eta > self.gap_endcap_eta) \
-                    & (photons.r9 > self.min_full5x5_r9_EE_high_r9)
-        isEB_low_r9 = (photon_abs_eta < self.gap_barrel_eta) \
-                    & (photons.r9 > self.min_full5x5_r9_EB_low_r9) \
-                    & (photons.r9 < self.min_full5x5_r9_EB_high_r9) \
-                    & (photons.trkSumPtHollowConeDR03 < self.max_trkSumPtHollowConeDR03_EB_low_r9) \
-                    & (photons.sieie < self.max_sieie_EB_low_r9) \
+        isEB_high_r9 = (photon_abs_eta < self.gap_barrel_eta) & (
+            photons.r9 > self.min_full5x5_r9_EB_high_r9
+        )
+        isEE_high_r9 = (photon_abs_eta > self.gap_endcap_eta) & (
+            photons.r9 > self.min_full5x5_r9_EE_high_r9
+        )
+        isEB_low_r9 = (
+            (photon_abs_eta < self.gap_barrel_eta)
+            & (photons.r9 > self.min_full5x5_r9_EB_low_r9)
+            & (photons.r9 < self.min_full5x5_r9_EB_high_r9)
+            & (
+                photons.trkSumPtHollowConeDR03
+                < self.max_trkSumPtHollowConeDR03_EB_low_r9
+            )
+            & (photons.sieie < self.max_sieie_EB_low_r9)
+            & (
+                (
+                    (photon_abs_eta < self.eta_rho_corr)
                     & (
-                        (
-                            (photon_abs_eta < self.eta_rho_corr) 
-                            & (photons.pfPhoIso03 - rho*self.low_eta_rho_corr < self.max_pho_iso_EB_low_r9)
-                        ) 
-                        | 
-                        (
-                            (photon_abs_eta > self.eta_rho_corr) 
-                            & (photons.pfPhoIso03 - rho*self.high_eta_rho_corr < self.max_pho_iso_EB_low_r9)
-                        )
+                        photons.pfPhoIso03 - rho * self.low_eta_rho_corr
+                        < self.max_pho_iso_EB_low_r9
                     )
-        isEE_low_r9 = (photon_abs_eta < self.gap_barrel_eta) \
-                    & (photons.r9 > self.min_full5x5_r9_EE_low_r9) \
-                    & (photons.r9 < self.min_full5x5_r9_EE_high_r9) \
-                    & (photons.trkSumPtHollowConeDR03 < self.max_trkSumPtHollowConeDR03_EE_low_r9) \
-                    & (photons.sieie < self.max_sieie_EE_low_r9) \
+                )
+                | (
+                    (photon_abs_eta > self.eta_rho_corr)
                     & (
-                        (
-                            (photon_abs_eta < self.eta_rho_corr) 
-                            & (photons.pfPhoIso03 - rho*self.low_eta_rho_corr < self.max_pho_iso_EE_low_r9)
-                        ) 
-                        | 
-                        (
-                            (photon_abs_eta > self.eta_rho_corr) 
-                            & (photons.pfPhoIso03 - rho*self.high_eta_rho_corr < self.max_pho_iso_EE_low_r9)
-                        )
+                        photons.pfPhoIso03 - rho * self.high_eta_rho_corr
+                        < self.max_pho_iso_EB_low_r9
                     )
+                )
+            )
+        )
+        isEE_low_r9 = (
+            (photon_abs_eta < self.gap_barrel_eta)
+            & (photons.r9 > self.min_full5x5_r9_EE_low_r9)
+            & (photons.r9 < self.min_full5x5_r9_EE_high_r9)
+            & (
+                photons.trkSumPtHollowConeDR03
+                < self.max_trkSumPtHollowConeDR03_EE_low_r9
+            )
+            & (photons.sieie < self.max_sieie_EE_low_r9)
+            & (
+                (
+                    (photon_abs_eta < self.eta_rho_corr)
+                    & (
+                        photons.pfPhoIso03 - rho * self.low_eta_rho_corr
+                        < self.max_pho_iso_EE_low_r9
+                    )
+                )
+                | (
+                    (photon_abs_eta > self.eta_rho_corr)
+                    & (
+                        photons.pfPhoIso03 - rho * self.high_eta_rho_corr
+                        < self.max_pho_iso_EE_low_r9
+                    )
+                )
+            )
+        )
 
         return photons[
             (photons.pt > self.min_pt_photon)

@@ -1,17 +1,16 @@
+from higgs_dna.metaconditions import corrections
+from higgs_dna.tools.xgb_loader import load_bdt
+
 import json
 from importlib import resources
 import os
 from typing import Any, Dict, List, Optional
-
-from higgs_dna.metaconditions import corrections
-
-corrections_dir = os.path.dirname(corrections.__file__)
-
 import awkward
 import numpy
 import xgboost
 
-from higgs_dna.tools.xgb_loader import load_bdt
+
+corrections_dir = os.path.dirname(corrections.__file__)
 
 
 class wrapped_xgb:
@@ -67,7 +66,9 @@ class ChainedQuantileRegression:
         correctIsolations: bool = True,
         correctPreshower: bool = False,
     ):
-        with resources.open_text("higgs_dna.metaconditions.corrections", corrections_summary) as f:
+        with resources.open_text(
+            "higgs_dna.metaconditions.corrections", corrections_summary
+        ) as f:
             cq_config = json.load(f)
 
         self.transforms: Dict[str, Any] = {}

@@ -5,7 +5,6 @@ import numpy
 import xgboost
 
 
-
 def calculate_diphoton_mva(
     mva: Tuple[Optional[xgboost.Booster], List[str]],
     diphotons: awkward.Array,

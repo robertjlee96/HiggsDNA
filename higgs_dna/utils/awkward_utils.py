@@ -3,6 +3,7 @@ import vector
 import numpy
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -20,7 +21,7 @@ def missing_fields(array, fields):
 
     missing_fields = []
 
-    for field in fields: 
+    for field in fields:
         if isinstance(field, str):
             if field not in array.fields:
                 missing_fields.append(field)
@@ -35,7 +36,10 @@ def missing_fields(array, fields):
                 sub_array = sub_array[sub_field]
 
         else:
-            message = "Each entry in the <fields> argument should be either a str or tuple, not %s which is the type of entry %s" % (str(type(field)), str(field))
+            message = (
+                "Each entry in the <fields> argument should be either a str or tuple, not %s which is the type of entry %s"
+                % (str(type(field)), str(field))
+            )
             logger.exception(message)
             raise TypeError(message)
 
@@ -56,14 +60,13 @@ def construct_jagged_array(offsets, contents):
     """
     array = awkward.Array(
         awkward.layout.ListOffsetArray64(
-            awkward.layout.Index64(offsets),
-            awkward.layout.NumpyArray(contents)
+            awkward.layout.Index64(offsets), awkward.layout.NumpyArray(contents)
         )
     )
     return array
 
 
-def add_field(events, name, data, overwrite = False):
+def add_field(events, name, data, overwrite=False):
     """
     Add a field or record to an awkward array.
     Checks if the field is already present and returns the existing field if so,
@@ -83,7 +86,10 @@ def add_field(events, name, data, overwrite = False):
 
     already_present = len(missing_fields(events, [name])) == 0
     if already_present and not overwrite:
-        logger.warning("[awkward_utils.py : add_field] You tried to write the field %s, but it is already present and overwrite option was not selected. Not overwriting existing field." % name)
+        logger.warning(
+            "[awkward_utils.py : add_field] You tried to write the field %s, but it is already present and overwrite option was not selected. Not overwriting existing field."
+            % name
+        )
         return events[name]
 
     if isinstance(data, awkward.highlevel.Array) or isinstance(data, numpy.ndarray):
@@ -92,18 +98,23 @@ def add_field(events, name, data, overwrite = False):
     elif isinstance(data, dict):
         return create_record(events, name, data, overwrite)
     else:
-        message = "[awkward_utils.py : add_field] argument <data> should be either an awkward.highlevel.Array (in the case of adding a single field) or a dictionary (in the case of creating a record), not %s as you have passed." % (str(type(data)))
+        message = (
+            "[awkward_utils.py : add_field] argument <data> should be either an awkward.highlevel.Array (in the case of adding a single field) or a dictionary (in the case of creating a record), not %s as you have passed."
+            % (str(type(data)))
+        )
         logger.exception(message)
         raise TypeError(message)
-    
 
-def add_object_fields(events, name, objects, n_objects, dummy_value = -999., fields = "all", overwrite = False):
+
+def add_object_fields(
+    events, name, objects, n_objects, dummy_value=-999.0, fields="all", overwrite=False
+):
     """
     For a collection of jagged-length objects (e.g. jets or leptons),
     add fixed-length flat fields to the events array, storing information for each of the
     first n_objects objects in each event, and filling missing events with dummy_value.
 
-    For example add_object_fields(events, "jet", selected_jets, 4) will add every field belonging to the 
+    For example add_object_fields(events, "jet", selected_jets, 4) will add every field belonging to the
     selected_jets record as individual entries for each of the first four jets:
     events.jet_1_pt
     events.jet_1_eta
@@ -132,40 +143,46 @@ def add_object_fields(events, name, objects, n_objects, dummy_value = -999., fie
         if fields == "all":
             fields = objects.fields
     elif not isinstance(fields, list):
-        message = "[awkward_utils.py : add_object_fields] argument <fields> should either be a string 'all' to save all fields in the original record, or a list of fields which is a subset of the fields in the original record, not '%s' as you have passed." % (str(type(fields)))
+        message = (
+            "[awkward_utils.py : add_object_fields] argument <fields> should either be a string 'all' to save all fields in the original record, or a list of fields which is a subset of the fields in the original record, not '%s' as you have passed."
+            % (str(type(fields)))
+        )
         logger.exception(message)
         raise TypeError(message)
 
     for field in fields:
         for i in range(n_objects):
             add_field(
-                events = events,
-                name = "%s_%d_%s" % (name, i+1, field),
-                data = awkward.fill_none(padded_objects[field][:,i], dummy_value),
-                overwrite = overwrite
+                events=events,
+                name="%s_%d_%s" % (name, i + 1, field),
+                data=awkward.fill_none(padded_objects[field][:, i], dummy_value),
+                overwrite=overwrite,
             )
 
 
 def create_record(events, name, data, overwrite):
     """
     Adds a nested record to events array.
-    If there are any fields containing "p4", this is assumed to be an array of <vector> objects and the pt/eta/phi/mass will be added as top-level fields in the record for easier access. 
+    If there are any fields containing "p4", this is assumed to be an array of <vector> objects and the pt/eta/phi/mass will be added as top-level fields in the record for easier access.
 
-    :param name: name of the record to be added 
+    :param name: name of the record to be added
     :type name: str or tuple
-    :param data: dictionary of subfields : awkward array 
+    :param data: dictionary of subfields : awkward array
     :type data: dict
     :param overwrite: whether to overwrite this field in events (only applicable if it already exists)
     :type overwrite: bool
     :return: events array with record added
-    :rtype: awkward.highlevel.Array 
+    :rtype: awkward.highlevel.Array
     """
-   
+
     # If there is a field named "p4", save its properties as additional fields for easier access
     additional_fields = {}
     for key, array in data.items():
         if "p4" in key:
-            logger.debug("[awkward_utils.py : create_record] Found a field %s in your data which looks like a four vector. For convenience, we will make pt/eta/phi/mass accessible as e.g. events.%s.pt (in addition to events.%s.%s.pt)" % (key, name, name, key))
+            logger.debug(
+                "[awkward_utils.py : create_record] Found a field %s in your data which looks like a four vector. For convenience, we will make pt/eta/phi/mass accessible as e.g. events.%s.pt (in addition to events.%s.%s.pt)"
+                % (key, name, name, key)
+            )
             additional_fields[key.replace("p4", "pt")] = array.pt
             additional_fields[key.replace("p4", "eta")] = array.eta
             additional_fields[key.replace("p4", "phi")] = array.phi
@@ -193,28 +210,24 @@ def create_four_vectors(events, offsets, contents):
     :type offsets: numpy array
     :param contents: pt, eta, phi, mass of the object to be zipped
     :type contents: numpy array
-    :return: awkward array of the four momentums 
+    :return: awkward array of the four momentums
     :rtype: awkward array of Momentum4D vector
     """
 
     # First convert from awkward.layout.Index & awkward.layout.Array -> to awkward array
     objects = {}
     for idx, field in enumerate(["pt", "eta", "phi", "mass"]):
-        objects[field] = construct_jagged_array(
-                offsets,
-                contents[:,idx]
-        )
+        objects[field] = construct_jagged_array(offsets, contents[:, idx])
 
     # Second, convert to awkward array of Momentum4D vector objects
     objects_p4 = vector.awk(
-            {
-                "pt" : objects["pt"],
-                "eta" : objects["eta"],
-                "phi" : objects["phi"],
-                "mass" : objects["mass"]
-            },
-            with_name = "Momentum4D"
+        {
+            "pt": objects["pt"],
+            "eta": objects["eta"],
+            "phi": objects["phi"],
+            "mass": objects["mass"],
+        },
+        with_name="Momentum4D",
     )
 
     return objects_p4
-

@@ -4,6 +4,7 @@ from higgs_dna.tools.xgb_loader import load_bdt
 from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_mva
 from higgs_dna.metaconditions import photon_id_mva_weights
 from higgs_dna.metaconditions import diphoton as diphoton_mva_dir
+from higgs_dna.systematics import systematics as available_systematics
 
 import functools
 import operator
@@ -29,7 +30,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
     def __init__(
         self,
         metaconditions: Dict[str, Any],
-        do_systematics: bool,
+        systematics: Optional[Dict[str, List[str]]],
         apply_trigger: bool,
         output_location: Optional[str],
         taggers: Optional[List[Any]],
@@ -38,7 +39,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         skipCQR: bool,
     ) -> None:
         self.meta = metaconditions
-        self.do_systematics = do_systematics
+        self.systematics = systematics if systematics is not None else {}
         self.apply_trigger = apply_trigger
         self.output_location = output_location
         self.trigger_group = trigger_group
@@ -233,10 +234,10 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             prefix = self.prefixes.get(field, "")
             if len(prefix) > 0:
                 for subfield in awkward.fields(diphotons[field]):
-                    logger.debug(f"Adding {prefix}_{subfield}")
-                    output[f"{prefix}_{subfield}"] = awkward.to_numpy(
-                        diphotons[field][subfield]
-                    )
+                    if subfield != "__systematics__":
+                        output[f"{prefix}_{subfield}"] = awkward.to_numpy(
+                            diphotons[field][subfield]
+                        )
             else:
                 output[field] = awkward.to_numpy(diphotons[field])
         return output
@@ -334,115 +335,146 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         # apply filters and triggers
         events = self.apply_filters_and_triggers(events)
 
-        # modifications to photons
-        photons = events.Photon
-
-        if self.chained_quantile is not None:
-            photons = self.chained_quantile.apply(events)
-
-        # recompute photonid_mva on the fly
-        if self.photonid_mva_EB and self.photonid_mva_EE:
-            photons = self.add_photonid_mva(photons, events)
-
-        # photon preselection
-        photons = self.photon_preselection(photons, events)
-        # sort photons in each event descending in pt
-        # make descending-pt combinations of photons
-        photons = photons[awkward.argsort(photons.pt, ascending=False)]
-        diphotons = awkward.combinations(photons, 2, fields=["pho_lead", "pho_sublead"])
-        # the remaining cut is to select the leading photons
-        # the previous sort assures the order
-        diphotons = diphotons[diphotons["pho_lead"].pt > self.min_pt_lead_photon]
-
-        # now turn the diphotons into candidates with four momenta and such
-        diphoton_4mom = diphotons["pho_lead"] + diphotons["pho_sublead"]
-        diphotons["pt"] = diphoton_4mom.pt
-        diphotons["eta"] = diphoton_4mom.eta
-        diphotons["phi"] = diphoton_4mom.phi
-        diphotons["mass"] = diphoton_4mom.mass
-        diphotons["charge"] = diphoton_4mom.charge
-        diphotons = awkward.with_name(diphotons, "PtEtaPhiMCandidate")
-
-        # sort diphotons by pT
-        diphotons = diphotons[awkward.argsort(diphotons.pt, ascending=False)]
-
-        # baseline modifications to diphotons
-        if self.diphoton_mva is not None:
-            diphotons = self.add_diphoton_mva(diphotons, events)
-
-        # set diphotons as part of the event record
-        events["diphotons"] = diphotons
-
         # here we start recording possible coffea accumulators
         # most likely histograms, could be counters, arrays, ...
         histos_etc = {}
 
-        # workflow specific processing
-        events, process_extra = self.process_extra(events)
-        histos_etc.update(process_extra)
+        # Whole systematics business
+        dataset_name = events.metadata["dataset"]
+        try:
+            systematic_names = self.systematics[dataset_name]
+        except KeyError:
+            systematic_names = []
 
-        # run taggers on the events list with added diphotons
-        # the shape here is ensured to be broadcastable
-        for tagger in self.taggers:
-            (
-                diphotons["_".join([tagger.name, str(tagger.priority)])],
-                tagger_extra,
-            ) = tagger(
-                events
-            )  # creates new column in diphotons - tagger priority, or 0, also return list of histrograms here?
-            histos_etc.update(tagger_extra)
+        original_photons = events.Photon
+        for systematic_name in systematic_names:
+            systematic_dct = available_systematics[systematic_name]
+            if systematic_dct["object"] == "Photon":
+                logger.info(
+                    f"Adding systematic {systematic_name} to photons collection of dataset {dataset_name}"
+                )
+                original_photons.add_systematic(
+                    name=systematic_name, **systematic_dct["args"]
+                )
 
-        # if there are taggers to run, arbitrate by them first
-        # Deal with order of tagger priorities
-        # Turn from diphoton jagged array to whether or not an event was selected
-        if len(self.taggers):
-            counts = awkward.num(diphotons.pt, axis=1)
-            flat_tags = numpy.stack(
-                [
-                    awkward.to_numpy(
+        photons_dct = {}
+        photons_dct["nominal"] = original_photons
+        logger.debug(original_photons.systematics.fields)
+        for systematic in original_photons.systematics.fields:
+            for variation in original_photons.systematics[systematic].fields:
+                photons_dct[f"{systematic}_{variation}"] = original_photons.systematics[
+                    systematic
+                ][variation]
+
+        for variation, photons in photons_dct.items():
+            logger.debug(f"Variation: {variation}")
+            if self.chained_quantile is not None:
+                photons = self.chained_quantile.apply(photons, events)
+
+            # recompute photonid_mva on the fly
+            if self.photonid_mva_EB and self.photonid_mva_EE:
+                photons = self.add_photonid_mva(photons, events)
+
+            # photon preselection
+            photons = self.photon_preselection(photons, events)
+            # sort photons in each event descending in pt
+            # make descending-pt combinations of photons
+            photons = photons[awkward.argsort(photons.pt, ascending=False)]
+            diphotons = awkward.combinations(
+                photons, 2, fields=["pho_lead", "pho_sublead"]
+            )
+            # the remaining cut is to select the leading photons
+            # the previous sort assures the order
+            diphotons = diphotons[diphotons["pho_lead"].pt > self.min_pt_lead_photon]
+
+            # now turn the diphotons into candidates with four momenta and such
+            diphoton_4mom = diphotons["pho_lead"] + diphotons["pho_sublead"]
+            diphotons["pt"] = diphoton_4mom.pt
+            diphotons["eta"] = diphoton_4mom.eta
+            diphotons["phi"] = diphoton_4mom.phi
+            diphotons["mass"] = diphoton_4mom.mass
+            diphotons["charge"] = diphoton_4mom.charge
+            diphotons = awkward.with_name(diphotons, "PtEtaPhiMCandidate")
+
+            # sort diphotons by pT
+            diphotons = diphotons[awkward.argsort(diphotons.pt, ascending=False)]
+
+            # baseline modifications to diphotons
+            if self.diphoton_mva is not None:
+                diphotons = self.add_diphoton_mva(diphotons, events)
+
+            # set diphotons as part of the event record
+            events[f"diphotons_{variation}"] = diphotons
+
+            # workflow specific processing
+            events, process_extra = self.process_extra(events)
+            histos_etc.update(process_extra)
+
+            # run taggers on the events list with added diphotons
+            # the shape here is ensured to be broadcastable
+            for tagger in self.taggers:
+                (
+                    diphotons["_".join([tagger.name, str(tagger.priority)])],
+                    tagger_extra,
+                ) = tagger(
+                    events, diphotons
+                )  # creates new column in diphotons - tagger priority, or 0, also return list of histrograms here?
+                histos_etc.update(tagger_extra)
+
+            # if there are taggers to run, arbitrate by them first
+            # Deal with order of tagger priorities
+            # Turn from diphoton jagged array to whether or not an event was selected
+            if len(self.taggers):
+                counts = awkward.num(diphotons.pt, axis=1)
+                flat_tags = numpy.stack(
+                    (
                         awkward.flatten(
                             diphotons["_".join([tagger.name, str(tagger.priority)])]
                         )
+                        for tagger in self.taggers
+                    ),
+                    axis=1,
+                )
+                tags = awkward.from_regular(
+                    awkward.unflatten(flat_tags, counts), axis=2
+                )
+                winner = awkward.min(tags[tags != 0], axis=2)
+                diphotons["best_tag"] = winner
+
+                # lowest priority is most important (ascending sort)
+                # leave in order of diphoton pT in case of ties (stable sort)
+                sorted = awkward.argsort(diphotons.best_tag, stable=True)
+                diphotons = diphotons[sorted]
+
+            diphotons = awkward.firsts(diphotons)
+
+            # annotate diphotons with event information
+            diphotons["event"] = events.event
+            diphotons["lumi"] = events.luminosityBlock
+            diphotons["run"] = events.run
+
+            # drop events without a preselected diphoton candidate
+            # drop events without a tag, if there are tags
+            if len(self.taggers):
+                diphotons = diphotons[
+                    ~(awkward.is_none(diphotons) | awkward.is_none(diphotons.best_tag))
+                ]
+            else:
+                diphotons = diphotons[~awkward.is_none(diphotons)]
+
+            if self.output_location is not None:
+                df = self.diphoton_list_to_pandas(diphotons)
+                fname = (
+                    events.behavior["__events_factory__"]._partition_key.replace(
+                        "/", "_"
                     )
-                    for tagger in self.taggers
-                ],
-                axis=1,
-            )
-            tags = awkward.from_regular(awkward.unflatten(flat_tags, counts), axis=2)
-            winner = awkward.min(tags[tags != 0], axis=2)
-            diphotons["best_tag"] = winner
-
-            # lowest priority is most important (ascending sort)
-            # leave in order of diphoton pT in case of ties (stable sort)
-            sorted = awkward.argsort(diphotons.best_tag, stable=True)
-            diphotons = diphotons[sorted]
-
-        diphotons = awkward.firsts(diphotons)
-
-        # annotate diphotons with event information
-        diphotons["event"] = events.event
-        diphotons["lumi"] = events.luminosityBlock
-        diphotons["run"] = events.run
-
-        # drop events without a preselected diphoton candidate
-        # drop events without a tag, if there are tags
-        if len(self.taggers):
-            diphotons = diphotons[
-                ~(awkward.is_none(diphotons) | awkward.is_none(diphotons.best_tag))
-            ]
-        else:
-            diphotons = diphotons[~awkward.is_none(diphotons)]
-
-        if self.output_location is not None:
-            df = self.diphoton_list_to_pandas(diphotons)
-            fname = (
-                events.behavior["__events_factory__"]._partition_key.replace("/", "_")
-                + ".parquet"
-            )
-            subdirs = []
-            if "dataset" in events.metadata:
-                subdirs.append(events.metadata["dataset"])
-            self.dump_pandas(df, fname, self.output_location, subdirs)
+                    + ".parquet"
+                )
+                subdirs = []
+                if "dataset" in events.metadata:
+                    subdirs.append(events.metadata["dataset"])
+                subdirs.append(variation)
+                self.dump_pandas(df, fname, self.output_location, subdirs)
 
         return histos_etc
 

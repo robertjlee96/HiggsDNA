@@ -544,10 +544,9 @@ class ChainedQuantileRegression:
 
         return photons
 
-    def apply(self, events: awkward.Array) -> awkward.Array:
+    def apply(self, photons: awkward.Array, events: awkward.Array) -> awkward.Array:
         # We're going to work in flattened data within this
         # function. Less mind-bending.
-        photons = events.Photon
         rho = awkward.ones_like(photons.pt) * events.fixedGridRhoAll
         counts = awkward.num(photons, axis=1)
         photons = awkward.flatten(photons)

@@ -5,6 +5,7 @@ from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_m
 from higgs_dna.metaconditions import photon_id_mva_weights
 from higgs_dna.metaconditions import diphoton as diphoton_mva_dir
 
+from dataclasses import dataclass
 import functools
 import operator
 import os
@@ -25,59 +26,50 @@ logger = logging.getLogger(__name__)
 vector.register_awkward()
 
 
+@dataclass
 class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
-    def __init__(
-        self,
-        metaconditions: Dict[str, Any],
-        do_systematics: bool,
-        apply_trigger: bool,
-        output_location: Optional[str],
-        taggers: Optional[List[Any]],
-        trigger_group: str,
-        analysis: str,
-        skipCQR: bool = False,
-    ) -> None:
-        self.meta = metaconditions
-        self.do_systematics = do_systematics
-        self.apply_trigger = apply_trigger
-        self.output_location = output_location
-        self.trigger_group = trigger_group
-        self.analysis = analysis
-        self.skipCQR = skipCQR
+    meta: Dict[str, Any]
+    do_systematics: bool
+    apply_trigger: bool
+    trigger_group: str
+    analysis: str
+    output_location: Optional[str] = None
+    taggers: Optional[List[Any]] = None
+    skipCQR: bool = False
 
-        # diphoton preselection cuts
-        self.min_pt_photon = 25.0
-        self.min_pt_lead_photon = 35.0
-        self.min_mvaid = -0.9
-        self.max_sc_eta = 2.5
-        self.gap_barrel_eta = 1.4442
-        self.gap_endcap_eta = 1.566
-        self.max_hovere = 0.08
-        self.min_full5x5_r9 = 0.8
-        self.max_chad_iso = 20.0
-        self.max_chad_rel_iso = 0.3
+    # diphoton preselection cuts
+    min_pt_photon = 25.0
+    min_pt_lead_photon = 35.0
+    min_mvaid = -0.9
+    max_sc_eta = 2.5
+    gap_barrel_eta = 1.4442
+    gap_endcap_eta = 1.566
+    max_hovere = 0.08
+    min_full5x5_r9 = 0.8
+    max_chad_iso = 20.0
+    max_chad_rel_iso = 0.3
 
-        self.min_full5x5_r9_EB_high_r9 = 0.85
-        self.min_full5x5_r9_EE_high_r9 = 0.9
-        self.min_full5x5_r9_EB_low_r9 = 0.5
-        self.min_full5x5_r9_EE_low_r9 = 0.8
-        self.max_trkSumPtHollowConeDR03_EB_low_r9 = 6.0
-        self.max_trkSumPtHollowConeDR03_EE_low_r9 = 6.0
-        self.max_sieie_EB_low_r9 = 0.015
-        self.max_sieie_EE_low_r9 = 0.035
-        self.max_pho_iso_EB_low_r9 = 4.0
-        self.max_pho_iso_EE_low_r9 = 4.0
+    min_full5x5_r9_EB_high_r9 = 0.85
+    min_full5x5_r9_EE_high_r9 = 0.9
+    min_full5x5_r9_EB_low_r9 = 0.5
+    min_full5x5_r9_EE_low_r9 = 0.8
+    max_trkSumPtHollowConeDR03_EB_low_r9 = 6.0
+    max_trkSumPtHollowConeDR03_EE_low_r9 = 6.0
+    max_sieie_EB_low_r9 = 0.015
+    max_sieie_EE_low_r9 = 0.035
+    max_pho_iso_EB_low_r9 = 4.0
+    max_pho_iso_EE_low_r9 = 4.0
 
-        self.eta_rho_corr = 1.5
-        self.low_eta_rho_corr = 0.16544
-        self.high_eta_rho_corr = 0.13212
+    eta_rho_corr = 1.5
+    low_eta_rho_corr = 0.16544
+    high_eta_rho_corr = 0.13212
 
+    def __post_init__(self) -> None:
         logger.debug(f"Setting up processor with metaconditions: {self.meta}")
 
-        self.taggers = []
-        if taggers is not None:
-            self.taggers = taggers
-            self.taggers.sort(key=lambda x: x.priority)  # type: ignore
+        if self.taggers is None:
+            self.taggers = []
+        self.taggers.sort(key=lambda x: x.priority)  # type: ignore
 
         self.prefixes = {"pho_lead": "lead", "pho_sublead": "sublead"}
 

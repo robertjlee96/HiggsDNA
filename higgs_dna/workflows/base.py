@@ -207,6 +207,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             prefix = self.prefixes.get(field, "")
             if len(prefix) > 0:
                 for subfield in awkward.fields(diphotons[field]):
+                    logger.debug(f"Adding {prefix}_{subfield}")
                     output[f"{prefix}_{subfield}"] = awkward.to_numpy(
                         diphotons[field][subfield]
                     )
@@ -273,13 +274,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
     def process_extra(self, events: awkward.Array) -> awkward.Array:
         raise NotImplementedError
 
-    def process(self, events: awkward.Array) -> Dict[Any, Any]:
-
-        # data or monte carlo?
-        data_kind = "mc" if "GenPart" in awkward.fields(events) else "data"
-
+    def apply_filters_and_triggers(self, events: awkward.Array) -> awkward.Array:
         # met filters
-        met_filters = self.meta["flashggMetFilters"][data_kind]
+        met_filters = self.meta["flashggMetFilters"][self.data_kind]
         filtered = functools.reduce(
             operator.and_,
             (events.Flag[metfilter.split("_")[-1]] for metfilter in met_filters),
@@ -292,8 +289,14 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 operator.or_, (events.HLT[trigger[4:-1]] for trigger in triggers)
             )
 
-        # apply met filters and triggers to data
-        events = events[filtered & triggered]
+        return events[filtered & triggered]
+
+    def process(self, events: awkward.Array) -> Dict[Any, Any]:
+        # data or monte carlo?
+        self.data_kind = "mc" if "GenPart" in awkward.fields(events) else "data"
+
+        # apply filters and triggers
+        events = self.apply_filters_and_triggers(events)
 
         # modifications to photons
         photons = events.Photon

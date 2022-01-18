@@ -6,7 +6,6 @@ from higgs_dna.metaconditions import photon_id_mva_weights
 from higgs_dna.metaconditions import diphoton as diphoton_mva_dir
 
 import functools
-import json
 import operator
 import os
 import pathlib

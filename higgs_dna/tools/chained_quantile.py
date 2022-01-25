@@ -9,6 +9,9 @@ import awkward
 import numpy
 import xgboost
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 corrections_dir = os.path.dirname(corrections.__file__)
 
@@ -51,9 +54,10 @@ def create_evaluator(
     variables: Optional[List[str]] = None,
     **kwargs: Dict[Any, Any],
 ) -> xgboost.Booster:
-    model = load_bdt(weights)
+    full_path_weights = f"{corrections_dir}/{weights}"
+    model = load_bdt(full_path_weights)
     if model is None:
-        raise RuntimeError(f"Could not load {weights}, check warnings!")
+        raise RuntimeError(f"Could not load {full_path_weights}, check warnings!")
     return wrapped_xgb(model=model, scale=scale, center=center, variables=variables)
 
 
@@ -69,6 +73,7 @@ class ChainedQuantileRegression:
         with resources.open_text(
             "higgs_dna.metaconditions.corrections", corrections_summary
         ) as f:
+            logger.debug(f"Loading corrections summary from {corrections_summary}")
             cq_config = json.load(f)
 
         self.transforms: Dict[str, Any] = {}

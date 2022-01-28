@@ -319,6 +319,8 @@ if __name__ == "__main__":
                 env_extra=env_extra,
             )
         elif "lxplus" in args.executor:
+            from dask_lxplus import CernCluster
+
             n_port = 8786
             if not check_port(8786):
                 raise RuntimeError(
@@ -326,12 +328,13 @@ if __name__ == "__main__":
                 )
             import socket
 
-            cluster = HTCondorCluster(
+            cluster = CernCluster(
                 cores=1,
-                memory="2GB",  # hardcoded
-                disk="1GB",
-                death_timeout="60",
-                nanny=False,
+                memory=args.memory,
+                disk="5GB",
+                image_type="singularity",
+                worker_image="/cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/batch-team/dask-lxplus/lxdask-cc7:latest",
+                death_timeout="3600",
                 scheduler_options={"port": n_port, "host": socket.gethostname()},
                 job_extra={
                     "log": "dask_job_output.log",
@@ -339,9 +342,10 @@ if __name__ == "__main__":
                     "error": "dask_job_output.err",
                     "should_transfer_files": "Yes",
                     "when_to_transfer_output": "ON_EXIT",
-                    "+JobFlavour": '"workday"',
+                    "+JobFlavour": '"workday"'
+                    if args.queue is None
+                    else f'"{args.queue}"',
                 },
-                extra=[f"--worker-port {n_port}"],
                 env_extra=env_extra,
             )
         elif "slurm" in args.executor:

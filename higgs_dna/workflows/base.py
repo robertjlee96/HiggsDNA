@@ -28,11 +28,11 @@ vector.register_awkward()
 
 @dataclass
 class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
-    meta: Dict[str, Any]
-    do_systematics: bool
-    apply_trigger: bool
-    trigger_group: str
-    analysis: str
+    meta: Optional[Dict[str, Any]] = None
+    do_systematics: bool = False
+    apply_trigger: bool = False
+    trigger_group: Optional[str] = None
+    analysis: Optional[str] = None
     output_location: Optional[str] = None
     taggers: Optional[List[Any]] = None
     skipCQR: bool = False
@@ -113,11 +113,16 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         logger.debug(
             f"Base path to look for IDMVA weight files: {diphoton_weights_dir}"
         )
-        self.diphoton_mva = load_bdt(
-            os.path.join(
-                diphoton_weights_dir, self.meta["flashggDiPhotonMVA"]["weightFile"]
+
+        try:
+            self.diphoton_mva = load_bdt(
+                os.path.join(
+                    diphoton_weights_dir, self.meta["flashggDiPhotonMVA"]["weightFile"]
+                )
             )
-        )
+        except Exception as e:
+            warnings.warn(f"Could not instantiate diphoton MVA: {e}")
+            self.diphoton_mva = None
 
     def photon_preselection(
         self, photons: awkward.Array, events: awkward.Array

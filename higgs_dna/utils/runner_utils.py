@@ -34,6 +34,13 @@ def get_main_parser():
         required=True,
     )
     parser.add_argument(
+        "--samples",
+        "--json",
+        dest="samplejson",
+        default="dummy_samples.json",
+        help="JSON file containing dataset and file locations (default: %(default)s)",
+    )
+    parser.add_argument(
         "--systs",
         "--systematics",
         dest="systematics",
@@ -41,6 +48,7 @@ def get_main_parser():
         type=str,
         help="Systematic variations file",
     )
+
     parser.add_argument(
         "--no-trigger",
         dest="use_trigger",
@@ -59,13 +67,6 @@ def get_main_parser():
         "--output",
         default=r"output.coffea",
         help="Output filename (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--samples",
-        "--json",
-        dest="samplejson",
-        default="dummy_samples.json",
-        help="JSON file containing dataset and file locations (default: %(default)s)",
     )
 
     # Scale out
@@ -101,6 +102,13 @@ def get_main_parser():
         "(e.g. futures or condor) (default: %(default)s)",
     )
     parser.add_argument(
+        "-m",
+        "--memory",
+        type=str,
+        default="10GB",
+        help="Memory to use for each job in distributed executors (default: %(default)s)",
+    )
+    parser.add_argument(
         "-s",
         "--scaleout",
         type=int,
@@ -114,6 +122,13 @@ def get_main_parser():
         type=int,
         default=250,
         help="The maximum number of nodes to adapt the cluster to. (default: %(default)s)",
+    )
+    parser.add_argument(
+        "-q",
+        "--queue",
+        type=str,
+        default=None,
+        help="Queue to submit jobs to if using slurm/condor (default: %(default)s)",
     )
     parser.add_argument(
         "--voms",

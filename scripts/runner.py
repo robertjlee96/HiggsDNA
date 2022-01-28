@@ -327,18 +327,16 @@ if __name__ == "__main__":
             )
         elif "slurm" in args.executor:
             cluster = SLURMCluster(
-                # queue="all",
+                queue=args.queue,
                 cores=args.workers,
                 processes=args.workers,
-                memory="200 GB",
-                # retries=10,
-                walltime="00:30:00",
+                memory=args.memory,
                 env_extra=env_extra,
             )
         elif "condor" in args.executor:
             cluster = HTCondorCluster(
                 cores=args.workers,
-                memory="4GB",
+                memory=args.memory,
                 disk="4GB",
                 env_extra=env_extra,
             )

@@ -7,7 +7,14 @@ def get_main_parser():
     parser = argparse.ArgumentParser(
         description="Run Hgg Workflows on NanoAOD using coffea processor files"
     )
-    # Inputs
+    # Analysis inputs
+    parser.add_argument(
+        "--json-analysis",
+        dest="json_analysis_file",
+        type=str,
+        help="JSON analysis file where workflow, taggers, metaconditions, samples and systematics are defined.",
+        default=None,
+    )
     parser.add_argument(
         "--wf",
         "--workflow",
@@ -49,6 +56,7 @@ def get_main_parser():
         help="Systematic variations file",
     )
 
+    # File handling information
     parser.add_argument(
         "--no-trigger",
         dest="use_trigger",
@@ -136,6 +144,7 @@ def get_main_parser():
         type=str,
         help="Path to voms proxy, accessible to worker nodes. By default a copy will be made to $HOME.",
     )
+
     # Debugging
     parser.add_argument(
         "--validate",

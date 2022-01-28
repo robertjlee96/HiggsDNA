@@ -12,8 +12,9 @@ from coffea.util import save
 from dask.distributed import Client, Worker, WorkerPlugin
 
 from higgs_dna.utils.runner_utils import get_main_parser
-from higgs_dna.workflows import workflows, taggers
-from higgs_dna.metaconditions import metaconditions
+from higgs_dna.workflows import workflows
+from higgs_dna.workflows import taggers as all_taggers
+from higgs_dna.metaconditions import metaconditions as all_metaconditions
 from higgs_dna.utils.logger_utils import setup_logger
 
 
@@ -22,7 +23,7 @@ def validate(file):
         fin = uproot.open(file)
         return fin["Events"].num_entries
     except Exception:
-        print(f"Corrupted file: {file}")  # noqa
+        print(f"Corrupted file: {file}")
         return
 
 
@@ -68,6 +69,23 @@ if __name__ == "__main__":
     parser = get_main_parser()
     args = parser.parse_args()
 
+    # Check whether a JSON analysis file was provided
+    if args.json_analysis_file is None:
+        workflow = args.workflow
+        taggers = args.taggers
+        metaconditions = args.metaconditions
+        samplejson = args.samplejson
+        systematics = args.systematics
+    else:
+        with open(args.json_analysis_file) as f:
+            analysis = json.load(f)
+        workflow = analysis["workflow"]
+        taggers = analysis["taggers"]
+        metaconditions = analysis["metaconditions"]
+        samplejson = analysis["samplejson"]
+        systematics = analysis["systematics"]
+
+    # Setup logger
     if args.debug:
         log_level = "DEBUG"
     else:
@@ -76,12 +94,14 @@ if __name__ == "__main__":
     logger.info("Start production")
 
     if args.output == parser.get_default("output"):
-        args.output = f'hists_{args.workflow}_{(args.samplejson).replace("/","_").rstrip(".json")}.coffea'
+        args.output = (
+            f'hists_{workflow}_{(samplejson).replace("/","_").rstrip(".json")}.coffea'
+        )
 
     # load dataset
     xrootd_pfx = "root://"
     xrd_pfx_len = len(xrootd_pfx)
-    with open(args.samplejson) as f:
+    with open(samplejson) as f:
         sample_dict = json.load(f)
     for key in sample_dict.keys():
         sample_dict[key] = sample_dict[key][: args.limit]
@@ -101,10 +121,10 @@ if __name__ == "__main__":
             sample_dict = dict([(args.only, sample_dict[args.only])])
         if "*" in args.only:  # wildcard for datasets
             _new_dict = {}
-            print("Will only process the following datasets:")  # noqa
+            logger.debug("Will only process the following datasets:")
             for k, v in sample_dict.items():
                 if k.lstrip("/").startswith(args.only.rstrip("*")):
-                    print("    ", k)  # noqa
+                    logger.debug("    ", k)
                     _new_dict[k] = v
             sample_dict = _new_dict
         else:  # is file
@@ -129,33 +149,33 @@ if __name__ == "__main__":
             _results = list(_rmap)
             counts = np.sum([r for r in _results if r is not None])
             all_invalid += [r for r in _results if type(r) == str]
-            print("Events:", np.sum(counts))  # noqa
-        print("Bad files:")  # noqa
+            logger.debug("Events:", np.sum(counts))
+        logger.debug("Bad files:")
         for fi in all_invalid:
-            print(f"  {fi}")  # noqa
+            logger.debug(f"  {fi}")
         end = time.time()
-        print("TIME:", time.strftime("%H:%M:%S", time.gmtime(end - start)))  # noqa
+        logger.debug("TIME:", time.strftime("%H:%M:%S", time.gmtime(end - start)))
         if input("Remove bad files? (y/n)") == "y":
-            print("Removing:")  # noqa
+            logger.debug("Removing:")
             for fi in all_invalid:
-                print(f"Removing: {fi}")  # noqa
+                logger.debug(f"Removing: {fi}")
                 os.system(f"rm {fi}")
         sys.exit(0)
 
     # load workflow
-    if args.workflow in workflows:
+    if workflow in workflows:
         wf_taggers = None
-        if args.taggers is not None:
-            for tagger in args.taggers:
-                if tagger not in taggers.keys():
+        if taggers is not None:
+            for tagger in taggers:
+                if tagger not in all_taggers.keys():
                     raise NotImplementedError
-            wf_taggers = [taggers[tagger]() for tagger in args.taggers]
+            wf_taggers = [taggers[tagger]() for tagger in all_taggers]
         with resources.open_text(
-            "higgs_dna.metaconditions", metaconditions[args.metaconditions]
+            "higgs_dna.metaconditions", all_metaconditions[metaconditions]
         ) as f:
-            processor_instance = workflows[args.workflow](
+            processor_instance = workflows[workflow](
                 json.load(f),
-                args.systematics,
+                systematics,
                 args.use_trigger,
                 args.dump,
                 wf_taggers,
@@ -199,7 +219,6 @@ if __name__ == "__main__":
             f'source {os.environ["HOME"]}/.bashrc',
         ]
 
-    #########
     # Execute
     if args.executor in ["futures", "iterative"]:
         if args.executor == "iterative":
@@ -343,13 +362,13 @@ if __name__ == "__main__":
 
         if args.executor == "dask/casa":
             client = Client("tls://localhost:8786")
-            print("Waiting for at least one worker...")  # noqa
+            logger.info("Waiting for at least one worker...")
             # client.wait_for_workers(1)
             client.register_worker_plugin(dependency_installer)
         else:
             cluster.adapt(minimum=args.scaleout, maximum=args.max_scaleout)
             client = Client(cluster)
-            print("Waiting for at least one worker...")  # noqa
+            logger.info("Waiting for at least one worker...")
             client.wait_for_workers(1)
         with performance_report(filename="dask-report.html"):
             output = processor.run_uproot_job(
@@ -369,5 +388,4 @@ if __name__ == "__main__":
 
     save(output, args.output)
 
-    print(output)  # noqa
-    print(f"Saving output to {args.output}")  # noqa
+    logger.info(f"Saving output to {args.output}")

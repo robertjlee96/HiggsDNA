@@ -117,6 +117,12 @@ def get_main_parser():
         help="Memory to use for each job in distributed executors (default: %(default)s)",
     )
     parser.add_argument(
+        "--walltime",
+        type=str,
+        default="01:00:00",
+        help="Walltime to use for each job in distributed executors (default: %(default)s)",
+    )
+    parser.add_argument(
         "-s",
         "--scaleout",
         type=int,

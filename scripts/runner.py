@@ -350,6 +350,7 @@ if __name__ == "__main__":
                 cores=args.workers,
                 processes=args.workers,
                 memory=args.memory,
+                walltime=args.walltime,
                 env_extra=env_extra,
             )
         elif "condor" in args.executor:

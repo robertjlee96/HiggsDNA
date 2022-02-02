@@ -1,5 +1,2 @@
 Examples
 ========
-
-.. toctree::
-   ../../notebooks/basics

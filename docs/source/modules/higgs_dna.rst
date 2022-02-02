@@ -14,6 +14,7 @@ Subpackages
 
    higgs_dna.metaconditions
    higgs_dna.samples
+   higgs_dna.selections
    higgs_dna.systematics
    higgs_dna.tools
    higgs_dna.utils

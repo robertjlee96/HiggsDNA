@@ -14,3 +14,21 @@ Submodules
    :members:
    :undoc-members:
    :show-inheritance:
+
+
+.. automodule:: higgs_dna.samples.file
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+.. automodule:: higgs_dna.samples.sample
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+.. automodule:: higgs_dna.samples.sample_manager
+   :members:
+   :undoc-members:
+   :show-inheritance:

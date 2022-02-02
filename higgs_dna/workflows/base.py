@@ -289,9 +289,16 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
 
         triggered = awkward.ones_like(filtered)
         if self.apply_trigger:
+            trigger_names = []
             triggers = self.meta["TriggerPaths"][self.trigger_group][self.analysis]
+            hlt = events.HLT
+            for trigger in triggers:
+                actual_trigger = trigger.replace("HLT_", "").replace("*", "")
+                for field in hlt.fields:
+                    if field.startswith(actual_trigger):
+                        trigger_names.append(field)
             triggered = functools.reduce(
-                operator.or_, (events.HLT[trigger[4:-1]] for trigger in triggers)
+                operator.or_, (hlt[trigger_name] for trigger_name in trigger_names)
             )
 
         return events[filtered & triggered]

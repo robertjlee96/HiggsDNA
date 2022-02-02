@@ -49,7 +49,9 @@ docs-gen:
   stage: docs-gen
   image: gitlab-registry.cern.ch/ci-tools/ci-worker:cc7
   script:
-  - yum -y install python3 pip3 locmap
+  - yum -y install python3 pip3 locmap python-setuptools
+  - pip install Cython
+  - pip3 install -e .[dev]
   - pip3 install sphinx breathe sphinx_rtd_theme sphinx-argparse nbsphinx
   - mkdir "$CI_OUTPUT_DIR"
   - cd docs/source

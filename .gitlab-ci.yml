@@ -1,5 +1,5 @@
 variables:
-  EOS_PATH: "/eos/user/g/gallim/www/docs/HiggsDNA"
+  EOS_PATH: "/eos/user/h/higgsdna/www"
   CI_OUTPUT_DIR: "public"
 
 image: "python:3.9"
@@ -35,6 +35,11 @@ unit_test:
     - pytest
 
 # Generate docs
+# This mappazzone is the result of a six hours attempt of finding a way
+# to properly execute and render the notebooks as part of the documentation.
+# The whole thing can (and should) be changed (especially considering that docs should
+# in principle be deployed in a separate branch in the repo's domain) but be careful...
+# CERN's infrastructures do not make things easy :)
 docs-gen-conda-build:
   stage: docs-gen-conda-build
   image: continuumio/miniconda3:latest

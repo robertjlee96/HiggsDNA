@@ -47,9 +47,14 @@ conda_build:
 # Generate docs
 docs-gen:
   stage: docs-gen
-  image: gitlab-registry.cern.ch/ci-tools/ci-worker:cc7
+  image: gitlab-registry.cern.ch/ci-tools/ci-worker:c8
   script:
-  - yum -y install python3 pip3 locmap python-setuptools
+  - dnf makecache --refresh
+  - dnf -y install pandoc
+  - pip3 install virtualenv
+  - virtualenv /tmp/higgs_dna
+  - source /tmp/higgs_dna/bin/activate
+  - pip3 install -e .[dev]
   - pip3 install sphinx breathe sphinx_rtd_theme sphinx-argparse nbsphinx
   - mkdir "$CI_OUTPUT_DIR"
   - cd docs/source

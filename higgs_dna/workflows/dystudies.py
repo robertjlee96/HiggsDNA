@@ -69,6 +69,9 @@ class TagAndProbeProcessor(HggBaseProcessor):
         # apply filters and triggers
         events = self.apply_filters_and_triggers(events)
 
+        # apply scales factors and smearings
+        events = self.apply_EGM_scale_smear_corrections(events)
+
         # modifications to photons
         photons = events.Photon
 

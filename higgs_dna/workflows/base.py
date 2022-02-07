@@ -303,6 +303,18 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
 
         return events[filtered & triggered]
 
+    def apply_EGM_scale_smear_corrections(self, events: awkward.Array) -> awkward.Array:
+        photons = events.Photon
+        events["Photon", "pt_uncorr"] = photons.pt
+        events["Photon", "mass_uncorr"] = photons.mass
+        events["Photon", "energy_uncorr"] = photons.energy
+
+        events["Photon", "pt"] = photons.pt * photons.eCorr
+        events["Photon", "mass"] = photons.mass * photons.eCorr
+        events["Photon", "energy"] = photons.energy * photons.eCorr
+
+        return events
+
     def process(self, events: awkward.Array) -> Dict[Any, Any]:
         # data or monte carlo?
         self.data_kind = "mc" if "GenPart" in awkward.fields(events) else "data"

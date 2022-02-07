@@ -92,12 +92,24 @@ class TagAndProbeProcessor(HggBaseProcessor):
             gen_particles = gen_particles[gen_indices]
             gen_particles = gen_particles[gen_particles.genPartIdxMother == 23]
 
-        # TODO: HLT matching for data
+        # HLT matching for data
+        # keep only photons for which there is at least one TriggerObject at less than 0.3 deltaR
+        if self.data_kind == "data":
+            trigger_objects = events.TrigObj
+            mval = photons.metric_table(trigger_objects)
+            photons = photons[ak.any(mval < 0.3, axis=-1)]
 
         # double the number of diphoton candidates (each item in the pair can be both a tag and a probe)
         tnp = ak.combinations(photons, 2, fields=["tag", "probe"])
         pnt = ak.combinations(photons, 2, fields=["probe", "tag"])
         tnp_candidates = ak.concatenate([tnp, pnt], axis=1)
+        fmom = tnp_candidates["tag"] + tnp_candidates["probe"]
+        tnp_candidates["pt"] = fmom.pt
+        tnp_candidates["eta"] = fmom.eta
+        tnp_candidates["phi"] = fmom.phi
+        tnp_candidates["mass"] = fmom.mass
+        tnp_candidates["charge"] = fmom.charge
+        tnp_candidates = ak.with_name(tnp_candidates, "PtEtaPhiMCandidate")
 
         # check that the e+/e- matched to tag and probe are not the same particle
         if self.data_kind == "mc":

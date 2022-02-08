@@ -1,3 +1,4 @@
+=================
 Working with Dask
 =================
 
@@ -6,16 +7,19 @@ Working with Dask
 Since it could be difficult to use at first, here we try to summarize the main troubles one could face and some tips to get the most out of this tool.
 
 
+---------------
 Troubleshooting
 ---------------
 
 Here is a collection of known possible issues that could arise when working with Dask:
 
-#. ``KilledWorker``
+KilledWorker
+------------
 
    The reason why this happens is explained clearly in `this answer <https://stackoverflow.com/questions/46691675/what-do-killedworker-exceptions-mean-in-dask>`_. When this happens, it's a good idea to run the analysis flow in iterative mode and a single file: in this way the real error can be seen and fixed. If this doesn't produce any error, than the job might be using too much memory and you have to increase it.
 
 
+------------------------
 Connect to the Dashboard
 ------------------------
 

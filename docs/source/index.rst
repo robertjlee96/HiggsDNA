@@ -11,6 +11,7 @@ HiggsDNA (Higgs to Diphoton NanoAOD Framework) is the tool used for Higgs to dip
 .. toctree::
    installation
    concepts
+   dask
    developers
    examples
    api

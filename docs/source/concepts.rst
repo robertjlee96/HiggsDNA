@@ -12,16 +12,16 @@ If you want to run an analysis with processors and taggers that have already bee
 
 Following are the main parts of the analysis that can be configured through the command line:
 
-* datasets
+* ``datasets``:
   path to a JSON file in the form ``{"dataset_name": [list_of_files]}`` (like the one dumped by dasgoclient)
-* workflow
+* ``workflow``:
   the coffea processor you want to use to process you data, can be found in the modules located inside the subpackage ``higgs_dna.workflows``
-* metaconditions
+* ``metaconditions``:
   the name (without ``.json`` extension) of one of the JSON files inherited from FLASHgg and located inside ``higgs_dna.metaconditions``
-* taggers
+* ``taggers``:
   the set of taggers you want to use, can be found in the modules located inside the subpackage ``higgs_dna/workflows/taggers``
 
-Here is how these information `can` be passed to through command line:
+Here is how these information `can` be passed to the command line:
 
 .. code-block:: bash
 
@@ -45,6 +45,31 @@ where ``simple_analysis.json`` looks like this:
                 "DummyTagger1"
             ]
         }
+
+The next two flags that you will want to specify are ``dump`` and ``executor``: the former receives the path to a directory where the parquet output files will be stored, while the latter specifies the Coffea executor used to process the chunks of data. It can be one of the following:
+
+* ``iterative``
+* ``futures``
+* ``dask/condor``
+* ``dask/slurm``
+* ``dask/lpc``
+* ``dask/lxplus``
+* ``dask/casa``
+* ``parsl/slurm``
+* ``parsl/condor``
+
+There are then a few other options that depend on the backend. When running with Dask, for instance, you may want to use the command line to change the following parameters:
+
+* ``workers``:
+  number processes/threads used **on the same node** (this means that every job will use this amount of cores)
+* ``scaleout``:
+  minimum number of nodes to scale out to (i.e. minimum number of jobs submitted)
+* ``max-scaleout``:
+  maximum number of nodes to adapt your cluster to (i.e. maximum number of jobs submitted)
+
+As usual, a description of all the options is printed when running::
+
+        run_analysis.py --help
 
 
 .. _def-processor:

@@ -50,6 +50,7 @@ docs-gen-conda-build:
     - mamba install -c anaconda -c conda-forge sphinx breathe sphinx_rtd_theme sphinx-argparse nbsphinx ipython ipywidgets
     - pip install -e .
     - cd docs/
+    - sphinx-apidoc -o source/modules ../higgs_dna
     - sphinx-build source build/html
     - cd -
     - mkdir "$CI_OUTPUT_DIR"

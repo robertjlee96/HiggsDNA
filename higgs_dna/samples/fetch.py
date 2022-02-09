@@ -61,9 +61,9 @@ def get_dataset_dict(fset, xrd, dbs_instance):
     for name, dataset in fset:
         flist = (
             os.popen(
-                (
-                    "/cvmfs/cms.cern.ch/common/dasgoclient -query='instance={} file dataset={}'"
-                ).format(dbs_instance, dataset)
+                ("dasgoclient -query='instance={} file dataset={}'").format(
+                    dbs_instance, dataset
+                )
             )
             .read()
             .split("\n")

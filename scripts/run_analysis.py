@@ -11,7 +11,7 @@ from coffea import processor
 from coffea.util import save
 from dask.distributed import Client, Worker, WorkerPlugin
 
-from higgs_dna.utils.runner_utils import get_main_parser
+from higgs_dna.utils.runner_utils import get_main_parser, get_proxy
 from higgs_dna.workflows import workflows
 from higgs_dna.workflows import taggers as all_taggers
 from higgs_dna.metaconditions import metaconditions as all_metaconditions
@@ -192,22 +192,7 @@ if __name__ == "__main__":
         if args.voms is not None:
             _x509_path = args.voms
         else:
-            try:
-                _x509_localpath = (
-                    [
-                        line
-                        for line in os.popen("voms-proxy-info").read().split("\n")
-                        if line.startswith("path")
-                    ][0]
-                    .split(":")[-1]
-                    .strip()
-                )
-            except Exception as err:
-                raise RuntimeError(
-                    "x509 proxy could not be parsed, try creating it with 'voms-proxy-init'"
-                ) from err
-            _x509_path = os.environ["HOME"] + f'/.{_x509_localpath.split("/")[-1]}'
-            os.system(f"cp {_x509_localpath} {_x509_path}")
+            _x509_path = get_proxy()
 
         env_extra = [
             "export XRD_RUNFORKHANDLER=1",

@@ -1,6 +1,12 @@
 from higgs_dna.workflows import workflows, taggers
 from higgs_dna.metaconditions import metaconditions
 import argparse
+import os
+import subprocess
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def get_main_parser():
@@ -203,3 +209,31 @@ def get_main_parser():
     )
 
     return parser
+
+
+def get_proxy():
+    """
+    Use voms-proxy-info to check if a proxy is available.
+    If so, copy it to $HOME/.proxy and return the path.
+    An exception is raised in the following cases:
+    - voms-proxy-info is not installed
+    - the proxy is not valid
+
+    :return: Path to proxy
+    :rtype: str
+    """
+    if not subprocess.getstatusoutput("voms-proxy-info")[0]:
+        raise RuntimeError("voms-proxy-init not found. Please install it.")
+
+    stat, out = subprocess.getstatusoutput("voms-proxy-info -e -p")
+    # stat is 0 the proxy is valid
+    if stat:
+        raise RuntimeError("No valid proxy found. Please create one.")
+
+    _x509_localpath = out.strip().split("/")[-1]
+    _x509_path = os.environ["HOME"] + f'/.{_x509_localpath.split("/")[-1]}'
+    os.system(f"cp {_x509_localpath} {_x509_path}")
+
+    logger.debug(f"Copied proxy to {_x509_path}")
+
+    return _x509_path

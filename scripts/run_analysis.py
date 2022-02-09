@@ -331,7 +331,7 @@ if __name__ == "__main__":
             cluster = CernCluster(
                 cores=1,
                 memory=args.memory,
-                disk="5GB",
+                disk=args.disk,
                 image_type="singularity",
                 worker_image="/cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/batch-team/dask-lxplus/lxdask-cc7:latest",
                 death_timeout="3600",

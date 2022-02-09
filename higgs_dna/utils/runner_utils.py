@@ -123,6 +123,12 @@ def get_main_parser():
         help="Walltime to use for each job in distributed executors (default: %(default)s)",
     )
     parser.add_argument(
+        "--disk",
+        type=str,
+        default="20GB",
+        help="Disk space to use for each job in distributed executors (default: %(default)s)",
+    )
+    parser.add_argument(
         "-s",
         "--scaleout",
         type=int,

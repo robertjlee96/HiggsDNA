@@ -6,17 +6,20 @@ image: "python:3.9"
 
 stages:
   - build
-#  - static analysis
+  - static analysis
   - test
   - docs-gen-conda-build
   - docs-deploy
 
-#static_analysis:
-#  stage: static analysis
-#  before_script:
-#    - pip install flake8
-#  script:
-#    - flake8 higgs_dna/*
+static_analysis:
+  stage: static analysis
+  before_script:
+    - pip install flake8
+    - pip install mypy --quiet
+  script:
+    - flake8 higgs_dna/*
+    - mypy higgs_dna
+  allow_failure: true
 
 build:
   stage: build

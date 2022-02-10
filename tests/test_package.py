@@ -18,7 +18,8 @@ def test_metaconditions():
     1. Check that by opening the metacondition files with this procedure we get dictionaries
     """
     from higgs_dna.metaconditions import metaconditions
+
     for json_file in metaconditions.values():
         with resources.open_text("higgs_dna.metaconditions", json_file) as f:
-            dct  = json.load(f)
+            dct = json.load(f)
             assert isinstance(dct, dict)

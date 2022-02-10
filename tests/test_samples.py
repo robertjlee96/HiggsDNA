@@ -1,4 +1,3 @@
-from higgs_dna.utils.runner_utils import get_proxy
 from higgs_dna.samples.fetch import get_dataset_dict
 import pytest
 from subprocess import getstatusoutput

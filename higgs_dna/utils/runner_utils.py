@@ -222,12 +222,12 @@ def get_proxy():
     :return: Path to proxy
     :rtype: str
     """
-    if not subprocess.getstatusoutput("voms-proxy-info")[0]:
+    if subprocess.getstatusoutput("voms-proxy-info")[0] != 0:
         raise RuntimeError("voms-proxy-init not found. Please install it.")
 
     stat, out = subprocess.getstatusoutput("voms-proxy-info -e -p")
     # stat is 0 the proxy is valid
-    if stat:
+    if stat != 0:
         raise RuntimeError("No valid proxy found. Please create one.")
 
     _x509_localpath = out.strip().split("/")[-1]

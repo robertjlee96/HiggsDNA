@@ -86,11 +86,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
             # keep only photons matched to gen e+ or e-
             photons = photons[photons.genPartFlav == 11]
 
-            # make sure that the matched e+/e- comes from a Z
-            gen_particles = events.GenPart
-            gen_indices = photons.genPartIdx[photons.genPartIdx != -1]
-            gen_particles = gen_particles[gen_indices]
-            gen_particles = gen_particles[gen_particles.genPartIdxMother == 23]
+            # TODO: make sure that the matched e+/e- comes from a Z
 
         # HLT matching for data
         # keep only photons for which there is at least one TriggerObject at less than 0.3 deltaR

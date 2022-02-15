@@ -28,7 +28,7 @@ vector.register_awkward()
 
 @dataclass
 class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
-    meta: Optional[Dict[str, Any]] = None
+    meta: Dict[str, Any]
     do_systematics: bool = False
     apply_trigger: bool = False
     trigger_group: Optional[str] = None
@@ -74,7 +74,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.prefixes = {"pho_lead": "lead", "pho_sublead": "sublead"}
 
         # build the chained quantile regressions
-        self.chained_quantile = None
         if not self.skipCQR:
             try:
                 self.chained_quantile: Optional[
@@ -82,8 +81,10 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 ] = ChainedQuantileRegression(**self.meta["PhoIdInputCorrections"])
             except Exception as e:
                 warnings.warn(f"Could not instantiate ChainedQuantileRegression: {e}")
+                self.chained_quantile = None
         else:
             logger.info("Skipping CQR as required")
+            self.chained_quantile = None
 
         # initialize photonid_mva
         photon_id_mva_dir = os.path.dirname(photon_id_mva_weights.__file__)

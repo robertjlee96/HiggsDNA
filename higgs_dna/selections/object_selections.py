@@ -1,7 +1,9 @@
-import awkward as ak
+import awkward  # type: ignore
 
 
-def delta_r_mask(first, second, threshold):
+def delta_r_mask(
+    first: awkward.highlevel.Array, second: awkward.highlevel.Array, threshold: float
+) -> awkward.highlevel.Array:
     """
     Select objects from first which are at least threshold away from all objects in second.
     The result is a mask (i.e., a boolean array) of the same shape as first.
@@ -16,4 +18,4 @@ def delta_r_mask(first, second, threshold):
     :rtype: coffea.nanoevents.methods.candidate.PtEtaPhiMCandidate
     """
     mval = first.metric_table(second)
-    return ak.all(mval > threshold, axis=-1)
+    return awkward.all(mval > threshold, axis=-1)

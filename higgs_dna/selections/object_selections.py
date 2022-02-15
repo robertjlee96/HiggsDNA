@@ -1,4 +1,4 @@
-import awkward  # type: ignore
+import awkward
 
 
 def delta_r_mask(

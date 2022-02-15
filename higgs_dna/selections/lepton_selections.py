@@ -1,5 +1,5 @@
 from higgs_dna.selections.object_selections import delta_r_mask
-import awkward  # type: ignore
+import awkward
 
 
 def select_electrons(

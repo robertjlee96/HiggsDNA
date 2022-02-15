@@ -3,6 +3,7 @@ from higgs_dna.utils.logger_utils import setup_logger
 import argparse
 import json
 import os
+from typing import List, Iterable, Dict
 
 xrootd_pfx = {
     "Americas": "root://cmsxrootd.fnal.gov/",
@@ -11,7 +12,7 @@ xrootd_pfx = {
 }
 
 
-def get_fetcher_args():
+def get_fetcher_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Query dasgoclient for dataset file lists"
     )
@@ -47,7 +48,9 @@ def get_fetcher_args():
     return parser.parse_args()
 
 
-def get_dataset_dict(fset, xrd, dbs_instance):
+def get_dataset_dict(
+    fset: Iterable[Iterable[str]], xrd: str, dbs_instance: str
+) -> Dict[str, List[str]]:
     """
     Get a dictionary of dataset and the files in it.
 

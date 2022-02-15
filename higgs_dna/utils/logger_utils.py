@@ -1,11 +1,12 @@
 import logging
 from rich.logging import RichHandler
 from rich.console import Console
+from typing import Optional
 
 LOGGER_NAME = "higgs_dna"
 
 
-def setup_logger(level="INFO", logfile=None):
+def setup_logger(level: str = "INFO", logfile: Optional[str] = None) -> logging.Logger:
     """Setup a logger that uses RichHandler to write the same message both in stdout
     and in a log file called logfile. Level of information can be customized and
     dumping a logfile is optional.

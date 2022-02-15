@@ -1,11 +1,12 @@
 [tool.mypy]
-files = "higgs_dna"
+files = "src"
 python_version = "3.7"
 warn_unused_configs = true
 
 disallow_any_generics = true
 disallow_subclassing_any = true
-disallow_untyped_calls = true
+# Error: Call to untyped function "bad" in typed context  [no-untyped-call]
+disallow_untyped_calls = false
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 check_untyped_defs = true

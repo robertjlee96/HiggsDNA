@@ -5,7 +5,7 @@ from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_m
 from higgs_dna.metaconditions import photon_id_mva_weights
 from higgs_dna.metaconditions import diphoton as diphoton_mva_dir
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import functools
 import operator
 import os
@@ -34,7 +34,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
     trigger_group: Optional[str] = None
     analysis: Optional[str] = None
     output_location: Optional[str] = None
-    taggers: Optional[List[Any]] = None
+    taggers: List[Any] = field(default_factory=list)
     skipCQR: bool = False
 
     # diphoton preselection cuts
@@ -67,8 +67,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
     def __post_init__(self) -> None:
         logger.debug(f"Setting up processor with metaconditions: {self.meta}")
 
-        if self.taggers is None:
-            self.taggers = []
         self.taggers.sort(key=lambda x: x.priority)  # type: ignore
 
         self.prefixes = {"pho_lead": "lead", "pho_sublead": "sublead"}
@@ -234,8 +232,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         xrootd = False
         if xrd_prefix in location:
             try:
-                import XRootD
-                import XRootD.client
+                import XRootD  # type: ignore
+                import XRootD.client  # type: ignore
 
                 xrootd = True
             except ImportError as err:
@@ -382,7 +380,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     for tagger in self.taggers
                 ),
                 axis=1,
-            )
+            )  # type: ignore
             tags = awkward.from_regular(awkward.unflatten(flat_tags, counts), axis=2)
             winner = awkward.min(tags[tags != 0], axis=2)
             diphotons["best_tag"] = winner

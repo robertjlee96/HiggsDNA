@@ -20,5 +20,9 @@ strict_equality = true
 
 # https://mypy.readthedocs.io/en/stable/config_file.html#using-a-pyproject-toml-file
 [[tool.mypy.overrides]]
-module = "awkward"
+module = [
+    "awkward",
+    "coffea",
+    "pandas"
+]
 ignore_missing_imports = true

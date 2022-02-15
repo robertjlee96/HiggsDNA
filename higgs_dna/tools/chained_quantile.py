@@ -53,7 +53,7 @@ def create_evaluator(
     center: Optional[float] = None,
     variables: Optional[List[str]] = None,
     **kwargs: Dict[Any, Any],
-) -> xgboost.Booster:
+) -> wrapped_xgb:
     full_path_weights = f"{corrections_dir}/{weights}"
     model = load_bdt(full_path_weights)
     if model is None:

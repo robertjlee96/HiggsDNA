@@ -77,7 +77,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.taggers = []
         if taggers is not None:
             self.taggers = taggers
-            self.taggers.sort(key=lambda x: x.priority)  # type: ignore
+            self.taggers.sort(key=lambda x: x.priority)
 
         self.prefixes = {"pho_lead": "lead", "pho_sublead": "sublead"}
 

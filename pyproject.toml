@@ -14,7 +14,8 @@ disallow_untyped_decorators = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-warn_return_any = true
+# https://mypy.readthedocs.io/en/stable/error_code_list2.html#check-that-function-does-not-return-any-value-no-any-return
+warn_return_any = false
 no_implicit_reexport = true
 strict_equality = true
 

@@ -136,6 +136,10 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
     def photon_preselection(
         self, photons: awkward.Array, events: awkward.Array
     ) -> awkward.Array:
+        """
+        Apply preselection cuts to photons.
+        Note that these selections are applied on each photon, it is not based on the diphoton pair.
+        """
         # hlt-mimicking cuts
         rho = events.fixedGridRhoAll * awkward.ones_like(photons.pt)
         photon_abs_eta = numpy.abs(photons.eta)
@@ -383,14 +387,16 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         if len(self.taggers):
             counts = awkward.num(diphotons.pt, axis=1)
             flat_tags = numpy.stack(
-                (
-                    awkward.flatten(
-                        diphotons["_".join([tagger.name, str(tagger.priority)])]
+                [
+                    awkward.to_numpy(
+                        awkward.flatten(
+                            diphotons["_".join([tagger.name, str(tagger.priority)])]
+                        )
                     )
                     for tagger in self.taggers
-                ),
+                ],
                 axis=1,
-            )  # type: ignore
+            )
             tags = awkward.from_regular(awkward.unflatten(flat_tags, counts), axis=2)
             winner = awkward.min(tags[tags != 0], axis=2)
             diphotons["best_tag"] = winner

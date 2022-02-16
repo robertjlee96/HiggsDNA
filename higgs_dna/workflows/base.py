@@ -220,6 +220,14 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         ]
 
     def diphoton_list_to_pandas(self, diphotons: awkward.Array) -> pandas.DataFrame:
+        """
+        Convert diphoton array to pandas dataframe.
+        By default the observables related to each item of the diphoton pair are
+        stored preceded by its prefix (e.g. 'lead', 'sublead').
+        The observables related to the diphoton pair are stored with no prefix.
+        To change the behavior, you can redefine the `diphoton_list_to_pandas` method in the
+        derived class.
+        """
         output = pandas.DataFrame()
         for field in awkward.fields(diphotons):
             prefix = self.prefixes.get(field, "")
@@ -240,6 +248,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         location: str,
         subdirs: Optional[List[str]] = None,
     ) -> None:
+        """
+        Dump a pandas dataframe to disk at location/'/'.join(subdirs)/fname.
+        """
         subdirs = subdirs or []
         xrd_prefix = "root://"
         pfx_len = len(xrd_prefix)

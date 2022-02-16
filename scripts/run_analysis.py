@@ -169,7 +169,7 @@ if __name__ == "__main__":
             for tagger in taggers:
                 if tagger not in all_taggers.keys():
                     raise NotImplementedError
-            wf_taggers = [taggers[tagger]() for tagger in all_taggers]
+            wf_taggers = [all_taggers[tagger]() for tagger in taggers]
         with resources.open_text(
             "higgs_dna.metaconditions", all_metaconditions[metaconditions]
         ) as f:

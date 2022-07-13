@@ -50,7 +50,8 @@ docs-gen-conda-build:
     - conda install -c conda-forge mamba
     - mamba env create -f environment.yml
     - source activate higgs-dna
-    - mamba install -c anaconda -c conda-forge sphinx breathe sphinx_rtd_theme sphinx-argparse nbsphinx ipython ipywidgets
+    - mamba install -c anaconda -c conda-forge sphinx breathe sphinx_rtd_theme sphinx-argparse nbsphinx ipython ipywidgets nbconvert=5.5.0 jinja2=3.0.3
+    - mamba install pandoc
     - pip install -e .
     - cd docs/
     - sphinx-apidoc -o source/modules ../higgs_dna

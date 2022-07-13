@@ -67,8 +67,8 @@ docs-gen-conda-build:
 # Deploy to an EOS folder the contents generated
 deployment:
   stage: docs-deploy
-    #only:
-    #- master
+  only:
+    - master
   # Custom docker image providing the needed tools to deploy in EOS
   image: gitlab-registry.cern.ch/ci-tools/ci-web-deployer:latest
   script:

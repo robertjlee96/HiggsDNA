@@ -1,0 +1,34 @@
+name: rtd
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.6
+  - ipython
+  - pyaml
+  - xrootd
+  - uproot
+  - awkward>=1.5
+  - numba
+  - pyarrow
+  - pandas
+  - rich
+  - matplotlib
+  - vector
+  - conda-pack
+  - tqdm
+  - coffea
+  - xgboost
+  - dask
+  - distributed
+  - dask-jobqueue
+  - sphinx
+  - breathe
+  - sphinx_rtd_theme
+  - sphinx-argparse
+  - nbsphinx
+  - ipywidgets
+  - nbconvert>=5.5.0
+  - jinja2>=3.0.3
+  - pandoc
+

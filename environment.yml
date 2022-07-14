@@ -3,6 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - python>=3.6
+  - ipython
   - pyaml
   - xrootd
   - uproot
@@ -15,3 +16,8 @@ dependencies:
   - vector
   - conda-pack
   - tqdm
+  - coffea
+  - xgboost
+  - dask
+  - distributed
+  - dask-jobqueue

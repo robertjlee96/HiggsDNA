@@ -1,10 +1,14 @@
+from higgs_dna.utils.metis_utils import do_cmd
+
 import os
 import sys
 import json
 import copy
 
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 def load_config(config):
     """
@@ -20,14 +24,20 @@ def load_config(config):
 
     elif isinstance(config, str):
         if not config.endswith(".json"):
-            logger.warning("[load_config] : You specified a string, meaning we load config options from a json file, but %s does not look like a json file!" % config)
+            logger.warning(
+                "[load_config] : You specified a string, meaning we load config options from a json file, but %s does not look like a json file!"
+                % config
+            )
 
         with open(expand_path(config), "r") as f_in:
             options = json.load(f_in)
             return options
 
     else:
-        message = "[load_config] : You tried to load a config file with '%s' which has type <%s>, but only loading from json file (<str>) or <dict> are supported." % (str(config), str(type(config)))
+        message = (
+            "[load_config] : You tried to load a config file with '%s' which has type <%s>, but only loading from json file (<str>) or <dict> are supported."
+            % (str(config), str(type(config)))
+        )
         logger.exception(message)
         raise TypeError(message)
 
@@ -43,9 +53,12 @@ def get_module(module_name):
     :rtype: module
     """
     if module_name not in sys.modules:
-        logger.exception("[misc_utils : get_module] Module '%s' has not been imported. Please add 'import %s' to your analysis script" % (module_name, module_name))
+        logger.exception(
+            "[misc_utils : get_module] Module '%s' has not been imported. Please add 'import %s' to your analysis script"
+            % (module_name, module_name)
+        )
         raise ImportError()
-        
+
     return sys.modules[module_name]
 
 
@@ -75,7 +88,7 @@ def update_dict(original, new):
     """
     Update nested dictionary (dictionary possibly containing dictionaries)
     If a field is present in new and original, take the value from new.
-    If a field is present in new but not original, insert this field 
+    If a field is present in new but not original, insert this field
 
 
     :param original: source dictionary
@@ -97,7 +110,7 @@ def update_dict(original, new):
 
     return updated
 
-from higgs_dna.utils.metis_utils import do_cmd
+
 def check_proxy():
     """
     Check if a valid grid proxy exists.
@@ -122,7 +135,10 @@ def check_proxy():
             bad_proxy = True
 
     if proxy is None or bad_proxy:
-        logger.warning("[misc_utils : check_proxy] We were not able to find grid proxy or proxy was found to be expired. Output of 'voms-proxy-info': %s" % (str(proxy_info)))
+        logger.warning(
+            "[misc_utils : check_proxy] We were not able to find grid proxy or proxy was found to be expired. Output of 'voms-proxy-info': %s"
+            % (str(proxy_info))
+        )
         return None
 
     else:

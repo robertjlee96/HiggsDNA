@@ -1,9 +1,10 @@
 import awkward
-import numpy
 import logging
+
 logger = logging.getLogger(__name__)
 
-def systematic_from_bins(bins, variables, central_only = False):
+
+def systematic_from_bins(bins, variables, central_only=False):
     """
     Function for calculating weight variations from bins which give the value and uncertainty.
     :param bins: dictionary containing variables used for binning and a list of the bins and their corresponding values
@@ -43,34 +44,28 @@ def systematic_from_bins(bins, variables, central_only = False):
                 bin_cut = bin_cut & cut
 
         # Update values of events in this bin
-        weight = awkward.where(
-                bin_cut,
-                weight * bin["value"],
-                weight
-        )
+        weight = awkward.where(bin_cut, weight * bin["value"], weight)
 
         if not central_only:
             weight_up = awkward.where(
-                    bin_cut,
-                    weight_up * (bin["value"] + bin["uncertainty"]),
-                    weight_up
+                bin_cut, weight_up * (bin["value"] + bin["uncertainty"]), weight_up
             )
 
             weight_down = awkward.where(
-                    bin_cut,
-                    weight_down * (bin["value"] - bin["uncertainty"]),
-                    weight_down
+                bin_cut, weight_down * (bin["value"] - bin["uncertainty"]), weight_down
             )
 
-    variations = { "central" : weight }
+    variations = {"central": weight}
     if not central_only:
-        variations["up"] =  weight_up
-        variations["down"] =  weight_down
+        variations["up"] = weight_up
+        variations["down"] = weight_down
 
     return variations
 
 
-def ic_systematic_from_bins(bins, variables, branch, nominal_only = False, modify_nominal = False, mask = None):
+def ic_systematic_from_bins(
+    bins, variables, branch, nominal_only=False, modify_nominal=False, mask=None
+):
     """
     Function for calculating systematics with independent collections (e.g. correcting and/or varying an energy scale)
     from bins which give the value and uncertainty of the correction.
@@ -117,28 +112,18 @@ def ic_systematic_from_bins(bins, variables, branch, nominal_only = False, modif
             bin_cut = bin_cut & mask
 
         if modify_nominal:
-            scale = awkward.where(
-                    bin_cut,
-                    bin["value"],
-                    scale
-            )
+            scale = awkward.where(bin_cut, bin["value"], scale)
 
             variations["nominal"] = awkward.where(
-                    bin_cut,
-                    branch * scale,
-                    variations["nominal"]
+                bin_cut, branch * scale, variations["nominal"]
             )
 
         if not nominal_only:
             variations["up"] = awkward.where(
-                    bin_cut,
-                    branch * (scale + bin["uncertainty"]),
-                    variations["up"]
+                bin_cut, branch * (scale + bin["uncertainty"]), variations["up"]
             )
             variations["down"] = awkward.where(
-                    bin_cut,
-                    branch * (scale - bin["uncertainty"]),
-                    variations["down"]
+                bin_cut, branch * (scale - bin["uncertainty"]), variations["down"]
             )
 
     return variations

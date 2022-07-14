@@ -1,0 +1,76 @@
+variables:
+  EOS_PATH: "/eos/user/h/higgsdna/www"
+  CI_OUTPUT_DIR: "public"
+
+image: "python:3.9"
+
+stages:
+  - build
+  - static analysis
+  - test
+  - docs-gen-conda-build
+  - docs-deploy
+
+static_analysis:
+  stage: static analysis
+  before_script:
+    - pip install flake8
+    - pip install mypy --quiet
+  script:
+    - flake8 higgs_dna/*
+    - mypy higgs_dna
+  allow_failure: true
+
+build:
+  stage: build
+  script:
+    - pip install -e .[dev]
+
+unit_test:
+  stage: test
+  before_script:
+    - pip install -e .[dev]
+  script:
+    - pwd
+    - ls -l
+    - export PYTHONPATH="$PYTHONPATH:."
+    - python -c "import sys;print(sys.path)"
+    - pytest
+
+# Generate docs
+# This mappazzone is the result of a six hours attempt of finding a way
+# to properly execute and render the notebooks as part of the documentation.
+# The whole thing can (and should) be changed (especially considering that docs should
+# in principle be deployed in a separate branch in the repo's domain) but be careful...
+# CERN's infrastructures do not make things easy :)
+docs-gen-conda-build:
+  stage: docs-gen-conda-build
+  image: continuumio/miniconda3:latest
+  script:
+    - conda install -c conda-forge mamba
+    - mamba env create -f environment.yml
+    - source activate higgs-dna
+    - mamba install -c anaconda -c conda-forge sphinx breathe sphinx_rtd_theme sphinx-argparse nbsphinx ipython ipywidgets nbconvert=5.5.0 jinja2=3.0.3
+    - mamba install pandoc
+    - pip install -e .
+    - cd docs/
+    - sphinx-apidoc -o source/modules ../higgs_dna
+    - sphinx-build source build/html
+    - cd -
+    - mkdir "$CI_OUTPUT_DIR"
+    - mv docs/build/html/* "$CI_OUTPUT_DIR"
+  artifacts:
+    paths:
+    # Upload as an artifact the folder where the output has been generated
+    # This will attach to the job the output. It can be browsed or downloaded
+    - "$CI_OUTPUT_DIR"
+
+# Deploy to an EOS folder the contents generated
+deployment:
+  stage: docs-deploy
+  only:
+    - master
+  # Custom docker image providing the needed tools to deploy in EOS
+  image: gitlab-registry.cern.ch/ci-tools/ci-web-deployer:latest
+  script:
+    - deploy-eos

@@ -1,26 +1,14 @@
-import setuptools
-import yaml
+#!/usr/bin/env python
+# Copyright (c) 2022, Hgg Group
+#
+# Distributed under the 3-clause BSD license, see accompanying file LICENSE
+# or https://gitlab.cern.ch/HiggsDNA-project/HiggsDNA for details.
 
-def get_dependencies(env_yaml_file):
-    """Scan a YAML environment file to get a list of dependencies
-    """
-    with open(env_yaml_file, "r") as f:
-        environment = yaml.safe_load(f)
-    dependencies = []
-    for dep in environment["dependencies"]:
-        if not dep.startswith("python"):
-            dependencies.append(dep)
-    return dependencies
+from __future__ import annotations
 
-setuptools.setup(
-    name="higgs_dna",
-    packages=[
-        "higgs_dna",
-        "higgs_dna/taggers",
-        "higgs_dna/selections",
-        "higgs_dna/systematics",
-        "higgs_dna/utils"
-    ],
-    install_requires=get_dependencies("environment.yml"),
-    python_requires=">=3.6",
-)
+from setuptools import setup
+
+setup()
+
+# This file is optional, on recent versions of pip you can remove it and even
+# still get editable installs.

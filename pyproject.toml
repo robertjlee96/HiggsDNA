@@ -1,0 +1,29 @@
+[tool.mypy]
+files = "src"
+python_version = "3.7"
+warn_unused_configs = true
+
+disallow_any_generics = true
+disallow_subclassing_any = true
+# Error: Call to untyped function "bad" in typed context  [no-untyped-call]
+disallow_untyped_calls = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+# https://mypy.readthedocs.io/en/stable/error_code_list2.html#check-that-function-does-not-return-any-value-no-any-return
+warn_return_any = false
+no_implicit_reexport = true
+strict_equality = true
+
+# https://mypy.readthedocs.io/en/stable/config_file.html#using-a-pyproject-toml-file
+[[tool.mypy.overrides]]
+module = [
+    "awkward",
+    "coffea",
+    "pandas"
+]
+ignore_missing_imports = true

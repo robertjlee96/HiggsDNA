@@ -1,11 +1,12 @@
 import awkward
 
+
 def dummy_jes_syst(events, is_data):
     """
     Dummy function illustrating a jet energy scale uncertainty that results in new jet collections with Jet.pt varied.
     Should be deleted once real examples are implemented.
     """
-    jets = events.Jet 
+    jets = events.Jet
 
     variations = {}
     variations["central"] = jets.pt + (2 * awkward.ones_like(jets.pt))

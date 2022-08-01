@@ -74,12 +74,12 @@ As usual, a description of all the options is printed when running::
 
 .. _def-processor:
 
----------
-Processor
----------
+----------
+Processors
+----------
 Processors are items defined within Coffea where the analysis workflow is described. While a general overview is available in the `Coffea documentation <https://coffeateam.github.io/coffea/concepts.html#coffea-processor>`_, here we will focus on the aspects that are important for HiggsDNA.
 
-Since in Higgs to diphoton analysis there are some operations that are common to every analysis workflow, we wrote a base processor which can be used in many basics analysis. If more complex operations are needed, one can still write a processor that inherits from the base class and redefines the function ``process``. The operations that one can find within ``HggBaseprocessor.process`` are the following:
+Since in Higgs to diphoton analysis there are some operations that are common to every analysis workflow, we wrote a base processor `HggBaseProcessor <https://higgs-dna.readthedocs.io/en/latest/modules/higgs_dna.workflows.html#higgs_dna.workflows.base.HggBaseProcessor>`_ which can be used in many basic analyses. If more complex operations are needed, one can still write a processor that inherits from the base class and redefines the function ``process``. The operations that one can find within ``HggBaseprocessor.process`` are the following:
 
 * application of filters and triggers
 * Chained Quantile Regression to correct shower shapes and isolation variables
@@ -88,3 +88,20 @@ Since in Higgs to diphoton analysis there are some operations that are common to
 * photon preselection
 * event tagging
 * application of systematic uncertainties
+
+Write a New Processor
+---------------------
+
+There are cases in which the workflows implemented in HiggsDNA are not enough for your studies. In these cases you might need to **write your own processor**. Depending on the scenario, there are different guidelines to do this.
+
+1. **Hgg-like workflow**. In this case your analysis is similar to the one implemented in the Hgg basic processor, but you need to perform other operations on top (e.g. additional cuts, application of NNs, etc.). In order to reduce the amount **repeated code**, what you can do is write a processor that inherits from ``HggBaseProcessor`` and redefine the function ``process_extra``. You can find an example of this in `DYStudiesProcessor <https://higgs-dna.readthedocs.io/en/latest/modules/higgs_dna.workflows.html#higgs_dna.workflows.dystudies.DYStudiesProcessor>`_.
+
+2. **Non Hgg-like workflow**. This is the case in which the operations you need to perform are different from the ones performed in the ``process`` function of ``HggBaseProcess``. In this kind of scenario you can still inherit from ``HggBaseProcessor`` in order to have access to the same attributes, but you also need to rewrite the ``process`` function. An example of this is the `TagAndProbeProcessor <https://higgs-dna.readthedocs.io/en/latest/_modules/higgs_dna/workflows/dystudies.html#TagAndProbeProcessor>`_. In this case, we cannot use the standard workflow since we manipulate objects in a different way (for instance, we have *tag* and *probe* photons instead of lead and sublead and since each item of a pair can be either tag or probe we need to double the number of candidates - this is an operation that we would never do in a standard workflow).
+
+-------
+Taggers
+-------
+
+------------------------
+Systematic Uncertainties
+------------------------

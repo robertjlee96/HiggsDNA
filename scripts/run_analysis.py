@@ -197,9 +197,12 @@ if __name__ == "__main__":
         env_extra = [
             "export XRD_RUNFORKHANDLER=1",
             f"export X509_USER_PROXY={_x509_path}",
-            f'export X509_CERT_DIR={os.environ["X509_CERT_DIR"]}',
             f"export PYTHONPATH=$PYTHONPATH:{os.getcwd()}",
         ]
+        try:
+            env_extra.append(f'export X509_CERT_DIR={os.environ["X509_CERT_DIR"]}')
+        except KeyError:
+            pass
         condor_extra = [
             f'source {os.environ["HOME"]}/.bashrc',
         ]
@@ -309,7 +312,7 @@ if __name__ == "__main__":
             n_port = 8786
             if not check_port(8786):
                 raise RuntimeError(
-                    "Port '8786' is not occupied on this node. Try another one."
+                    "Port '8786' is now occupied on this node. Try another one."
                 )
             import socket
 
@@ -332,6 +335,7 @@ if __name__ == "__main__":
                     else f'"{args.queue}"',
                 },
                 env_extra=env_extra,
+                shared_temp_directory="/tmp"
             )
         elif "slurm" in args.executor:
             cluster = SLURMCluster(

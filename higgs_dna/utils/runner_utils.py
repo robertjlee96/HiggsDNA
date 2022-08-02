@@ -160,7 +160,8 @@ def get_main_parser():
         "--voms",
         default=None,
         type=str,
-        help="Path to voms proxy, accessible to worker nodes. By default a copy will be made to $HOME.",
+        help="Path to voms proxy, accessible to worker nodes. Note that when this is specified "
+        "the environment variable X509_CERT_DIR must be set to the certificates directory location",
     )
 
     # Debugging
@@ -230,7 +231,7 @@ def get_proxy():
     if stat != 0:
         raise RuntimeError("No valid proxy found. Please create one.")
 
-    _x509_localpath = out.strip().split("/")[-1]
+    _x509_localpath = out
     _x509_path = os.environ["HOME"] + f'/.{_x509_localpath.split("/")[-1]}'
     os.system(f"cp {_x509_localpath} {_x509_path}")
 

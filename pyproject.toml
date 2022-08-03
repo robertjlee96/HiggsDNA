@@ -1,6 +1,6 @@
 [tool.mypy]
-files = "src"
-python_version = "3.7"
+files = "higgs_dna"
+python_version = "3.9"
 warn_unused_configs = true
 
 disallow_any_generics = true
@@ -18,6 +18,8 @@ warn_unused_ignores = true
 warn_return_any = false
 no_implicit_reexport = true
 strict_equality = true
+
+exclude = ["higgs_dna/tools/chained_quantile.py"]
 
 # https://mypy.readthedocs.io/en/stable/config_file.html#using-a-pyproject-toml-file
 [[tool.mypy.overrides]]

@@ -23,7 +23,7 @@ static_analysis:
   script:
     - flake8 higgs_dna/*
     # mypy will pick up what is specified in pyproject.toml
-    - mypy
+    #- mypy
 
 unit_test:
   stage: test

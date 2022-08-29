@@ -12,30 +12,6 @@ higgs\_dna.samples.fetch module
    :undoc-members:
    :show-inheritance:
 
-higgs\_dna.samples.file module
-------------------------------
-
-.. automodule:: higgs_dna.samples.file
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-higgs\_dna.samples.sample module
---------------------------------
-
-.. automodule:: higgs_dna.samples.sample
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-higgs\_dna.samples.sample\_manager module
------------------------------------------
-
-.. automodule:: higgs_dna.samples.sample_manager
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Module contents
 ---------------
 

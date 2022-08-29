@@ -15,17 +15,6 @@ Subpackages
    higgs_dna.utils
    higgs_dna.workflows
 
-Submodules
-----------
-
-higgs\_dna.constants module
----------------------------
-
-.. automodule:: higgs_dna.constants
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Module contents
 ---------------
 

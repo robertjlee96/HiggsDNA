@@ -20,12 +20,13 @@ Following are the main parts of the analysis that can be configured through the 
   the name (without ``.json`` extension) of one of the JSON files inherited from FLASHgg and located inside ``higgs_dna.metaconditions``
 * ``taggers``:
   the set of taggers you want to use, can be found in the modules located inside the subpackage ``higgs_dna/workflows/taggers``
+* ``systematics``: the set of systematics you want to use for each sample
 
 Here is how these information `can` be passed to the command line:
 
 .. code-block:: bash
 
-        run_analysis.py --samples DY-MC.json --workflow tagandprobe --meta Era2017_legacy_xgb_v1 --tagger-set DummyTagger1
+        run_analysis.py --samples DY-MC.json --workflow tagandprobe --meta Era2017_legacy_xgb_v1 --tagger-set DummyTagger1 --systematics SampleName:PhotonPtScale
 
 However, when the analysis increases in complexity, the parameters specified can increase a lot in complexity and the command can get quite messy (see Combine as a perfect example of this). In these cases, the above mentioned parameters can be specified in a JSON file and passed to the command line with the flag ``--json-analysis``
 
@@ -43,8 +44,22 @@ where ``simple_analysis.json`` looks like this:
             "metaconditions": "Era2017_legacy_xgb_v1",
             "taggers": [
                 "DummyTagger1"
-            ]
+            ],
+            "systematics": "/work/gallim/devel/HiggsDNA/tmp/sys_example.json"
         }
+
+Note that the JSON file where the systematics are specified looks like the following:
+
+.. code-block:: json
+
+   {
+        "SampleName1": [
+            "SystematicA", "SystematicB"
+        ],
+        "SampleName2": [
+            "SustematicC"
+        ]
+   {
 
 The next two flags that you will want to specify are ``dump`` and ``executor``: the former receives the path to a directory where the parquet output files will be stored, while the latter specifies the Coffea executor used to process the chunks of data. It can be one of the following:
 

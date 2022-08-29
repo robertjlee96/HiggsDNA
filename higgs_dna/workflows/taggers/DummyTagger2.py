@@ -16,7 +16,9 @@ class DummyTagger2:
     def priority(self) -> int:
         return 10
 
-    def __call__(self, events: awkward.Array) -> awkward.Array:
+    def __call__(
+        self, events: awkward.Array, diphotons: awkward.Array
+    ) -> awkward.Array:
         counts = awkward.num(events.diphotons, axis=1)
         x = numpy.random.exponential(size=awkward.sum(counts))
         return awkward.unflatten(self.priority * (x > 2), counts), {}

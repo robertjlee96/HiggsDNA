@@ -16,6 +16,7 @@ from higgs_dna.workflows import workflows
 from higgs_dna.workflows import taggers as all_taggers
 from higgs_dna.metaconditions import metaconditions as all_metaconditions
 from higgs_dna.utils.logger_utils import setup_logger
+from higgs_dna.utils.runner_utils import get_systematics_dict
 
 
 def validate(file):
@@ -92,6 +93,9 @@ if __name__ == "__main__":
         log_level = "INFO"
     logger = setup_logger(level=log_level)
     logger.info("Start production")
+
+    systematics = get_systematics_dict(systematics)
+    logger.info(f"Systematics: {systematics}")
 
     if args.output == parser.get_default("output"):
         args.output = (

@@ -16,9 +16,11 @@ class DummyTagger1:
     def priority(self) -> int:
         return 20
 
-    def __call__(self, events: awkward.Array) -> awkward.Array:
+    def __call__(
+        self, events: awkward.Array, diphotons: awkward.Array
+    ) -> awkward.Array:
         # Baseline example for subcategorization:
         return (
-            self.priority * awkward.ones_like(events.diphotons.pt, dtype=numpy.int32),
+            self.priority * awkward.ones_like(diphotons.pt, dtype=numpy.int32),
             {},
         )

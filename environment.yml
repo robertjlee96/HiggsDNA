@@ -18,7 +18,7 @@ dependencies:
   - conda-pack
   - tqdm
   - coffea
-  - xgboost
+  - xgboost==1.5.1
   - dask
   - distributed
   - dask-jobqueue

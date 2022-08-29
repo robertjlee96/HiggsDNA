@@ -6,7 +6,6 @@ def test_package():
     """
     Test the package imports
     """
-    from higgs_dna import systematics
     from higgs_dna import tools
     from higgs_dna import utils
     from higgs_dna import workflows

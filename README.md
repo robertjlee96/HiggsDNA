@@ -1,5 +1,5 @@
 # HiggsDNA  
-Higgs to diphoton nanoAOD framework  
+Higgs to diphoton nanoAOD framework ([see documentation](https://higgs-dna.readthedocs.io/en/latest/index.html#)).
   
 ## Installation  
   

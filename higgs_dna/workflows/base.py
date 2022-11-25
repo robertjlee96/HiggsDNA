@@ -5,6 +5,7 @@ from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_m
 from higgs_dna.metaconditions import photon_id_mva_weights
 from higgs_dna.metaconditions import diphoton as diphoton_mva_dir
 from higgs_dna.systematics import systematics as available_systematics
+from higgs_dna.systematics import weight_systematics as available_weight_systematics
 
 import functools
 import operator
@@ -18,6 +19,7 @@ import numpy
 import pandas
 import vector
 from coffea import processor
+from coffea.analysis_tools import Weights
 
 import logging
 
@@ -335,6 +337,10 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         # apply filters and triggers
         events = self.apply_filters_and_triggers(events)
 
+        # initiate Weight container, containing nominal event weight and systematic variations
+        events.Weights = Weights(size=len(events))
+        events.Weights._weight = events["genWeight"]  # will correspond to "nominal" weight, what else has to be included here? (lumi? xSec? MC sum of weights?)
+
         # here we start recording possible coffea accumulators
         # most likely histograms, could be counters, arrays, ...
         histos_etc = {}
@@ -348,14 +354,25 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
 
         original_photons = events.Photon
         for systematic_name in systematic_names:
-            systematic_dct = available_systematics[systematic_name]
-            if systematic_dct["object"] == "Photon":
+            if systematic_name in available_systematics.keys():
+                systematic_dct = available_systematics[systematic_name]
+                if systematic_dct["object"] == "Photon":
+                    logger.info(
+                        f"Adding systematic {systematic_name} to photons collection of dataset {dataset_name}"
+                    )
+                    original_photons.add_systematic(
+                        name=systematic_name, **systematic_dct["args"]
+                    )
+            elif systematic_name in available_weight_systematics:
                 logger.info(
-                    f"Adding systematic {systematic_name} to photons collection of dataset {dataset_name}"
+                    f"Adding systematic {systematic_name} to weight collection of dataset {dataset_name}"
                 )
-                original_photons.add_systematic(
-                    name=systematic_name, **systematic_dct["args"]
-                )
+                varying_function = available_weight_systematics[systematic_name]
+                events.Weights = varying_function(events.Weights)  # full event may have to be passed instead of events.Weights for other systs
+            else:
+                # may want to throw an error instead, needs to be discussed
+                warnings.warn(f"Could not process systematic variation {systematic_name}.")
+                continue
 
         photons_dct = {}
         photons_dct["nominal"] = original_photons
@@ -452,6 +469,12 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             diphotons["event"] = events.event
             diphotons["lumi"] = events.luminosityBlock
             diphotons["run"] = events.run
+            diphotons["weight"] = events.Weights.weight()
+
+            if variation == "nominal":
+                logger.info("Adding systematic weight variations to nominal output file.")
+                for modifier in events.Weights.variations:
+                    diphotons["weight_" + modifier] = events.Weights.weight(modifier=modifier)
 
             # drop events without a preselected diphoton candidate
             # drop events without a tag, if there are tags

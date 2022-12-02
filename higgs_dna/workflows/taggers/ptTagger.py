@@ -1,3 +1,6 @@
+import awkward as ak
+
+
 class ptTagger:
 
     def __init__(self) -> None:

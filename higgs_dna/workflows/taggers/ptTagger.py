@@ -10,62 +10,36 @@ class ptTagger:
     def name(self) -> str:
         return "ptTagger"
 
+    # lower priority is better
+    # first decimal point is category within tag (in case for untagged)
     @property
     def priority(self) -> int:
-        return 30
+        return 20
 
     def GetCategory(self, ievt: int) -> int:
 
         evt_pt = self.pt[ievt][0]
 
-        if evt_pt < 5:
-            cat = 0
-        elif evt_pt >= 5 and evt_pt < 10:
-            cat = 1
-        elif evt_pt >= 10 and evt_pt < 15:
-            cat = 2
-        elif evt_pt >= 15 and evt_pt < 20:
-            cat = 3
-        elif evt_pt >= 20 and evt_pt < 25:
-            cat = 4
-        elif evt_pt >= 25 and evt_pt < 30:
-            cat = 5
-        elif evt_pt >= 30 and evt_pt < 35:
-            cat = 6
-        elif evt_pt >= 35 and evt_pt < 45:
-            cat = 7
-        elif evt_pt >= 45 and evt_pt < 60:
-            cat = 8
-        elif evt_pt >= 60 and evt_pt < 80:
-            cat = 9
-        elif evt_pt >= 80 and evt_pt < 100:
-            cat = 10
-        elif evt_pt >= 100 and evt_pt < 120:
-            cat = 11
-        elif evt_pt >= 120 and evt_pt < 140:
-            cat = 12
-        elif evt_pt >= 140 and evt_pt < 170:
-            cat = 13
-        elif evt_pt >= 170 and evt_pt < 200:
-            cat = 14
-        elif evt_pt >= 200 and evt_pt < 250:
-            cat = 15
-        elif evt_pt >= 250 and evt_pt < 350:
-            cat = 16
-        elif evt_pt >= 350 and evt_pt < 450:
-            cat = 17
+        Demarcation = [5, 10, 15, 20, 25, 30, 35, 45, 60, 80, 100, 120, 140, 170, 200, 250, 350, 450]
+        for index, elem in enumerate(Demarcation):
+            if evt_pt < elem:
+                cat = index
+                break
         else:
             cat = 18
 
         return cat
 
     def __call__(self, events: ak.Array, diphotons: ak.Array) -> ak.Array:
+        """
+        We can classify events according to it's pt of diphotons.
+        """
 
         self.pt = events.diphotons.pt
 
         nDiphotons = ak.num(
             events.diphotons.pt, axis=1
-        )
+        )  # Number of entries per row. (N diphotons per row)
 
         ievts_by_dipho = ak.flatten(
             ak.Array([nDipho * [evt_i] for evt_i, nDipho in enumerate(nDiphotons)])

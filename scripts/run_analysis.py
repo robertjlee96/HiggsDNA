@@ -388,7 +388,3 @@ if __name__ == "__main__":
         args_string = " ".join(sys.argv[1:])
         vanilla_submitter = LXPlusVanillaSubmitter(samplejson, args_string, sample_dict, queue=args.queue, memory=args.memory)
         output = vanilla_submitter.submit()
-
-    save(output, args.output)
-
-    logger.info(f"Saving output to {args.output}")

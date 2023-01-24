@@ -10,11 +10,17 @@ class LXPlusVanillaSubmitter:
     """
     A class for submitting vanilla job to the lxplus cluster using HTCondor.
     It takes four inputs:
-    samplejson : str : The path of the input sample json
-    args_string : str : The command line arguments to be passed to the analysis script
-    sample_dict : dict : A dictionary of sample names and their files
-    queue : str : The queue to which the job has to be submitted, default is "longlunch"
-    memory : str : The memory required for the job, default is "10GB"
+
+    :param samplejson: The path of the input sample json
+    :type samplejson: str
+    :param args_string: The command line arguments to be passed to the analysis script
+    :type args_string: str
+    :param sample_dict: A dictionary of sample names and their files
+    :type sample_dict: dict
+    :param queue: The queue to which the job has to be submitted, default is "longlunch"
+    :type queue: str
+    :param memory: The memory required for the job, default is "10GB"
+    :type memory: str
 
     The class creates a directory structure and writes job files to submit the job to the cluster.
     The directory structure is as follows:

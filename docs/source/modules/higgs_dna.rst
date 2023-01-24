@@ -11,6 +11,7 @@ Subpackages
    higgs_dna.samples
    higgs_dna.selections
    higgs_dna.systematics
+   higgs_dna.submission
    higgs_dna.tools
    higgs_dna.utils
    higgs_dna.workflows

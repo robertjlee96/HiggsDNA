@@ -339,7 +339,7 @@ if __name__ == "__main__":
                     else f'"{args.queue}"',
                 },
                 env_extra=env_extra,
-                shared_temp_directory="/tmp"
+                #shared_temp_directory="/tmp"
             )
         elif "slurm" in args.executor:
             cluster = SLURMCluster(
@@ -383,6 +383,11 @@ if __name__ == "__main__":
                 chunksize=args.chunk,
                 maxchunks=args.max,
             )
+    elif args.executor == "vanilla_lxplus":
+        from higgs_dna.submission.lxplus import LXPlusVanillaSubmitter
+        args_string = " ".join(sys.argv[1:])
+        vanilla_submitter = LXPlusVanillaSubmitter(samplejson, args_string, sample_dict, queue=args.queue, memory=args.memory)
+        output = vanilla_submitter.submit()
 
     save(output, args.output)
 

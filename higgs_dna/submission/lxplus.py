@@ -1,82 +1,104 @@
 import subprocess
 import sys
 import json
-import time
 from pathlib import Path
 import os
+from copy import deepcopy
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class LXPlusVanillaSubmitter:
     """
-    A class for submitting vanilla job to the lxplus cluster using HTCondor.
-    It takes four inputs:
+    A class for submitting jobs on the CERN's LXPlus cluster using HTCondor, one job per file in a sample list of an analysis.
+    The constructor creates a directory .higgs_dna_vanilla_lxplus if it does not exist and another one called .higgs_dna_vanilla_lxplus/<analysis_name>.
+    If the latter exists, an exception is raised. Inside this directory two subdirectories called <inputs> and <jobs> will be created.
+    In the former the split JSON files will be stored, in the latter the HTCondor related job files will be stored.
 
-    :param samplejson: The path of the input sample json
-    :type samplejson: str
-    :param args_string: The command line arguments to be passed to the analysis script
-    :type args_string: str
-    :param sample_dict: A dictionary of sample names and their files
-    :type sample_dict: dict
-    :param queue: The queue to which the job has to be submitted, default is "longlunch"
-    :type queue: str
-    :param memory: The memory required for the job, default is "10GB"
-    :type memory: str
-
-    The class creates a directory structure and writes job files to submit the job to the cluster.
-    The directory structure is as follows:
-    1. base_dir = ".higgs_dna_vanilla_lxplus"
-    2. analysis_dir = base_dir/<sample_json_name>-<current_time>
-    3. input_dir = analysis_dir/inputs
-    4. jobs_dir = analysis_dir/jobs
-
-    The class has a submit method that submits all the jobs in the jobs_dir to the cluster using condor_submit.
+    Parameters:
+        :param analysis_name: Name of the analysis.
+        :type analysis_name: str
+        :param analysis_dict Dictionary containing the parameters of the analysis.
+        :type analysis_dict: dict
+        :param original_analysis_path: Path of the original analysis to be replaced with the new ones.
+        :type original_analysis_path: str
+        :param sample_dict: Dictionary containing the samples and their respective files.
+        :type sample_dict: dict
+        :param args_string: String containing the command line arguments.
+        :type args_string: str
+        :param queue: HTCondor queue to submit the job to. Defaults to "longlunch".
+        :type queue: str, optional
+        :param memory: Memory request for the job. Defaults to "10GB".
+        :type memory: str, optional
     """
 
     def __init__(
-        self, samplejson, args_string, sample_dict, queue="longlunch", memory="10GB"
+        self,
+        analysis_name,
+        analysis_dict,
+        original_analysis_path,
+        sample_dict,
+        args_string,
+        queue="longlunch",
+        memory="10GB",
     ):
-        self.original_samplejson = samplejson
-        self.sample_json_name = samplejson.split("/")[-1].split(".")[0]
-        self.args_string = args_string
+        self.analysis_name = analysis_name
+        self.analysis_dict = analysis_dict
         self.sample_dict = sample_dict
+        self.args_string = args_string
         self.queue = queue
         self.memory = memory
-        current_time = time.strftime("%Y%m%d-%H%M%S", time.gmtime())
-        self.base_dir = ".higgs_dna_vanilla_lxplus"
-        self.analysis_dir = os.path.join(
-            self.base_dir, f"{self.sample_json_name}-{current_time}"
-        )
-        Path(self.analysis_dir).mkdir(parents=True, exist_ok=True)
+        current_dir = os.getcwd()
+        self.base_dir = os.path.join(current_dir, ".higgs_dna_vanilla_lxplus")
+        self.analysis_dir = os.path.join(self.base_dir, self.analysis_name)
+        try:
+            Path(self.analysis_dir).mkdir(parents=True, exist_ok=False)
+        except FileExistsError as e:
+            logger.exception(
+                "Directory already exists, maybe you already submitted jobs for this analysis?\n%s",
+                e,
+            )
+            raise
+
         self.input_dir = os.path.join(self.analysis_dir, "inputs")
         Path(self.input_dir).mkdir(parents=True, exist_ok=True)
 
-        # split sample_dict in different JSON files
-        self.json_files = []
+        # split analysis_dict and sample_dict in different JSON files
+        self.json_analysis_files = []
+        self.json_sample_files = []
         for sample in sample_dict:
             for fl in sample_dict[sample]:
-                to_dump = {}
-                to_dump[sample] = [fl]
-                simple_file_name = fl.split("/")[-1].split(".")[0]
-                json_file_name = os.path.join(
-                    self.input_dir, f"{sample}-{simple_file_name}.json"
+                sample_to_dump = {}
+                sample_to_dump[sample] = [fl]
+                root_file_name = fl.split("/")[-1].split(".")[0]
+                sample_file_name = os.path.join(
+                    self.input_dir, f"{sample}-{root_file_name}.json"
                 )
-                with open(json_file_name, "w") as jf:
-                    json.dump(to_dump, jf, indent=4)
-                self.json_files.append(json_file_name)
+                with open(sample_file_name, "w") as jf:
+                    json.dump(sample_to_dump, jf, indent=4)
+                self.json_sample_files.append(sample_file_name)
+                an_file_name = os.path.join(
+                    self.input_dir, f"AN-{sample}-{root_file_name}.json"
+                )
+                an_to_dump = deepcopy(self.analysis_dict)
+                an_to_dump["samplejson"] = sample_file_name
+                with open(an_file_name, "w") as jf:
+                    json.dump(an_to_dump, jf, indent=4)
+                self.json_analysis_files.append(an_file_name)
 
         # write job files
         self.jobs_dir = os.path.join(self.analysis_dir, "jobs")
         Path(self.jobs_dir).mkdir(parents=True, exist_ok=True)
         self.job_files = []
-        current_dir = os.getcwd()
-        for json_file in self.json_files:
+        for json_file in self.json_analysis_files:
             base_name = json_file.split("/")[-1].split(".")[0]
             job_file_name = os.path.join(self.jobs_dir, f"{base_name}.sub")
             job_file_out = os.path.join(self.jobs_dir, f"{base_name}.out")
             job_file_err = os.path.join(self.jobs_dir, f"{base_name}.err")
             with open(job_file_name, "w") as submit_file:
                 arguments = self.args_string.replace(
-                    self.original_samplejson, os.path.join(current_dir, json_file)
+                    original_analysis_path, json_file
                 ).replace(" vanilla_lxplus", " iterative")
                 submit_file.write("executable = /usr/bin/env\n")
                 submit_file.write(
@@ -84,7 +106,7 @@ class LXPlusVanillaSubmitter:
                 )
                 submit_file.write(f"output = {job_file_out}\n")
                 submit_file.write(f"error = {job_file_err}\n")
-                submit_file.write(f"+RequestMemory={self.memory}\n")
+                submit_file.write(f"request_memory = {self.memory}\n")
                 submit_file.write(f'+JobFlavour = "{self.queue}"\n')
                 submit_file.write("queue 1\n")
             self.job_files.append(job_file_name)

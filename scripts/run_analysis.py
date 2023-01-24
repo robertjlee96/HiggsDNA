@@ -70,21 +70,15 @@ if __name__ == "__main__":
     parser = get_main_parser()
     args = parser.parse_args()
 
-    # Check whether a JSON analysis file was provided
-    if args.json_analysis_file is None:
-        workflow = args.workflow
-        taggers = args.taggers
-        metaconditions = args.metaconditions
-        samplejson = args.samplejson
-        systematics = args.systematics
-    else:
-        with open(args.json_analysis_file) as f:
-            analysis = json.load(f)
-        workflow = analysis["workflow"]
-        taggers = analysis["taggers"]
-        metaconditions = analysis["metaconditions"]
-        samplejson = analysis["samplejson"]
-        systematics = analysis["systematics"]
+    # Here we assume that all the keys are there, otherwise an exception will be raised
+    analysis_name = args.json_analysis_file.split("/")[-1].split(".")[0]
+    with open(args.json_analysis_file) as f:
+        analysis = json.load(f)
+    workflow = analysis["workflow"]
+    taggers = analysis["taggers"] if analysis["taggers"] else None
+    metaconditions = analysis["metaconditions"]
+    samplejson = analysis["samplejson"]
+    systematics = analysis["systematics"] if analysis["systematics"] != "" else None
 
     # Setup logger
     if args.debug:
@@ -386,5 +380,5 @@ if __name__ == "__main__":
     elif args.executor == "vanilla_lxplus":
         from higgs_dna.submission.lxplus import LXPlusVanillaSubmitter
         args_string = " ".join(sys.argv[1:])
-        vanilla_submitter = LXPlusVanillaSubmitter(samplejson, args_string, sample_dict, queue=args.queue, memory=args.memory)
+        vanilla_submitter = LXPlusVanillaSubmitter(analysis_name, analysis, args.json_analysis_file, sample_dict, args_string, queue=args.queue, memory=args.memory)
         output = vanilla_submitter.submit()

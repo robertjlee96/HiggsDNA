@@ -2,7 +2,6 @@ from higgs_dna.workflows import workflows, taggers
 from higgs_dna.metaconditions import metaconditions
 
 import argparse
-import sys
 import os
 import subprocess
 import json
@@ -48,48 +47,16 @@ def get_main_parser():
         "--json-analysis",
         dest="json_analysis_file",
         type=str,
-        help="JSON analysis file where workflow, taggers, metaconditions, samples and systematics are defined.",
-        default=None,
-    )
-    parser.add_argument(
-        "--wf",
-        "--workflow",
-        dest="workflow",
-        choices=list(workflows.keys()),
-        help="Which processor to run",
-        required=True if "--json-analysis" not in sys.argv else False,
-    )
-    parser.add_argument(
-        "--ts",
-        "--tagger-set",
-        dest="taggers",
-        nargs="+",
-        default=None,
-        choices=list(taggers.keys()),
-        help="The tagger set to apply to this run.",
-    )
-    parser.add_argument(
-        "--meta",
-        "--metaconditions",
-        dest="metaconditions",
-        choices=list(metaconditions.keys()),
-        help="What metaconditions to load",
-        required=True if "--json-analysis" not in sys.argv else False,
-    )
-    parser.add_argument(
-        "--samples",
-        "--json",
-        dest="samplejson",
-        default="dummy_samples.json",
-        help="JSON file containing dataset and file locations (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--systs",
-        "--systematics",
-        dest="systematics",
-        default=None,
-        type=str,
-        help="Systematic variations file",
+        help="JSON analysis file where workflow, taggers, metaconditions, samples and systematics are defined.\n"
+        + "It has to look like this:\n"
+        + "{\n"
+        + "\t\"samplejson\": \"path to sample JSON\",\n"
+        + f"\t\"workflow\": one of {list(workflows.keys())},\n"
+        + f"\t\"metaconditions\": one of {list(metaconditions.keys())},\n"
+        + f"\t\"taggers\": list from {list(taggers.keys())},\n"
+        + "\t\"systematics\": path to systematics JSON\n"
+        + "}",
+        required=True
     )
 
     # File handling information

@@ -19,7 +19,7 @@ class LXPlusVanillaSubmitter:
     Parameters:
         :param analysis_name: Name of the analysis.
         :type analysis_name: str
-        :param analysis_dict Dictionary containing the parameters of the analysis.
+        :param analysis_dict: Dictionary containing the parameters of the analysis.
         :type analysis_dict: dict
         :param original_analysis_path: Path of the original analysis to be replaced with the new ones.
         :type original_analysis_path: str

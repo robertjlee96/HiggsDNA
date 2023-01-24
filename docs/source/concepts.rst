@@ -10,7 +10,7 @@ Command Line Tool
 -----------------
 If you want to run an analysis with processors and taggers that have already been developed, the suggested way is to use the command line tool ``run_analysis.py``.
 
-Following are the main parts of the analysis that can be configured through the command line:
+The main part that define an analysis are the following:
 
 * ``datasets``:
   path to a JSON file in the form ``{"dataset_name": [list_of_files]}`` (like the one dumped by dasgoclient)
@@ -22,13 +22,7 @@ Following are the main parts of the analysis that can be configured through the 
   the set of taggers you want to use, can be found in the modules located inside the subpackage ``higgs_dna/workflows/taggers``
 * ``systematics``: the set of systematics you want to use for each sample
 
-Here is how these information `can` be passed to the command line:
-
-.. code-block:: bash
-
-        run_analysis.py --samples DY-MC.json --workflow tagandprobe --meta Era2017_legacy_xgb_v1 --tagger-set DummyTagger1 --systematics SampleName:PhotonPtScale
-
-However, when the analysis increases in complexity, the parameters specified can increase a lot in complexity and the command can get quite messy (see Combine as a perfect example of this). In these cases, the above mentioned parameters can be specified in a JSON file and passed to the command line with the flag ``--json-analysis``
+These parameters are specified in a JSON file and passed to the command line with the flag ``--json-analysis``
 
 .. code-block:: bash
 

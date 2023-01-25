@@ -16,7 +16,6 @@ from higgs_dna.workflows import workflows
 from higgs_dna.workflows import taggers as all_taggers
 from higgs_dna.metaconditions import metaconditions as all_metaconditions
 from higgs_dna.utils.logger_utils import setup_logger
-from higgs_dna.utils.runner_utils import get_systematics_dict
 
 
 def validate(file):
@@ -70,22 +69,6 @@ if __name__ == "__main__":
     parser = get_main_parser()
     args = parser.parse_args()
 
-    # Check whether a JSON analysis file was provided
-    if args.json_analysis_file is None:
-        workflow = args.workflow
-        taggers = args.taggers
-        metaconditions = args.metaconditions
-        samplejson = args.samplejson
-        systematics = args.systematics
-    else:
-        with open(args.json_analysis_file) as f:
-            analysis = json.load(f)
-        workflow = analysis["workflow"]
-        taggers = analysis["taggers"]
-        metaconditions = analysis["metaconditions"]
-        samplejson = analysis["samplejson"]
-        systematics = analysis["systematics"]
-
     # Setup logger
     if args.debug:
         log_level = "DEBUG"
@@ -94,7 +77,15 @@ if __name__ == "__main__":
     logger = setup_logger(level=log_level)
     logger.info("Start production")
 
-    systematics = get_systematics_dict(systematics)
+    # Here we assume that all the keys are there, otherwise an exception will be raised
+    analysis_name = args.json_analysis_file.split("/")[-1].split(".")[0]
+    with open(args.json_analysis_file) as f:
+        analysis = json.load(f)
+    workflow = analysis["workflow"]
+    taggers = analysis["taggers"] if analysis["taggers"] else None
+    metaconditions = analysis["metaconditions"]
+    samplejson = analysis["samplejson"]
+    systematics = analysis["systematics"]
     logger.info(f"Systematics: {systematics}")
 
     if args.output == parser.get_default("output"):
@@ -339,7 +330,7 @@ if __name__ == "__main__":
                     else f'"{args.queue}"',
                 },
                 env_extra=env_extra,
-                shared_temp_directory="/tmp"
+                #shared_temp_directory="/tmp"
             )
         elif "slurm" in args.executor:
             cluster = SLURMCluster(
@@ -383,7 +374,8 @@ if __name__ == "__main__":
                 chunksize=args.chunk,
                 maxchunks=args.max,
             )
-
-    save(output, args.output)
-
-    logger.info(f"Saving output to {args.output}")
+    elif args.executor == "vanilla_lxplus":
+        from higgs_dna.submission.lxplus import LXPlusVanillaSubmitter
+        args_string = " ".join(sys.argv[1:])
+        vanilla_submitter = LXPlusVanillaSubmitter(analysis_name, analysis, args.json_analysis_file, sample_dict, args_string, queue=args.queue, memory=args.memory)
+        output = vanilla_submitter.submit()

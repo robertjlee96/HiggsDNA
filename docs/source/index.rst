@@ -11,7 +11,7 @@ HiggsDNA - Higgs to Diphoton NanoAOD Framework
 .. toctree::
    installation
    concepts
-   dask
+   jobs
    developers
    examples
    api

@@ -49,8 +49,8 @@ class LXPlusVanillaSubmitter:
         self.args_string = args_string
         self.queue = queue
         self.memory = memory
-        current_dir = os.getcwd()
-        self.base_dir = os.path.join(current_dir, ".higgs_dna_vanilla_lxplus")
+        self.current_dir = os.getcwd()
+        self.base_dir = os.path.join(self.current_dir, ".higgs_dna_vanilla_lxplus")
         self.analysis_dir = os.path.join(self.base_dir, self.analysis_name)
         try:
             Path(self.analysis_dir).mkdir(parents=True, exist_ok=False)
@@ -116,5 +116,9 @@ class LXPlusVanillaSubmitter:
         A method to submit all the jobs in the jobs_dir to the cluster
         """
         for jf in self.job_files:
-            subprocess.run(["condor_submit", jf])
+            if self.current_dir.startswith("/eos"):
+                # see https://batchdocs.web.cern.ch/troubleshooting/eos.html#no-eos-submission-allowed
+                subprocess.run(["condor_submit", "-spool", jf])
+            else:
+                subprocess.run(["condor_submit", jf])
         return None

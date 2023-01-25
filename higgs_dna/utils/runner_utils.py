@@ -4,38 +4,9 @@ from higgs_dna.metaconditions import metaconditions
 import argparse
 import os
 import subprocess
-import json
-import re
 import logging
 
 logger = logging.getLogger(__name__)
-
-
-def get_systematics_dict(string=None):
-    """
-    Function used by the runner to get which systematics affect which datasets.
-    If string is a path to a json file, it is loaded.
-    If string is a string, it must be in the form 'dataset1:systA,systB/dataset2:systC,systD'
-    The dictionary returned is of the form {dataset1: [systA, systB], dataset2: [systC, systD]}
-
-    :param string: string with systematics
-    :type string: str
-    :return: dictionary with systematics
-    :rtype: dict
-    """
-    if string is None:
-        return {}
-    if string.endswith(".json"):
-        with open(string) as f:
-            return json.load(f)
-    else:
-        dct = {}
-        dataset_column_systematics_list = re.split("/| ", string)
-        for dataset_column_systematics in dataset_column_systematics_list:
-            dataset_name, systematics_string = dataset_column_systematics.split(":")
-            systematics_list = re.split(",|, ", systematics_string)
-            dct[dataset_name] = systematics_list
-        return dct
 
 
 def get_main_parser():

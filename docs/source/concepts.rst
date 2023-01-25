@@ -32,28 +32,25 @@ where ``simple_analysis.json`` looks like this:
 
 .. code-block:: json
 
-        {
-            "samplejson": "/work/gallim/devel/HiggsDNA/tmp/DY-data-test.json",
-            "workflow": "tagandprobe",
-            "metaconditions": "Era2017_legacy_xgb_v1",
-            "taggers": [
-                "DummyTagger1"
-            ],
-            "systematics": "/work/gallim/devel/HiggsDNA/tmp/sys_example.json"
-        }
+      {
+          "samplejson": "/work/gallim/devel/HiggsDNA/tmp/DY-data-test.json",
+          "workflow": "tagandprobe",
+          "metaconditions": "Era2017_legacy_xgb_v1",
+          "taggers": [
+              "DummyTagger1"
+          ],
+          "systematics": {
+              "SampleName1": [
+                  "SystematicA", "SystematicB"
+              ],
+              "SampleName2": [
+                  "SystematicC"
+              ]
+          }
+      }
 
-Note that the JSON file where the systematics are specified looks like the following:
+where the ``taggers`` list and the ``systematics`` dictionary can be left empty if no taggers or systematics are applied.
 
-.. code-block:: json
-
-   {
-        "SampleName1": [
-            "SystematicA", "SystematicB"
-        ],
-        "SampleName2": [
-            "SustematicC"
-        ]
-   {
 
 The next two flags that you will want to specify are ``dump`` and ``executor``: the former receives the path to a directory where the parquet output files will be stored, while the latter specifies the Coffea executor used to process the chunks of data. It can be one of the following:
 

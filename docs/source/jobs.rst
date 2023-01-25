@@ -60,10 +60,30 @@ If you work on a remote cluster (so pretty much all the time) you can see the da
 LXPLUS Vanilla Submitter
 ------------------------
 
-In order to provide an alternative to Dask to work on LXPLUS, a vanilla submitter was implemented. Being very basic and a temporary solution until Dask is mature, the distribution model is quite simple and one ROOT file is assigned to each job. An example of command line is the following:
+In order to provide an alternative to Dask to work on LXPLUS, a vanilla submitter was implemented. Being very basic and a temporary solution until Dask is mature, the distribution model is quite simple and one ROOT file is assigned to each job. 
+
+A directory called ``.higgs_dna_vanilla_lxplus`` is created in the current path, with a subdirectory with the name of the ``json-analysis``. There, two subdirectories called ``input`` and ``jobs`` are created: the former contains the new JSON files split by ROOT file, while the latter contains the submit files that are passed to ``condor_submit``. 
+
+An example of command line is the following:
 
 .. code-block:: bash
 
-      run_analysis.py --wf tagandprobe --dump /afs/cern.ch/work/g/gallim/devel/vanilla_lxplus_tests --meta Era2017_legacy_xgb_v1 --samples tmp/HggNanoDY_10_6_26-test.json --skipCQR --executor vanilla_lxplus --queue espresso
+     run_analysis.py --json-analysis /afs/cern.ch/work/g/gallim/devel/HiggsDNA/analyses/json_analysis_file_example.json --dump /afs/cern.ch/work/g/gallim/devel/vanilla_lxplus_tests --skipCQR --executor vanilla_lxplus --queue espresso 
       
 the arguments ``--queue`` and ``--memory`` are the same used also for ``dask/lxplus``.
+
+.. warning::
+   
+      When working from ``eos``, specific care has to be taken in order correctly fetch log and error files. As explained `here <https://batchdocs.web.cern.ch/troubleshooting/eos.html#no-eos-submission-allowed>`_ one can run:
+
+      .. code-block:: bash
+
+         condor_transfer_data $USERNAME
+         condor_rm $USERNAME -constraint 'JobStatus == 4' || true
+
+      to fetch logs and error files and then remove the finished jobs that otherwise would be kept showing when running ``condor_q``.
+
+.. note::
+   As already stated above, this submitter is just a temporary solution and it is not meant to be complete nor maximally efficient. 
+   
+   A smarter solution would have to be implemented as an executor directly in Coffea, and it is on the to-do list.

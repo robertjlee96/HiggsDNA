@@ -21,13 +21,14 @@ def get_main_parser():
         help="JSON analysis file where workflow, taggers, metaconditions, samples and systematics are defined.\n"
         + "It has to look like this:\n"
         + "{\n"
-        + "\t\"samplejson\": \"path to sample JSON\",\n"
-        + f"\t\"workflow\": one of {list(workflows.keys())},\n"
-        + f"\t\"metaconditions\": one of {list(metaconditions.keys())},\n"
-        + f"\t\"taggers\": list from {list(taggers.keys())},\n"
-        + "\t\"systematics\": path to systematics JSON\n"
+        + '\t"samplejson": "path to sample JSON",\n'
+        + f'\t"workflow": one of {list(workflows.keys())},\n'
+        + f'\t"metaconditions": one of {list(metaconditions.keys())},\n'
+        + f'\t"taggers": list from {list(taggers.keys())},\n'
+        + '\t"systematics": path to systematics JSON or systematics in JSON style,\n'
+        + '\t"corrections": path to corrections JSON or corrections in JSON sytle\n'
         + "}",
-        required=True
+        required=True,
     )
 
     # File handling information
@@ -64,7 +65,7 @@ def get_main_parser():
             "dask/lpc",
             "dask/lxplus",
             "dask/casa",  # Use for coffea-casa
-            "vanilla_lxplus"
+            "vanilla_lxplus",
         ],
         default="futures",  # Local executor (named after concurrent futures package)
         help="The type of executor to use (default: %(default)s). Other options can be implemented. "
@@ -75,7 +76,7 @@ def get_main_parser():
         "- `dask/condor` - tested at DESY, RWTH"
         "- `dask/lpc` - custom lpc/condor setup (due to write access restrictions)"
         "- `dask/lxplus` - custom lxplus/condor setup (due to port restrictions)"
-        "- `vanilla_lxplus` - custom plain lxplus submitter"
+        "- `vanilla_lxplus` - custom plain lxplus submitter",
     )
     parser.add_argument(
         "-j",

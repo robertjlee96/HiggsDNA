@@ -16,6 +16,7 @@ from higgs_dna.workflows import workflows
 from higgs_dna.workflows import taggers as all_taggers
 from higgs_dna.metaconditions import metaconditions as all_metaconditions
 from higgs_dna.utils.logger_utils import setup_logger
+from higgs_dna.systematics import check_corr_syst_combinations
 
 
 def validate(file):
@@ -86,7 +87,11 @@ if __name__ == "__main__":
     metaconditions = analysis["metaconditions"]
     samplejson = analysis["samplejson"]
     systematics = analysis["systematics"]
+    corrections = analysis["corrections"]
+    logger.info(f"Corrections: {corrections}")
     logger.info(f"Systematics: {systematics}")
+    check_corr_syst_combinations(corrections, systematics, logger)
+    
 
     if args.output == parser.get_default("output"):
         args.output = (
@@ -171,6 +176,7 @@ if __name__ == "__main__":
             processor_instance = workflows[workflow](
                 json.load(f),
                 systematics,
+                corrections,
                 args.use_trigger,
                 args.dump,
                 wf_taggers,

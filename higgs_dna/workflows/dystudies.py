@@ -1,9 +1,10 @@
 from higgs_dna.workflows.base import HggBaseProcessor
-from higgs_dna.systematics import systematics as available_systematics
+from higgs_dna.systematics import object_systematics as available_object_systematics
 
 from typing import Any, Dict, List, Optional
 import awkward as ak
 import logging
+import functools
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,7 @@ class DYStudiesProcessor(HggBaseProcessor):
         self,
         metaconditions: Dict[str, Any],
         systematics: Dict[str, List[Any]] = None,
+        corrections: Dict[str, List[Any]] = None,
         apply_trigger: bool = False,
         output_location: Optional[str] = None,
         taggers: Optional[List[Any]] = None,
@@ -21,6 +23,7 @@ class DYStudiesProcessor(HggBaseProcessor):
         super().__init__(
             metaconditions,
             systematics=systematics,
+            corrections=corrections,
             apply_trigger=apply_trigger,
             output_location=output_location,
             taggers=taggers,
@@ -43,6 +46,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
         self,
         metaconditions: Dict[str, Any],
         systematics: Dict[str, List[Any]] = None,
+        corrections: Optional[Dict[str, List[str]]] = None,
         apply_trigger: bool = False,
         output_location: Optional[str] = None,
         taggers: Optional[List[Any]] = None,
@@ -51,6 +55,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
         super().__init__(
             metaconditions,
             systematics=systematics,
+            corrections=corrections,
             apply_trigger=apply_trigger,
             output_location=output_location,
             taggers=taggers,
@@ -79,13 +84,14 @@ class TagAndProbeProcessor(HggBaseProcessor):
 
         original_photons = events.Photon
         for systematic_name in systematic_names:
-            systematic_dct = available_systematics[systematic_name]
+            systematic_dct = available_object_systematics[systematic_name]
             if systematic_dct["object"] == "Photon":
                 logger.info(
                     f"Adding systematic {systematic_name} to photons collection of dataset {dataset_name}"
                 )
                 original_photons.add_systematic(
-                    name=systematic_name, **systematic_dct["args"]
+                    # name=systematic_name, **systematic_dct["args"]
+                    name=systematic_name, kind=systematic_dct["args"]["kind"], what=systematic_dct["args"]["what"], varying_function=functools.partial(systematic_dct["args"]["varying_function"], events=events)
                 )
 
         photons_dct = {}

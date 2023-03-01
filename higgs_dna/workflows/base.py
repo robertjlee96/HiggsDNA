@@ -4,8 +4,10 @@ from higgs_dna.tools.xgb_loader import load_bdt
 from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_mva
 from higgs_dna.metaconditions import photon_id_mva_weights
 from higgs_dna.metaconditions import diphoton as diphoton_mva_dir
-from higgs_dna.systematics import systematics as available_systematics
+from higgs_dna.systematics import object_systematics as available_object_systematics
+from higgs_dna.systematics import object_corrections as available_object_corrections
 from higgs_dna.systematics import weight_systematics as available_weight_systematics
+from higgs_dna.systematics import weight_corrections as available_weight_corrections
 
 import functools
 import operator
@@ -33,6 +35,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self,
         metaconditions: Dict[str, Any],
         systematics: Optional[Dict[str, List[str]]],
+        corrections: Optional[Dict[str, List[str]]],
         apply_trigger: bool,
         output_location: Optional[str],
         taggers: Optional[List[Any]],
@@ -42,6 +45,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
     ) -> None:
         self.meta = metaconditions
         self.systematics = systematics if systematics is not None else {}
+        self.corrections = corrections if corrections is not None else {}
         self.apply_trigger = apply_trigger
         self.output_location = output_location
         self.trigger_group = trigger_group
@@ -337,41 +341,57 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         # apply filters and triggers
         events = self.apply_filters_and_triggers(events)
 
-        # initiate Weight container, containing nominal event weight and systematic variations
-        events.Weights = Weights(size=len(events))
-        events.Weights._weight = events["genWeight"]  # will correspond to "nominal" weight, what else has to be included here? (lumi? xSec? MC sum of weights?)
-
         # here we start recording possible coffea accumulators
         # most likely histograms, could be counters, arrays, ...
         histos_etc = {}
 
-        # Whole systematics business
+        # read which systematics and corrections to process
         dataset_name = events.metadata["dataset"]
+        try:
+            correction_names = self.corrections[dataset_name]
+        except KeyError:
+            correction_names = []
         try:
             systematic_names = self.systematics[dataset_name]
         except KeyError:
             systematic_names = []
 
+        # object corrections:
+        for correction_name in correction_names:
+            if correction_name in available_object_corrections.keys():
+                varying_function = available_object_corrections[correction_name]
+                events = varying_function(events=events)
+            elif correction_name in available_weight_corrections:
+                # event weight corrections will be applied after photon preselection / application of further taggers
+                continue
+            else:
+                # may want to throw an error instead, needs to be discussed
+                warnings.warn(f"Could not process correction {correction_name}.")
+                continue
+
         original_photons = events.Photon
+        # systematic object variations
         for systematic_name in systematic_names:
-            if systematic_name in available_systematics.keys():
-                systematic_dct = available_systematics[systematic_name]
+            if systematic_name in available_object_systematics.keys():
+                systematic_dct = available_object_systematics[systematic_name]
                 if systematic_dct["object"] == "Photon":
                     logger.info(
                         f"Adding systematic {systematic_name} to photons collection of dataset {dataset_name}"
                     )
                     original_photons.add_systematic(
-                        name=systematic_name, **systematic_dct["args"]
+                        # passing the arguments here explicitly since I want to pass the events to the varying function. If there is a more elegant / flexible way, just change it!
+                        name=systematic_name, kind=systematic_dct["args"]["kind"], what=systematic_dct["args"]["what"], varying_function=functools.partial(systematic_dct["args"]["varying_function"], events=events)
+                        # name=systematic_name, **systematic_dct["args"]
                     )
+                # to be implemented for other objects here
             elif systematic_name in available_weight_systematics:
-                logger.info(
-                    f"Adding systematic {systematic_name} to weight collection of dataset {dataset_name}"
-                )
-                varying_function = available_weight_systematics[systematic_name]
-                events.Weights = varying_function(events.Weights)  # full event may have to be passed instead of events.Weights for other systs
+                # event weight systematics will be applied after photon preselection / application of further taggers
+                continue
             else:
                 # may want to throw an error instead, needs to be discussed
-                warnings.warn(f"Could not process systematic variation {systematic_name}.")
+                warnings.warn(
+                    f"Could not process systematic variation {systematic_name}."
+                )
                 continue
 
         photons_dct = {}
@@ -420,9 +440,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             if self.diphoton_mva is not None:
                 diphotons = self.add_diphoton_mva(diphotons, events)
 
-            # set diphotons as part of the event record
-            events[f"diphotons_{variation}"] = diphotons
-
             # workflow specific processing
             events, process_extra = self.process_extra(events)
             histos_etc.update(process_extra)
@@ -464,26 +481,72 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 diphotons = diphotons[sorted]
 
             diphotons = awkward.firsts(diphotons)
+            # set diphotons as part of the event record
+            events[f"diphotons_{variation}"] = diphotons
 
             # annotate diphotons with event information
             diphotons["event"] = events.event
             diphotons["lumi"] = events.luminosityBlock
             diphotons["run"] = events.run
-            diphotons["weight"] = events.Weights.weight()
-
-            if variation == "nominal":
-                logger.info("Adding systematic weight variations to nominal output file.")
-                for modifier in events.Weights.variations:
-                    diphotons["weight_" + modifier] = events.Weights.weight(modifier=modifier)
 
             # drop events without a preselected diphoton candidate
             # drop events without a tag, if there are tags
             if len(self.taggers):
-                diphotons = diphotons[
-                    ~(awkward.is_none(diphotons) | awkward.is_none(diphotons.best_tag))
-                ]
+                selection_mask = ~(
+                    awkward.is_none(diphotons) | awkward.is_none(diphotons.best_tag)
+                )
+                diphotons = diphotons[selection_mask]
             else:
-                diphotons = diphotons[~awkward.is_none(diphotons)]
+                selection_mask = ~awkward.is_none(diphotons)
+                diphotons = diphotons[selection_mask]
+
+            if self.data_kind == "mc":
+                # initiate Weight container here, after selection, since event selection cannot easily be applied to weight container afterwards
+                event_weights = Weights(size=len(events[selection_mask]))
+                # _weight will correspond to "nominal" weight, what else has to be included here? (lumi? xSec? MC sum of weights?)
+                event_weights._weight = events["genWeight"][selection_mask]
+
+                # corrections to event weights:
+                for correction_name in correction_names:
+                    if correction_name in available_weight_corrections:
+                        logger.info(
+                            f"Adding correction {correction_name} to weight collection of dataset {dataset_name}"
+                        )
+                        varying_function = available_weight_corrections[correction_name]
+                        event_weights = varying_function(
+                            events=events[selection_mask],
+                            photons=events[f"diphotons_{variation}"][selection_mask],
+                            weights=event_weights,
+                        )
+
+                # systematic variations of event weights go to nominal output dataframe:
+                if variation == "nominal":
+                    for systematic_name in systematic_names:
+                        if systematic_name in available_weight_systematics:
+                            logger.info(
+                                f"Adding systematic {systematic_name} to weight collection of dataset {dataset_name}"
+                            )
+                            varying_function = available_weight_systematics[
+                                systematic_name
+                            ]
+                            event_weights = varying_function(
+                                events=events[selection_mask],
+                                photons=events[f"diphotons_{variation}"][
+                                    selection_mask
+                                ],
+                                weights=event_weights,
+                            )
+
+                diphotons["weight"] = event_weights.weight()
+                if variation == "nominal":
+                    if len(event_weights.variations):
+                        logger.info(
+                            "Adding systematic weight variations to nominal output file."
+                        )
+                    for modifier in event_weights.variations:
+                        diphotons["weight_" + modifier] = event_weights.weight(
+                            modifier=modifier
+                        )
 
             if self.output_location is not None:
                 df = self.diphoton_list_to_pandas(diphotons)

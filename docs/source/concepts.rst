@@ -21,6 +21,7 @@ The main part that define an analysis are the following:
 * ``taggers``:
   the set of taggers you want to use, can be found in the modules located inside the subpackage ``higgs_dna/workflows/taggers``
 * ``systematics``: the set of systematics you want to use for each sample
+* ``corections``: the set of corrections you want to use for each sample
 
 These parameters are specified in a JSON file and passed to the command line with the flag ``--json-analysis``
 
@@ -46,10 +47,18 @@ where ``simple_analysis.json`` looks like this:
               "SampleName2": [
                   "SystematicC"
               ]
-          }
+          },
+          "corrections": {
+                  "SampleName1": [
+                      "CorrectionA", "CorrectionB"
+                  ],
+                  "SampleName2": [
+                      "CorrectionC"
+                  ]
+              }
       }
 
-where the ``taggers`` list and the ``systematics`` dictionary can be left empty if no taggers or systematics are applied.
+where the ``taggers`` list and the ``systematics`` or ``corrections`` dictionaries can be left empty if no taggers or systematics are applied.
 
 
 The next two flags that you will want to specify are ``dump`` and ``executor``: the former receives the path to a directory where the parquet output files will be stored, while the latter specifies the Coffea executor used to process the chunks of data. It can be one of the following:

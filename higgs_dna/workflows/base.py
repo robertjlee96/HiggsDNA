@@ -307,6 +307,82 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             assert os.path.isfile(destination)
         pathlib.Path(local_file).unlink()
 
+    def diphoton_ak_array(self, diphotons: awkward.Array) -> awkward.Array:
+        """
+        Adjust the prefix.
+        By default the observables related to each item of the diphoton pair are
+        stored preceded by its prefix (e.g. 'lead', 'sublead').
+        The observables related to the diphoton pair are stored with no prefix.
+        """
+        output = {}
+        for field in awkward.fields(diphotons):
+            prefix = self.prefixes.get(field, "")
+            if len(prefix) > 0:
+                for subfield in awkward.fields(diphotons[field]):
+                    if subfield != "__systematics__":
+                        output[f"{prefix}_{subfield}"] = diphotons[field][subfield]
+            else:
+                output[field] = diphotons[field]
+        return awkward.Array(output)
+
+    def dump_ak_array(
+        self,
+        akarr: awkward.Array,
+        fname: str,
+        location: str,
+        subdirs: Optional[List[str]] = None,
+    ) -> None:
+        """
+        Dump a pandas dataframe to disk at location/'/'.join(subdirs)/fname.
+        """
+        subdirs = subdirs or []
+        xrd_prefix = "root://"
+        pfx_len = len(xrd_prefix)
+        xrootd = False
+        if xrd_prefix in location:
+            try:
+                import XRootD  # type: ignore
+                import XRootD.client  # type: ignore
+
+                xrootd = True
+            except ImportError as err:
+                raise ImportError(
+                    "Install XRootD python bindings with: conda install -c conda-forge xroot"
+                ) from err
+        local_file = (
+            os.path.abspath(os.path.join(".", fname))
+            if xrootd
+            else os.path.join(".", fname)
+        )
+        merged_subdirs = "/".join(subdirs) if xrootd else os.path.sep.join(subdirs)
+        destination = (
+            location + merged_subdirs + f"/{fname}"
+            if xrootd
+            else os.path.join(location, os.path.join(merged_subdirs, fname))
+        )
+        awkward.to_parquet(akarr, local_file)
+        if xrootd:
+            copyproc = XRootD.client.CopyProcess()
+            copyproc.add_job(local_file, destination)
+            copyproc.prepare()
+            copyproc.run()
+            client = XRootD.client.FileSystem(
+                location[: location[pfx_len:].find("/") + pfx_len]
+            )
+            status = client.locate(
+                destination[destination[pfx_len:].find("/") + pfx_len + 1 :],
+                XRootD.client.flags.OpenFlags.READ,
+            )
+            assert status[0].ok
+            del client
+            del copyproc
+        else:
+            dirname = os.path.dirname(destination)
+            pathlib.Path(dirname).mkdir(parents=True, exist_ok=True)
+            shutil.copy(local_file, destination)
+            assert os.path.isfile(destination)
+        pathlib.Path(local_file).unlink()
+
     def process_extra(self, events: awkward.Array) -> awkward.Array:
         raise NotImplementedError
 
@@ -336,7 +412,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
 
     def process(self, events: awkward.Array) -> Dict[Any, Any]:
         # data or monte carlo?
-        self.data_kind = "mc" if "GenPart" in awkward.fields(events) else "data"
+        self.data_kind = "mc" if hasattr(events, "GenPart") else "data"
 
         # apply filters and triggers
         events = self.apply_filters_and_triggers(events)
@@ -483,6 +559,16 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             diphotons = awkward.firsts(diphotons)
             # set diphotons as part of the event record
             events[f"diphotons_{variation}"] = diphotons
+            # event PDF/Scale/PS weights
+            if hasattr(events, "LHEScaleWeight"):
+                diphotons["nLHEScaleWeight"] = awkward.num(events.LHEScaleWeight,axis=1)
+                diphotons["LHEScaleWeight"] = events.LHEScaleWeight
+            if hasattr(events, "LHEPdfWeight"):
+                diphotons["nLHEPdfWeight"] = awkward.num(events.LHEPdfWeight,axis=1)
+                diphotons["LHEPdfWeight"] = events.LHEPdfWeight
+            if hasattr(events, "PSWeight"):
+                diphotons["nPSWeight"] = awkward.num(events.PSWeight,axis=1)
+                diphotons["PSWeight"] = events.PSWeight
 
             # annotate diphotons with event information
             diphotons["event"] = events.event
@@ -549,7 +635,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         )
 
             if self.output_location is not None:
-                df = self.diphoton_list_to_pandas(diphotons)
+                # df = self.diphoton_list_to_pandas(diphotons)
+                akarr = self.diphoton_ak_array(diphotons)
                 fname = (
                     events.behavior["__events_factory__"]._partition_key.replace(
                         "/", "_"
@@ -560,7 +647,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 if "dataset" in events.metadata:
                     subdirs.append(events.metadata["dataset"])
                 subdirs.append(variation)
-                self.dump_pandas(df, fname, self.output_location, subdirs)
+                # self.dump_pandas(df, fname, self.output_location, subdirs)
+                self.dump_ak_array(akarr, fname, self.output_location, subdirs)
 
         return histos_etc
 

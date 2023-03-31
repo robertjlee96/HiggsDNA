@@ -5,10 +5,9 @@ channels:
 dependencies:
   - python>=3.6
   - ipython
+  - coffea
   - pyaml
   - xrootd
-  - uproot
-  - awkward>=1.5
   - numba
   - pyarrow
   - pandas
@@ -17,7 +16,6 @@ dependencies:
   - vector
   - conda-pack
   - tqdm
-  - coffea
   - xgboost==1.5.1
   - dask
   - distributed

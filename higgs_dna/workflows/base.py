@@ -68,8 +68,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.min_full5x5_r9_EE_high_r9 = 0.9
         self.min_full5x5_r9_EB_low_r9 = 0.5
         self.min_full5x5_r9_EE_low_r9 = 0.8
-        self.max_trkSumPtHollowConeDR03_EB_low_r9 = 6.0
-        self.max_trkSumPtHollowConeDR03_EE_low_r9 = 6.0
+        self.max_trkSumPtHollowConeDR03_EB_low_r9 = 6.0  # for v11, we cut on Photon_pfChargedIsoPFPV
+        self.max_trkSumPtHollowConeDR03_EE_low_r9 = 6.0  # Leaving the names of the preselection cut variables the same to change as little as possible
         self.max_sieie_EB_low_r9 = 0.015
         self.max_sieie_EE_low_r9 = 0.035
         self.max_pho_iso_EB_low_r9 = 4.0
@@ -148,7 +148,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         Note that these selections are applied on each photon, it is not based on the diphoton pair.
         """
         # hlt-mimicking cuts
-        rho = events.fixedGridRhoAll * awkward.ones_like(photons.pt)
+        rho = events.Rho.fixedGridRhoAll * awkward.ones_like(photons.pt)
         photon_abs_eta = numpy.abs(photons.eta)
         isEB_high_r9 = (photon_abs_eta < self.gap_barrel_eta) & (
             photons.r9 > self.min_full5x5_r9_EB_high_r9
@@ -161,7 +161,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             & (photons.r9 > self.min_full5x5_r9_EB_low_r9)
             & (photons.r9 < self.min_full5x5_r9_EB_high_r9)
             & (
-                photons.trkSumPtHollowConeDR03
+                photons.pfChargedIsoPFPV  # for v11
                 < self.max_trkSumPtHollowConeDR03_EB_low_r9
             )
             & (photons.sieie < self.max_sieie_EB_low_r9)
@@ -187,7 +187,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             & (photons.r9 > self.min_full5x5_r9_EE_low_r9)
             & (photons.r9 < self.min_full5x5_r9_EE_high_r9)
             & (
-                photons.trkSumPtHollowConeDR03
+                photons.pfChargedIsoPFPV  # for v11
                 < self.max_trkSumPtHollowConeDR03_EE_low_r9
             )
             & (photons.sieie < self.max_sieie_EE_low_r9)
@@ -220,8 +220,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             & (photons.hoe < self.max_hovere)
             & (
                 (photons.r9 > self.min_full5x5_r9)
-                | (photons.pfRelIso03_chg < self.max_chad_iso)
-                | (photons.pfRelIso03_chg / photons.pt < self.max_chad_rel_iso)
+                | (photons.pfRelIso03_chg_quadratic < self.max_chad_iso)  # changed from pfRelIso03_chg since this variable is not in v11 nanoAOD...?
+                | (photons.pfRelIso03_chg_quadratic / photons.pt < self.max_chad_rel_iso)
             )
             & (isEB_high_r9 | isEB_low_r9 | isEE_high_r9 | isEE_low_r9)
         ]
@@ -417,6 +417,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             # sort photons in each event descending in pt
             # make descending-pt combinations of photons
             photons = photons[awkward.argsort(photons.pt, ascending=False)]
+            photons["charge"] = awkward.zeros_like(photons.pt)  # added this because charge is not a property of photons in nanoAOD v11. We just assume every photon has charge zero...
             diphotons = awkward.combinations(
                 photons, 2, fields=["pho_lead", "pho_sublead"]
             )
@@ -488,6 +489,12 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             diphotons["event"] = events.event
             diphotons["lumi"] = events.luminosityBlock
             diphotons["run"] = events.run
+            # annotate diphotons with dZ information (difference between z position of GenVtx and PV) as required by flashggfinalfits
+            if self.data_kind == "mc":
+                diphotons["dZ"] = events.GenVtx.z - events.PV.z
+            # Fill zeros for data because there is no GenVtx for data, obviously
+            else:
+                diphotons["dZ"] = awkward.zeros_like(events.PV.z)
 
             # drop events without a preselected diphoton candidate
             # drop events without a tag, if there are tags
@@ -579,7 +586,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
     def add_photonid_mva(
         self, photons: awkward.Array, events: awkward.Array
     ) -> awkward.Array:
-        photons["fixedGridRhoAll"] = events.fixedGridRhoAll * awkward.ones_like(
+        photons["fixedGridRhoAll"] = events.Rho.fixedGridRhoAll * awkward.ones_like(
             photons.pt
         )
         counts = awkward.num(photons, axis=-1)

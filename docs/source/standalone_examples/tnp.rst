@@ -8,3 +8,6 @@ To try it out, one can fetch the custom sample at ``/afs/cern.ch/user/g/gallim/p
 .. code-block:: bash
 
    run_analysis.py --wf tagandprobe --dump path/to/directory --meta Era2017_legacy_xgb_v1 --samples HggNanoDY_10_6_26-das.json
+
+
+**This example has to be rewritten since we need a sample JSON nowadays.**

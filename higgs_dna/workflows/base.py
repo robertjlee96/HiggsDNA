@@ -78,6 +78,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.eta_rho_corr = 1.5
         self.low_eta_rho_corr = 0.16544
         self.high_eta_rho_corr = 0.13212
+        self.e_veto = 0.5
 
         logger.debug(f"Setting up processor with metaconditions: {self.meta}")
 
@@ -210,7 +211,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         )
 
         return photons[
-            (photons.pt > self.min_pt_photon)
+            (photons.electronVeto > self.e_veto)
+            & (photons.pt > self.min_pt_photon)
             & (photon_abs_eta < self.max_sc_eta)
             & (
                 (photon_abs_eta < self.gap_barrel_eta)

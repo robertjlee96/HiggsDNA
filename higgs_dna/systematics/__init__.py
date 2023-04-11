@@ -1,5 +1,5 @@
-from .photon_systematics import photon_pt_scale_dummy, Scale
-from .event_weight_systematics import SF_photon_ID
+from .photon_systematics import photon_pt_scale_dummy, Scale, FNUF, ShowerShape
+from .event_weight_systematics import SF_photon_ID, LooseMvaSF
 from functools import partial
 
 # using add_systematic function of coffea.nanoevents.methods.nanoaod objects as Photon to store object systematics in addition to nominal objects
@@ -20,24 +20,44 @@ object_systematics = {
             "varying_function": partial(Scale, year="2016postVFP", is_correction=False),
         }
     },
+    "FNUF": {
+        "object": "Photon",
+        "args": {
+            "kind": "UpDownSystematic",
+            "what": "pt",
+            "varying_function": partial(FNUF, year="2017", is_correction=False),
+        },
+    },
+    "ShowerShape": {
+        "object": "Photon",
+        "args": {
+            "kind": "UpDownSystematic",
+            "what": "pt",
+            "varying_function": partial(ShowerShape, year="2017", is_correction=False),
+        },
+    },
 }
 
 # functions correcting nominal object quantities to be placed here
 # dict containing "name": varying_function
 object_corrections = {
     "Scale_2016postVFP": partial(Scale, pt=None,year="2016postVFP", is_correction=True),
+    "FNUF": partial(FNUF, pt=None, year="2017", is_correction=True),
+    "ShowerShape": partial(ShowerShape, pt=None, year="2017", is_correction=True),
 }
 
 # functions adding systematic variations to event weights to be placed here
 # dict containing "name": varying_function
 weight_systematics = {
     "SF_photon_ID": partial(SF_photon_ID, is_correction=False),
+    "LooseMvaSF": partial(LooseMvaSF, is_correction=False),
 }
 
 # functions correcting nominal event weights to be placed here
 # dict containing "name": varying_function
 weight_corrections = {
     "SF_photon_ID": partial(SF_photon_ID, is_correction=True),
+    "LooseMvaSF": partial(LooseMvaSF, is_correction=True),
 }
 
 

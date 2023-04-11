@@ -60,3 +60,101 @@ def Scale(pt, events, year="2016postVFP", is_correction=True):
 
         # coffea does the unflattenning step itself and sets this value as pt of the up/down variations
         return np.concatenate((corr_up_variation.reshape(-1,1), corr_down_variation.reshape(-1,1)), axis=1) * _pt[:, None]
+
+
+# Not nice but working: if the functions are called in the base processor by Photon.add_systematic(... "what"="pt"...), the pt is passed to the function as first argument.
+# I need the full events here, so I pass in addition the events. Seems to only work if it is explicitly a function of pt, but I might be missing something. Open for better solutions.
+def FNUF(pt, events, year="2017", is_correction=True):
+    """
+    ---This is an implementation of the FNUF uncertainty copied from flashgg,
+    --- Preliminary JSON (run2 I don't know if this needs to be changed) file created with correctionlib starting from flashgg: https://github.com/cms-analysis/flashgg/blob/2677dfea2f0f40980993cade55144636656a8a4f/Systematics/python/flashggDiPhotonSystematics2017_Legacy_cfi.py
+    Applies the photon pt and energy scale corrections and corresponding uncertainties (only on the pt because it is what is used in selection).
+    To be checked by experts
+    """
+
+    # for later unflattening:
+    counts = ak.num(events.Photon.pt)
+    eta = ak.flatten(events.Photon.eta)
+    r9 = ak.flatten(events.Photon.r9)
+    _energy = ak.flatten(events.Photon.energy)
+    _pt = ak.flatten(events.Photon.pt)
+
+    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/FNUF.json")
+    evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["FNUF"]
+
+    if is_correction:
+        correction = evaluator.evaluate("nominal", eta, r9)
+        corr_energy = _energy * correction
+        corr_pt = _pt * correction
+
+        corrected_photons = deepcopy(events.Photon)
+        corr_energy = ak.unflatten(corr_energy, counts)
+        corr_pt = ak.unflatten(corr_pt, counts)
+        corrected_photons["energy"] = corr_energy
+        corrected_photons["pt"] = corr_pt
+        events.Photon = corrected_photons
+
+        return events
+
+    else:
+        correction = evaluator.evaluate("nominal", eta, r9)
+        # When creating the JSON I already included added the variation to the returned value,
+        # the ratio is there because was there in the example function not 100% sure it's needed
+        uncertainty_up = evaluator.evaluate("up", eta, r9) / correction
+        uncertainty_dn = evaluator.evaluate("down", eta, r9) / correction
+        # coffea does the unflattenning step itself and sets this value as pt of the up/down variations
+        return (
+            np.concatenate(
+                (uncertainty_up.reshape(-1, 1), uncertainty_dn.reshape(-1, 1)), axis=1
+            )
+            * _pt[:, None]
+        )
+
+
+# Same old same old, just reiterated: if the functions are called in the base processor by Photon.add_systematic(... "what"="pt"...), the pt is passed to the function as first argument.
+# Open for better solutions.
+def ShowerShape(pt, events, year="2017", is_correction=True):
+    """
+    ---This is an implementation of the ShowerShape uncertainty copied from flashgg,
+    --- Preliminary JSON (run2 I don't know if this needs to be changed) file created with correctionlib starting from flashgg: https://github.com/cms-analysis/flashgg/blob/2677dfea2f0f40980993cade55144636656a8a4f/Systematics/python/flashggDiPhotonSystematics2017_Legacy_cfi.py
+    Applies the photon pt and energy scale corrections and corresponding uncertainties (only on the pt because it is what is used in selection).
+    To be checked by experts
+    """
+
+    # for later unflattening:
+    counts = ak.num(events.Photon.pt)
+    eta = ak.flatten(events.Photon.eta)
+    r9 = ak.flatten(events.Photon.r9)
+    _energy = ak.flatten(events.Photon.energy)
+    _pt = ak.flatten(events.Photon.pt)
+
+    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/ShowerShape.json")
+    evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["ShowerShape"]
+
+    if is_correction:
+        correction = evaluator.evaluate("nominal", eta, r9)
+        corr_energy = _energy * correction
+        corr_pt = _pt * correction
+
+        corrected_photons = deepcopy(events.Photon)
+        corr_energy = ak.unflatten(corr_energy, counts)
+        corr_pt = ak.unflatten(corr_pt, counts)
+        corrected_photons["energy"] = corr_energy
+        corrected_photons["pt"] = corr_pt
+        events.Photon = corrected_photons
+
+        return events
+
+    else:
+        correction = evaluator.evaluate("nominal", eta, r9)
+        # When creating the JSON I already included added the variation to the returned value,
+        # the ratio is there because was there in the example function not 100% sure it's needed
+        uncertainty_up = evaluator.evaluate("up", eta, r9) / correction
+        uncertainty_dn = evaluator.evaluate("down", eta, r9) / correction
+        # coffea does the unflattenning step itself and sets this value as pt of the up/down variations
+        return (
+            np.concatenate(
+                (uncertainty_up.reshape(-1, 1), uncertainty_dn.reshape(-1, 1)), axis=1
+            )
+            * _pt[:, None]
+        )

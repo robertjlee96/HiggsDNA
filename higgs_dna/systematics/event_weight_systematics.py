@@ -1,5 +1,6 @@
 import numpy as np
 import correctionlib
+import os
 
 
 def SF_photon_ID(photons, weights, year="2017", WP="Loose", is_correction=True, **kwargs):
@@ -56,5 +57,60 @@ def SF_photon_ID(photons, weights, year="2017", WP="Loose", is_correction=True, 
         sfdown = sfdown_lead * sfdown_sublead / _sf
 
     weights.add(name="SF_photon_ID", weight=sf, weightUp=sfup, weightDown=sfdown)
+
+    return weights
+
+
+def LooseMvaSF(photons, weights, year="2017", WP="Loose", is_correction=True, **kwargs):
+    """
+    LooseMvaSF: correction to the event weight on a per photon level, impacting one of the high importance input variable of the DiphotonBDT, binned in eta and r9.
+    for original implementation look at: https://github.com/cms-analysis/flashgg/blob/2677dfea2f0f40980993cade55144636656a8a4f/Systematics/python/flashggDiPhotonSystematics2017_Legacy_cfi.py
+    And for presentation on the study: https://indico.cern.ch/event/963617/contributions/4103623/attachments/2141570/3608645/Zee_Validation_UL2017_Update_09112020_Prasant.pdf
+    """
+
+    # have to think about how to specify era/year, using 2017 test-wise here, defined as parameter of the function
+    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/LooseMvaSF.json")
+    evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["LooseMvaSF"]
+
+    if is_correction:
+        # only calculate correction to nominal weight
+        sf_lead = evaluator.evaluate(
+            "nominal", photons["pho_lead"].eta, photons["pho_lead"].r9
+        )
+        sf_sublead = evaluator.evaluate(
+            "nominal", photons["pho_sublead"].eta, photons["pho_sublead"].r9
+        )
+        sf = sf_lead * sf_sublead
+
+        sfup, sfdown = None, None
+
+    else:
+        # only calculate systs
+        sf = np.ones(len(weights._weight))
+        sf_lead = evaluator.evaluate(
+            "nominal", photons["pho_lead"].eta, photons["pho_lead"].r9
+        )
+        sf_sublead = evaluator.evaluate(
+            "nominal", photons["pho_sublead"].eta, photons["pho_sublead"].r9
+        )
+        _sf = sf_lead * sf_sublead
+
+        sfup_lead = evaluator.evaluate(
+            "up", photons["pho_lead"].eta, photons["pho_lead"].r9
+        )
+        sfup_sublead = evaluator.evaluate(
+            "up", photons["pho_sublead"].eta, photons["pho_sublead"].r9
+        )
+        sfup = sfup_lead * sfup_sublead / _sf
+
+        sfdown_lead = evaluator.evaluate(
+            "down", photons["pho_lead"].eta, photons["pho_lead"].r9
+        )
+        sfdown_sublead = evaluator.evaluate(
+            "down", photons["pho_sublead"].eta, photons["pho_sublead"].r9
+        )
+        sfdown = sfdown_lead * sfdown_sublead / _sf
+
+    weights.add(name="LooseMvaSF", weight=sf, weightUp=sfup, weightDown=sfdown)
 
     return weights

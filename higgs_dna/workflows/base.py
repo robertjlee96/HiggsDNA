@@ -22,6 +22,7 @@ import numpy
 import vector
 from coffea import processor
 from coffea.analysis_tools import Weights
+from copy import deepcopy
 
 import logging
 
@@ -233,15 +234,15 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         logger.debug(original_photons.systematics.fields)
         for systematic in original_photons.systematics.fields:
             for variation in original_photons.systematics[systematic].fields:
-                photons_dct[f"{systematic}_{variation}"] = original_photons.systematics[
-                    systematic
-                ][variation]
+                # deepcopy to allow for independent calculations on photon variables with CQR
+                photons_dct[f"{systematic}_{variation}"] = deepcopy(
+                    original_photons.systematics[systematic][variation]
+                    )
 
         for variation, photons in photons_dct.items():
             logger.debug(f"Variation: {variation}")
             if self.chained_quantile is not None:
                 photons = self.chained_quantile.apply(photons, events)
-
             # recompute photonid_mva on the fly
             if self.photonid_mva_EB and self.photonid_mva_EE:
                 photons = self.add_photonid_mva(photons, events)
@@ -318,17 +319,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             diphotons = awkward.firsts(diphotons)
             # set diphotons as part of the event record
             events[f"diphotons_{variation}"] = diphotons
-            # event PDF/Scale/PS weights
-            if hasattr(events, "LHEScaleWeight"):
-                diphotons["nLHEScaleWeight"] = awkward.num(events.LHEScaleWeight,axis=1)
-                diphotons["LHEScaleWeight"] = events.LHEScaleWeight
-            if hasattr(events, "LHEPdfWeight"):
-                diphotons["nLHEPdfWeight"] = awkward.num(events.LHEPdfWeight,axis=1)
-                diphotons["LHEPdfWeight"] = events.LHEPdfWeight
-            if hasattr(events, "PSWeight"):
-                diphotons["nPSWeight"] = awkward.num(events.PSWeight,axis=1)
-                diphotons["PSWeight"] = events.PSWeight
-
             # annotate diphotons with event information
             diphotons["event"] = events.event
             diphotons["lumi"] = events.luminosityBlock
@@ -386,7 +376,17 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                     selection_mask
                                 ],
                                 weights=event_weights,
-                            )
+                            ) 
+                    # event PDF/Scale/PS weights
+                    if hasattr(events, "LHEScaleWeight"):
+                        diphotons["nLHEScaleWeight"] = awkward.num(events.LHEScaleWeight[selection_mask],axis=1)
+                        diphotons["LHEScaleWeight"] = events.LHEScaleWeight[selection_mask]
+                    if hasattr(events, "LHEPdfWeight"):
+                        diphotons["nLHEPdfWeight"] = awkward.num(events.LHEPdfWeight[selection_mask],axis=1)
+                        diphotons["LHEPdfWeight"] = events.LHEPdfWeight[selection_mask]
+                    if hasattr(events, "PSWeight"):
+                        diphotons["nPSWeight"] = awkward.num(events.PSWeight[selection_mask],axis=1)
+                        diphotons["PSWeight"] = events.PSWeight[selection_mask]
 
                 diphotons["weight"] = event_weights.weight()
                 if variation == "nominal":

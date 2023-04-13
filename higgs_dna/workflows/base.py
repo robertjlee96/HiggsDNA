@@ -2,6 +2,9 @@ from higgs_dna.tools.chained_quantile import ChainedQuantileRegression
 from higgs_dna.tools.diphoton_mva import calculate_diphoton_mva
 from higgs_dna.tools.xgb_loader import load_bdt
 from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_mva
+from higgs_dna.selections.photon_selections import photon_preselection
+from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array
+# from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
 from higgs_dna.metaconditions import photon_id_mva_weights
 from higgs_dna.metaconditions import diphoton as diphoton_mva_dir
 from higgs_dna.systematics import object_systematics as available_object_systematics
@@ -12,13 +15,10 @@ from higgs_dna.systematics import weight_corrections as available_weight_correct
 import functools
 import operator
 import os
-import pathlib
-import shutil
 import warnings
 from typing import Any, Dict, List, Optional
 import awkward
 import numpy
-import pandas
 import vector
 from coffea import processor
 from coffea.analysis_tools import Weights
@@ -141,250 +141,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             warnings.warn(f"Could not instantiate diphoton MVA: {e}")
             self.diphoton_mva = None
 
-    def photon_preselection(
-        self, photons: awkward.Array, events: awkward.Array
-    ) -> awkward.Array:
-        """
-        Apply preselection cuts to photons.
-        Note that these selections are applied on each photon, it is not based on the diphoton pair.
-        """
-        # hlt-mimicking cuts
-        rho = events.Rho.fixedGridRhoAll * awkward.ones_like(photons.pt)
-        photon_abs_eta = numpy.abs(photons.eta)
-        isEB_high_r9 = (photon_abs_eta < self.gap_barrel_eta) & (
-            photons.r9 > self.min_full5x5_r9_EB_high_r9
-        )
-        isEE_high_r9 = (photon_abs_eta > self.gap_endcap_eta) & (
-            photons.r9 > self.min_full5x5_r9_EE_high_r9
-        )
-        isEB_low_r9 = (
-            (photon_abs_eta < self.gap_barrel_eta)
-            & (photons.r9 > self.min_full5x5_r9_EB_low_r9)
-            & (photons.r9 < self.min_full5x5_r9_EB_high_r9)
-            & (
-                photons.pfChargedIsoPFPV  # for v11
-                < self.max_trkSumPtHollowConeDR03_EB_low_r9
-            )
-            & (photons.sieie < self.max_sieie_EB_low_r9)
-            & (
-                (
-                    (photon_abs_eta < self.eta_rho_corr)
-                    & (
-                        photons.pfPhoIso03 - rho * self.low_eta_rho_corr
-                        < self.max_pho_iso_EB_low_r9
-                    )
-                )
-                | (
-                    (photon_abs_eta > self.eta_rho_corr)
-                    & (
-                        photons.pfPhoIso03 - rho * self.high_eta_rho_corr
-                        < self.max_pho_iso_EB_low_r9
-                    )
-                )
-            )
-        )
-        isEE_low_r9 = (
-            (photon_abs_eta < self.gap_barrel_eta)
-            & (photons.r9 > self.min_full5x5_r9_EE_low_r9)
-            & (photons.r9 < self.min_full5x5_r9_EE_high_r9)
-            & (
-                photons.pfChargedIsoPFPV  # for v11
-                < self.max_trkSumPtHollowConeDR03_EE_low_r9
-            )
-            & (photons.sieie < self.max_sieie_EE_low_r9)
-            & (
-                (
-                    (photon_abs_eta < self.eta_rho_corr)
-                    & (
-                        photons.pfPhoIso03 - rho * self.low_eta_rho_corr
-                        < self.max_pho_iso_EE_low_r9
-                    )
-                )
-                | (
-                    (photon_abs_eta > self.eta_rho_corr)
-                    & (
-                        photons.pfPhoIso03 - rho * self.high_eta_rho_corr
-                        < self.max_pho_iso_EE_low_r9
-                    )
-                )
-            )
-        )
-
-        return photons[
-            (photons.electronVeto > self.e_veto)
-            & (photons.pt > self.min_pt_photon)
-            & (photon_abs_eta < self.max_sc_eta)
-            & (
-                (photon_abs_eta < self.gap_barrel_eta)
-                | (photon_abs_eta > self.gap_endcap_eta)
-            )
-            & (photons.mvaID > self.min_mvaid)
-            & (photons.hoe < self.max_hovere)
-            & (
-                (photons.r9 > self.min_full5x5_r9)
-                | (photons.pfRelIso03_chg_quadratic < self.max_chad_iso)  # changed from pfRelIso03_chg since this variable is not in v11 nanoAOD...?
-                | (photons.pfRelIso03_chg_quadratic / photons.pt < self.max_chad_rel_iso)
-            )
-            & (isEB_high_r9 | isEB_low_r9 | isEE_high_r9 | isEE_low_r9)
-        ]
-
-    def diphoton_list_to_pandas(self, diphotons: awkward.Array) -> pandas.DataFrame:
-        """
-        Convert diphoton array to pandas dataframe.
-        By default the observables related to each item of the diphoton pair are
-        stored preceded by its prefix (e.g. 'lead', 'sublead').
-        The observables related to the diphoton pair are stored with no prefix.
-        To change the behavior, you can redefine the `diphoton_list_to_pandas` method in the
-        derived class.
-        """
-        output = pandas.DataFrame()
-        for field in awkward.fields(diphotons):
-            prefix = self.prefixes.get(field, "")
-            if len(prefix) > 0:
-                for subfield in awkward.fields(diphotons[field]):
-                    if subfield != "__systematics__":
-                        output[f"{prefix}_{subfield}"] = awkward.to_numpy(
-                            diphotons[field][subfield]
-                        )
-            else:
-                output[field] = awkward.to_numpy(diphotons[field])
-        return output
-
-    def dump_pandas(
-        self,
-        pddf: pandas.DataFrame,
-        fname: str,
-        location: str,
-        subdirs: Optional[List[str]] = None,
-    ) -> None:
-        """
-        Dump a pandas dataframe to disk at location/'/'.join(subdirs)/fname.
-        """
-        subdirs = subdirs or []
-        xrd_prefix = "root://"
-        pfx_len = len(xrd_prefix)
-        xrootd = False
-        if xrd_prefix in location:
-            try:
-                import XRootD  # type: ignore
-                import XRootD.client  # type: ignore
-
-                xrootd = True
-            except ImportError as err:
-                raise ImportError(
-                    "Install XRootD python bindings with: conda install -c conda-forge xroot"
-                ) from err
-        local_file = (
-            os.path.abspath(os.path.join(".", fname))
-            if xrootd
-            else os.path.join(".", fname)
-        )
-        merged_subdirs = "/".join(subdirs) if xrootd else os.path.sep.join(subdirs)
-        destination = (
-            location + merged_subdirs + f"/{fname}"
-            if xrootd
-            else os.path.join(location, os.path.join(merged_subdirs, fname))
-        )
-        pddf.to_parquet(local_file)
-        if xrootd:
-            copyproc = XRootD.client.CopyProcess()
-            copyproc.add_job(local_file, destination)
-            copyproc.prepare()
-            copyproc.run()
-            client = XRootD.client.FileSystem(
-                location[: location[pfx_len:].find("/") + pfx_len]
-            )
-            status = client.locate(
-                destination[destination[pfx_len:].find("/") + pfx_len + 1 :],
-                XRootD.client.flags.OpenFlags.READ,
-            )
-            assert status[0].ok
-            del client
-            del copyproc
-        else:
-            dirname = os.path.dirname(destination)
-            if not os.path.exists(dirname):
-                pathlib.Path(dirname).mkdir(parents=True, exist_ok=True)
-            shutil.copy(local_file, destination)
-            assert os.path.isfile(destination)
-        pathlib.Path(local_file).unlink()
-
-    def diphoton_ak_array(self, diphotons: awkward.Array) -> awkward.Array:
-        """
-        Adjust the prefix.
-        By default the observables related to each item of the diphoton pair are
-        stored preceded by its prefix (e.g. 'lead', 'sublead').
-        The observables related to the diphoton pair are stored with no prefix.
-        """
-        output = {}
-        for field in awkward.fields(diphotons):
-            prefix = self.prefixes.get(field, "")
-            if len(prefix) > 0:
-                for subfield in awkward.fields(diphotons[field]):
-                    if subfield != "__systematics__":
-                        output[f"{prefix}_{subfield}"] = diphotons[field][subfield]
-            else:
-                output[field] = diphotons[field]
-        return awkward.Array(output)
-
-    def dump_ak_array(
-        self,
-        akarr: awkward.Array,
-        fname: str,
-        location: str,
-        subdirs: Optional[List[str]] = None,
-    ) -> None:
-        """
-        Dump a pandas dataframe to disk at location/'/'.join(subdirs)/fname.
-        """
-        subdirs = subdirs or []
-        xrd_prefix = "root://"
-        pfx_len = len(xrd_prefix)
-        xrootd = False
-        if xrd_prefix in location:
-            try:
-                import XRootD  # type: ignore
-                import XRootD.client  # type: ignore
-
-                xrootd = True
-            except ImportError as err:
-                raise ImportError(
-                    "Install XRootD python bindings with: conda install -c conda-forge xroot"
-                ) from err
-        local_file = (
-            os.path.abspath(os.path.join(".", fname))
-            if xrootd
-            else os.path.join(".", fname)
-        )
-        merged_subdirs = "/".join(subdirs) if xrootd else os.path.sep.join(subdirs)
-        destination = (
-            location + merged_subdirs + f"/{fname}"
-            if xrootd
-            else os.path.join(location, os.path.join(merged_subdirs, fname))
-        )
-        awkward.to_parquet(akarr, local_file)
-        if xrootd:
-            copyproc = XRootD.client.CopyProcess()
-            copyproc.add_job(local_file, destination)
-            copyproc.prepare()
-            copyproc.run()
-            client = XRootD.client.FileSystem(
-                location[: location[pfx_len:].find("/") + pfx_len]
-            )
-            status = client.locate(
-                destination[destination[pfx_len:].find("/") + pfx_len + 1 :],
-                XRootD.client.flags.OpenFlags.READ,
-            )
-            assert status[0].ok
-            del client
-            del copyproc
-        else:
-            dirname = os.path.dirname(destination)
-            pathlib.Path(dirname).mkdir(parents=True, exist_ok=True)
-            shutil.copy(local_file, destination)
-            assert os.path.isfile(destination)
-        pathlib.Path(local_file).unlink()
-
     def process_extra(self, events: awkward.Array) -> awkward.Array:
         raise NotImplementedError
 
@@ -491,7 +247,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 photons = self.add_photonid_mva(photons, events)
 
             # photon preselection
-            photons = self.photon_preselection(photons, events)
+            photons = photon_preselection(self, photons, events)
             # sort photons in each event descending in pt
             # make descending-pt combinations of photons
             photons = photons[awkward.argsort(photons.pt, ascending=False)]
@@ -644,8 +400,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         )
 
             if self.output_location is not None:
-                # df = self.diphoton_list_to_pandas(diphotons)
-                akarr = self.diphoton_ak_array(diphotons)
+                # df = diphoton_list_to_pandas(self, diphotons)
+                akarr = diphoton_ak_array(self, diphotons)
                 fname = (
                     events.behavior["__events_factory__"]._partition_key.replace(
                         "/", "_"
@@ -656,8 +412,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 if "dataset" in events.metadata:
                     subdirs.append(events.metadata["dataset"])
                 subdirs.append(variation)
-                # self.dump_pandas(df, fname, self.output_location, subdirs)
-                self.dump_ak_array(akarr, fname, self.output_location, subdirs)
+                # dump_pandas(self, df, fname, self.output_location, subdirs)
+                dump_ak_array(self, akarr, fname, self.output_location, subdirs)
 
         return histos_etc
 

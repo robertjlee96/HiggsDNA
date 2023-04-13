@@ -1,5 +1,7 @@
 from higgs_dna.workflows.base import HggBaseProcessor
 from higgs_dna.systematics import object_systematics as available_object_systematics
+from higgs_dna.selections.photon_selections import photon_preselection
+from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
 
 from typing import Any, Dict, List, Optional
 import awkward as ak
@@ -114,7 +116,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
                 photons = self.add_photonid_mva(photons, events)
 
             # photon preselection
-            photons = self.photon_preselection(photons, events)
+            photons = photon_preselection(self, photons, events)
 
             if self.data_kind == "mc":
                 # keep only photons matched to gen e+ or e-
@@ -160,7 +162,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
             tnp_candidates = ak.flatten(tnp_candidates)
 
             if self.output_location is not None:
-                df = self.diphoton_list_to_pandas(tnp_candidates)
+                df = diphoton_list_to_pandas(self, tnp_candidates)
                 fname = (
                     events.behavior["__events_factory__"]._partition_key.replace(
                         "/", "_"
@@ -171,7 +173,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
                 if "dataset" in events.metadata:
                     subdirs.append(events.metadata["dataset"])
                 subdirs.append(variation)
-                self.dump_pandas(df, fname, self.output_location, subdirs)
+                dump_pandas(self, df, fname, self.output_location, subdirs)
 
         return {}
 

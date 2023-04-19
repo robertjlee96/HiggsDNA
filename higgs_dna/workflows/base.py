@@ -376,7 +376,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                     selection_mask
                                 ],
                                 weights=event_weights,
-                            ) 
+                            )
                     # event PDF/Scale/PS weights
                     if hasattr(events, "LHEScaleWeight"):
                         diphotons["nLHEScaleWeight"] = awkward.num(events.LHEScaleWeight[selection_mask],axis=1)

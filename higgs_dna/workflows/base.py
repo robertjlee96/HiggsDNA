@@ -237,7 +237,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 # deepcopy to allow for independent calculations on photon variables with CQR
                 photons_dct[f"{systematic}_{variation}"] = deepcopy(
                     original_photons.systematics[systematic][variation]
-                    )
+                )
 
         for variation, photons in photons_dct.items():
             logger.debug(f"Variation: {variation}")

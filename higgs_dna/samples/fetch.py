@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from higgs_dna.utils.logger_utils import setup_logger
 
 import argparse

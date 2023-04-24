@@ -1,5 +1,5 @@
+#!/usr/bin/env python
 # Author Tiziano Bevilacqua (03/03/2023)
-
 import os
 import subprocess
 from optparse import OptionParser

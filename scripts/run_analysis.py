@@ -382,6 +382,10 @@ if __name__ == "__main__":
             )
     elif args.executor == "vanilla_lxplus":
         from higgs_dna.submission.lxplus import LXPlusVanillaSubmitter
+        for cmd_str in env_extra:
+            g_var = cmd_str.split()[-1]
+            var, var_value = g_var.split("=")
+            os.environ[var] = var_value
         args_string = " ".join(sys.argv[1:])
         vanilla_submitter = LXPlusVanillaSubmitter(analysis_name, analysis, args.json_analysis_file, sample_dict, args_string, queue=args.queue, memory=args.memory)
         output = vanilla_submitter.submit()

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import correctionlib
 import correctionlib.schemav2 as cs
 import rich

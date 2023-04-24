@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import argparse
 from higgs_dna.utils.logger_utils import setup_logger
 import pandas as pd

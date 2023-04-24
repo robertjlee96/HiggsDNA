@@ -107,6 +107,7 @@ class LXPlusVanillaSubmitter:
                 submit_file.write(f"output = {job_file_out}\n")
                 submit_file.write(f"error = {job_file_err}\n")
                 submit_file.write(f"request_memory = {self.memory}\n")
+                submit_file.write("getenv = True\n")
                 submit_file.write(f'+JobFlavour = "{self.queue}"\n')
                 submit_file.write("queue 1\n")
             self.job_files.append(job_file_name)

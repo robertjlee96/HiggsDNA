@@ -87,9 +87,9 @@ def photon_preselection(
         & (
             (photons.r9 > self.min_full5x5_r9)
             | (
-                photons.pfRelIso03_chg_quadratic < self.max_chad_iso
+                photons.pfRelIso03_chg_quadratic * photons.pt < self.max_chad_iso
             )  # changed from pfRelIso03_chg since this variable is not in v11 nanoAOD...?
-            | (photons.pfRelIso03_chg_quadratic / photons.pt < self.max_chad_rel_iso)
+            | (photons.pfRelIso03_chg_quadratic < self.max_chad_rel_iso)
         )
         & (isEB_high_r9 | isEB_low_r9 | isEE_high_r9 | isEE_low_r9)
     ]

@@ -65,6 +65,8 @@ def get_dataset_dict(
     for name, dataset in fset:
         flist = (
             os.popen(
+                # use the cvmfs source for dasgoclient if not on lxplus and it does not work out of the box:
+                # ("/cvmfs/cms.cern.ch/common/dasgoclient -query='instance={} file dataset={}'").format(
                 ("dasgoclient -query='instance={} file dataset={}'").format(
                     dbs_instance, dataset
                 )

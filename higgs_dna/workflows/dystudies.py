@@ -146,13 +146,13 @@ class TagAndProbeProcessor(HggBaseProcessor):
                 (tnp_candidates.tag.pt > 40)
                 & (tnp_candidates.tag.electronIdx != -1)
                 & (tnp_candidates.tag.pixelSeed)
-                & (tnp_candidates.tag.chargedHadronIso < 20)
-                & (tnp_candidates.tag.chargedHadronIso / tnp_candidates.tag.pt < 0.3)
+                & (tnp_candidates.tag.pfChargedIsoPFPV < 20)  # was: (tnp_candidates.tag.chargedHadronIso < 20)
+                & (tnp_candidates.tag.pfChargedIsoPFPV / tnp_candidates.tag.pt < 0.3)  # was: (tnp_candidates.tag.chargedHadronIso / tnp_candidates.tag.pt < 0.3)
             )
 
             # probe selections
-            probe_mask = (tnp_candidates.probe.chargedHadronIso < 20) & (
-                tnp_candidates.probe.chargedHadronIso / tnp_candidates.probe.pt < 0.3
+            probe_mask = (tnp_candidates.probe.pfChargedIsoPFPV < 20) & (  # was: (tnp_candidates.probe.chargedHadronIso < 20)
+                tnp_candidates.probe.pfChargedIsoPFPV / tnp_candidates.tag.pt < 0.3  # was: tnp_candidates.probe.chargedHadronIso / tnp_candidates.probe.pt < 0.3
             )
 
             # apply selections

@@ -127,8 +127,12 @@ dmypy.json
 # tagger output files
 examples/output/
 scripts/output/
+tests/output/
+tests/log
 
 # other stuff
 .higgs_dna_vanilla_lxplus
 dask-report.html
 *.cc
+
+

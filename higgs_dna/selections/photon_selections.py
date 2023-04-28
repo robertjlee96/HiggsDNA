@@ -15,12 +15,8 @@ def photon_preselection(
     # hlt-mimicking cuts
     rho = events.Rho.fixedGridRhoAll * awkward.ones_like(photons.pt)
     photon_abs_eta = numpy.abs(photons.eta)
-    isEB_high_r9 = (photons.isScEtaEB) & (
-        photons.r9 > self.min_full5x5_r9_EB_high_r9
-    )
-    isEE_high_r9 = (photons.isScEtaEE) & (
-        photons.r9 > self.min_full5x5_r9_EE_high_r9
-    )
+    isEB_high_r9 = (photons.isScEtaEB) & (photons.r9 > self.min_full5x5_r9_EB_high_r9)
+    isEE_high_r9 = (photons.isScEtaEE) & (photons.r9 > self.min_full5x5_r9_EE_high_r9)
     isEB_low_r9 = (
         (photons.isScEtaEB)
         & (photons.r9 > self.min_full5x5_r9_EB_low_r9)

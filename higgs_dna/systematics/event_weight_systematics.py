@@ -3,7 +3,9 @@ import correctionlib
 import os
 
 
-def SF_photon_ID(photons, weights, year="2017", WP="Loose", is_correction=True, **kwargs):
+def SF_photon_ID(
+    photons, weights, year="2017", WP="Loose", is_correction=True, **kwargs
+):
     """
     ---This is a dummy, meant to be replaced by the Run-3 photon ID continuous SF later, but shows how it can be implemented.---
     Applies the photon ID scale-factor and corresponding uncertainties
@@ -52,7 +54,11 @@ def SF_photon_ID(photons, weights, year="2017", WP="Loose", is_correction=True, 
             year, "sfdown", "Loose", photons["pho_lead"].eta, photons["pho_lead"].pt
         )
         sfdown_sublead = evaluator.evaluate(
-            year, "sfdown", "Loose", photons["pho_sublead"].eta, photons["pho_sublead"].pt,
+            year,
+            "sfdown",
+            "Loose",
+            photons["pho_sublead"].eta,
+            photons["pho_sublead"].pt,
         )
         sfdown = sfdown_lead * sfdown_sublead / _sf
 
@@ -115,6 +121,7 @@ def LooseMvaSF(photons, weights, year="2017", WP="Loose", is_correction=True, **
 
     return weights
 
+
 def AlphaS(photons, events, weights, logger, dataset, systematic):
     """
     AlphaS weights variations are the last two of the PDF replicas, e.g.,
@@ -125,8 +132,8 @@ def AlphaS(photons, events, weights, logger, dataset, systematic):
         weights.add(
             name="AlphaS",
             weight=np.ones(len(events)),
-            weightUp=events.LHEPdfWeight[:,-1],
-            weightDown=events.LHEPdfWeight[:,-2]
+            weightUp=events.LHEPdfWeight[:, -1],
+            weightDown=events.LHEPdfWeight[:, -2],
         )
     except:
         logger.info(
@@ -135,6 +142,7 @@ def AlphaS(photons, events, weights, logger, dataset, systematic):
         return weights
 
     return weights
+
 
 def PartonShower(photons, events, weights, logger, dataset, systematic):
     """
@@ -145,22 +153,18 @@ def PartonShower(photons, events, weights, logger, dataset, systematic):
         weights.add(
             name="PS_FSR",
             weight=np.ones(len(events)),
-            weightUp=events.PSWeight[:,0],
-            weightDown=events.PSWeight[:,2]
+            weightUp=events.PSWeight[:, 0],
+            weightDown=events.PSWeight[:, 2],
         )
 
         weights.add(
             name="PS_ISR",
             weight=np.ones(len(events)),
-            weightUp=events.PSWeight[:,1],
-            weightDown=events.PSWeight[:,3]
+            weightUp=events.PSWeight[:, 1],
+            weightDown=events.PSWeight[:, 3],
         )
     except:
-        logger.info(
-            f"No PS Weights in dataset {dataset}, skip systematic {systematic}"
-        )
+        logger.info(f"No PS Weights in dataset {dataset}, skip systematic {systematic}")
         return weights
 
     return weights
-
-

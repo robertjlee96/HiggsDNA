@@ -114,3 +114,54 @@ def LooseMvaSF(photons, weights, year="2017", WP="Loose", is_correction=True, **
     weights.add(name="LooseMvaSF", weight=sf, weightUp=sfup, weightDown=sfdown)
 
     return weights
+
+def AlphaS(photons, events, weights, logger, dataset, systematic):
+    """
+    AlphaS weights variations are the last two of the PDF replicas, e.g.,
+    https://github.com/cms-sw/cmssw/blob/d37d2797dffc978a78da2fafec3ba480071a0e67/PhysicsTools/NanoAOD/python/genWeightsTable_cfi.py#L10
+    https://lhapdfsets.web.cern.ch/current/NNPDF31_nnlo_as_0118_mc_hessian_pdfas/NNPDF31_nnlo_as_0118_mc_hessian_pdfas.info
+    """
+    try:
+        weights.add(
+            name="AlphaS",
+            weight=np.ones(len(events)),
+            weightUp=events.LHEPdfWeight[:,-1],
+            weightDown=events.LHEPdfWeight[:,-2]
+        )
+    except:
+        logger.info(
+            f"No LHEPdf Weights in dataset {dataset}, skip systematic {systematic}"
+        )
+        return weights
+
+    return weights
+
+def PartonShower(photons, events, weights, logger, dataset, systematic):
+    """
+    AlphaS weights variations are the last two of the PDF replicas, e.g.,
+    https://github.com/cms-sw/cmssw/blob/d37d2797dffc978a78da2fafec3ba480071a0e67/PhysicsTools/NanoAOD/python/genWeightsTable_cfi.py#L10
+    https://lhapdfsets.web.cern.ch/current/NNPDF31_nnlo_as_0118_mc_hessian_pdfas/NNPDF31_nnlo_as_0118_mc_hessian_pdfas.info
+    """
+    try:
+        weights.add(
+            name="PS_FSR",
+            weight=np.ones(len(events)),
+            weightUp=events.PSWeight[:,0],
+            weightDown=events.PSWeight[:,2]
+        )
+
+        weights.add(
+            name="PS_ISR",
+            weight=np.ones(len(events)),
+            weightUp=events.PSWeight[:,1],
+            weightDown=events.PSWeight[:,3]
+        )
+    except:
+        logger.info(
+            f"No PS Weights in dataset {dataset}, skip systematic {systematic}"
+        )
+        return weights
+
+    return weights
+
+

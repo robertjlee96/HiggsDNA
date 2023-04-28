@@ -1,5 +1,5 @@
 from .photon_systematics import photon_pt_scale_dummy, Scale, FNUF, ShowerShape
-from .event_weight_systematics import SF_photon_ID, LooseMvaSF
+from .event_weight_systematics import SF_photon_ID, LooseMvaSF, AlphaS, PartonShower
 from functools import partial
 
 # using add_systematic function of coffea.nanoevents.methods.nanoaod objects as Photon to store object systematics in addition to nominal objects
@@ -51,6 +51,10 @@ object_corrections = {
 weight_systematics = {
     "SF_photon_ID": partial(SF_photon_ID, is_correction=False),
     "LooseMvaSF": partial(LooseMvaSF, is_correction=False),
+    "AlphaS": partial(AlphaS),
+    "PartonShower": partial(PartonShower),
+    "LHEScale": None,
+    "LHEPdf": None
 }
 
 # functions correcting nominal event weights to be placed here

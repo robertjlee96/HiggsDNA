@@ -341,11 +341,17 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 selection_mask = ~awkward.is_none(diphotons)
                 diphotons = diphotons[selection_mask]
 
+            # return if there is no surviving events
+            if len(diphotons)==0:
+                logger.debug(
+                    "No surviving events in this run, return now!"
+                )
+                return histos_etc
             if self.data_kind == "mc":
                 # initiate Weight container here, after selection, since event selection cannot easily be applied to weight container afterwards
                 event_weights = Weights(size=len(events[selection_mask]))
                 # _weight will correspond to "nominal" weight, what else has to be included here? (lumi? xSec? MC sum of weights?)
-                event_weights._weight = events["genWeight"][selection_mask]
+                event_weights._weight = numpy.sign(events["genWeight"][selection_mask])
 
                 # corrections to event weights:
                 for correction_name in correction_names:
@@ -367,26 +373,37 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             logger.info(
                                 f"Adding systematic {systematic_name} to weight collection of dataset {dataset_name}"
                             )
-                            varying_function = available_weight_systematics[
-                                systematic_name
-                            ]
-                            event_weights = varying_function(
-                                events=events[selection_mask],
-                                photons=events[f"diphotons_{variation}"][
-                                    selection_mask
-                                ],
-                                weights=event_weights,
-                            )
-                    # event PDF/Scale/PS weights
-                    if hasattr(events, "LHEScaleWeight"):
-                        diphotons["nLHEScaleWeight"] = awkward.num(events.LHEScaleWeight[selection_mask],axis=1)
-                        diphotons["LHEScaleWeight"] = events.LHEScaleWeight[selection_mask]
-                    if hasattr(events, "LHEPdfWeight"):
-                        diphotons["nLHEPdfWeight"] = awkward.num(events.LHEPdfWeight[selection_mask],axis=1)
-                        diphotons["LHEPdfWeight"] = events.LHEPdfWeight[selection_mask]
-                    if hasattr(events, "PSWeight"):
-                        diphotons["nPSWeight"] = awkward.num(events.PSWeight[selection_mask],axis=1)
-                        diphotons["PSWeight"] = events.PSWeight[selection_mask]
+                            if systematic_name=="LHEScale":
+                                if hasattr(events, "LHEScaleWeight"):
+                                    diphotons["nLHEScaleWeight"] = awkward.num(events.LHEScaleWeight[selection_mask],axis=1)
+                                    diphotons["LHEScaleWeight"] = events.LHEScaleWeight[selection_mask]
+                                else:
+                                    logger.info(
+                                        f"No {systematic_name} Weights in dataset {dataset_name}"
+                                    )
+                            elif systematic_name=="LHEPdf":
+                                if hasattr(events, "LHEPdfWeight"):
+                                    # two AlphaS weights are removed
+                                    diphotons["nLHEPdfWeight"] = awkward.num(events.LHEPdfWeight[selection_mask],axis=1)-2
+                                    diphotons["LHEPdfWeight"] = events.LHEPdfWeight[selection_mask][:,:-2]
+                                else:
+                                    logger.info(
+                                        f"No {systematic_name} Weights in dataset {dataset_name}"
+                                    )
+                            else:
+                                varying_function = available_weight_systematics[
+                                    systematic_name
+                                ]
+                                event_weights = varying_function(
+                                    events=events[selection_mask],
+                                    photons=events[f"diphotons_{variation}"][
+                                        selection_mask
+                                    ],
+                                    weights=event_weights,
+                                    logger=logger,
+                                    dataset=dataset_name,
+                                    systematic=systematic_name
+                                )
 
                 diphotons["weight"] = event_weights.weight()
                 if variation == "nominal":

@@ -48,7 +48,7 @@ def photon_preselection(
         )
     )
     isEE_low_r9 = (
-        (photon_abs_eta > self.gap_barrel_eta)
+        (photon_abs_eta > self.gap_endcap_eta)
         & (photons.r9 > self.min_full5x5_r9_EE_low_r9)
         & (photons.r9 < self.min_full5x5_r9_EE_high_r9)
         & (

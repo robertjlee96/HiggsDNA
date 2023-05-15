@@ -372,6 +372,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             events=events[selection_mask],
                             photons=events[f"diphotons_{variation}"][selection_mask],
                             weights=event_weights,
+                            dataset_name=dataset_name,
                         )
 
                 # systematic variations of event weights go to nominal output dataframe:

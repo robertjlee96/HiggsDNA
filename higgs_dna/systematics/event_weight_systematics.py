@@ -1,6 +1,8 @@
 import numpy as np
-import correctionlib
+import json
 import os
+from scipy.interpolate import interp1d
+import correctionlib
 
 
 def SF_photon_ID(
@@ -122,6 +124,67 @@ def LooseMvaSF(photons, weights, year="2017", WP="Loose", is_correction=True, **
     return weights
 
 
+def NNLOPS(
+    events, dataset_name, weights, is_correction=True, generator="mcatnlo", **kwargs
+):
+    """
+    --- NNLOPS reweighting for ggH events to be applied to NLO Madgraph (and Powheg).
+    Swap generator argument to 'powheg' if to be applied to powheg events
+    Reweight event based on truth Higgs pt and number of jets, extracted from HTXS object
+    Constructs njet-dependent linear splines based on input data, functions of Higgs pt
+    Reweighting only applied if ggH is in the dataset name, otherwise get a scale factor of 1
+    """
+    json_file = os.path.join(os.path.dirname(__file__), "JSONs/NNLOPS_reweight.json")
+
+    if is_correction:
+        if "ggH" in dataset_name:
+            # Extract NNLOPS weights from json file
+            with open(json_file, "r") as jf:
+                nnlops_reweight = json.load(jf)
+
+            # Load reweight factors for specific generator
+            nnlops_reweight = nnlops_reweight[generator]
+
+            # Build linear splines for different njet bins
+            spline_0jet = interp1d(
+                nnlops_reweight["0jet"]["pt"], nnlops_reweight["0jet"]["weight"]
+            )
+            spline_1jet = interp1d(
+                nnlops_reweight["1jet"]["pt"], nnlops_reweight["1jet"]["weight"]
+            )
+            spline_2jet = interp1d(
+                nnlops_reweight["2jet"]["pt"], nnlops_reweight["2jet"]["weight"]
+            )
+            spline_ge3jet = interp1d(
+                nnlops_reweight["3jet"]["pt"], nnlops_reweight["3jet"]["weight"]
+            )
+
+            # Load truth Higgs pt and njets (pt>30) from events
+            higgs_pt = events.HTXS.Higgs_pt
+            njets30 = events.HTXS.njets30
+
+            # Extract scale factors from splines and mask for different jet bins
+            # Define maximum pt values as interpolated splines only go up so far
+            sf = (
+                (njets30 == 0) * spline_0jet(np.minimum(np.array(higgs_pt), 125.0))
+                + (njets30 == 1) * spline_1jet(np.minimum(np.array(higgs_pt), 625.0))
+                + (njets30 == 2) * spline_2jet(np.minimum(np.array(higgs_pt), 800.0))
+                + (njets30 >= 3) * spline_ge3jet(np.minimum(np.array(higgs_pt), 925.0))
+            )
+
+        else:
+            sf = np.ones(len(weights._weight))
+
+    else:
+        raise RuntimeError(
+            "NNLOPS reweighting is only a flat correction, not a systematic"
+        )
+
+    weights.add("NNLOPS", sf, None, None)
+
+    return weights
+
+
 def AlphaS(photons, events, weights, logger, dataset, systematic):
     """
     AlphaS weights variations are the last two of the PDF replicas, e.g.,
@@ -166,5 +229,3 @@ def PartonShower(photons, events, weights, logger, dataset, systematic):
     except:
         logger.info(f"No PS Weights in dataset {dataset}, skip systematic {systematic}")
         return weights
-
-    return weights

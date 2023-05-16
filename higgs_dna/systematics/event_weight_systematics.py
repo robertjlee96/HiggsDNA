@@ -229,3 +229,5 @@ def PartonShower(photons, events, weights, logger, dataset, systematic):
     except:
         logger.info(f"No PS Weights in dataset {dataset}, skip systematic {systematic}")
         return weights
+
+    return weights

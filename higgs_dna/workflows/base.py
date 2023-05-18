@@ -2,6 +2,7 @@ from higgs_dna.tools.chained_quantile import ChainedQuantileRegression
 from higgs_dna.tools.diphoton_mva import calculate_diphoton_mva
 from higgs_dna.tools.xgb_loader import load_bdt
 from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_mva
+from higgs_dna.tools.pileup_reweighting import add_pileup_weight
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array
 # from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
@@ -173,6 +174,10 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         # data or monte carlo?
         self.data_kind = "mc" if hasattr(events, "GenPart") else "data"
 
+        # calculate pileup weights (should be according to a setting in Metaconditions, later)
+        if self.data_kind == "mc":
+            events = add_pileup_weight(events)
+
         # apply filters and triggers
         events = self.apply_filters_and_triggers(events)
 
@@ -323,6 +328,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             diphotons["event"] = events.event
             diphotons["lumi"] = events.luminosityBlock
             diphotons["run"] = events.run
+            # nPV just for validation of pileup reweighting
+            diphotons["nPV"] = events.PV.npvs
             # annotate diphotons with dZ information (difference between z position of GenVtx and PV) as required by flashggfinalfits
             if self.data_kind == "mc":
                 diphotons["dZ"] = events.GenVtx.z - events.PV.z
@@ -345,7 +352,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 # initiate Weight container here, after selection, since event selection cannot easily be applied to weight container afterwards
                 event_weights = Weights(size=len(events[selection_mask]))
                 # _weight will correspond to "nominal" weight, what else has to be included here? (lumi? xSec? MC sum of weights?)
-                event_weights._weight = events["genWeight"][selection_mask]
+                event_weights._weight = events["genWeight"][selection_mask] * events["weight_pileup"][selection_mask]
 
                 # corrections to event weights:
                 for correction_name in correction_names:

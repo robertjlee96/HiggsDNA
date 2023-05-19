@@ -2,11 +2,12 @@ from higgs_dna.workflows.base import HggBaseProcessor
 from higgs_dna.systematics import object_systematics as available_object_systematics
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
-
+from higgs_dna.tools.pileup_reweighting import add_pileup_weight
 from typing import Any, Dict, List, Optional
 import awkward as ak
 import logging
 import functools
+from coffea.analysis_tools import Weights
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,10 @@ class TagAndProbeProcessor(HggBaseProcessor):
         # data or mc?
         self.data_kind = "mc" if "GenPart" in ak.fields(events) else "data"
 
+        # calculate pileup weights (should be according to a setting in Metaconditions, later)
+        if self.data_kind == "mc":
+            events = add_pileup_weight(events)
+
         # apply filters and triggers
         events = self.apply_filters_and_triggers(events)
 
@@ -105,6 +110,11 @@ class TagAndProbeProcessor(HggBaseProcessor):
                     systematic
                 ][variation]
 
+        if self.data_kind == "mc":
+            event_weights = Weights(size=len(events))
+            # _weight will correspond to "nominal" weight, what else has to be included here? (lumi? xSec? MC sum of weights?)
+            event_weights._weight = events["genWeight"] * events["weight_pileup"]
+
         for variation, photons in photons_dct.items():
             logger.debug(f"Variation: {variation}")
 
@@ -116,9 +126,12 @@ class TagAndProbeProcessor(HggBaseProcessor):
                 photons = self.add_photonid_mva(photons, events)
 
             # photon preselection
-            photons = photon_preselection(self, photons, events)
+            photons = photon_preselection(self, photons, events, apply_electron_veto=False)
 
             if self.data_kind == "mc":
+                # TODO: add weight systs (if needed)
+                # need to annotate the photons already here with a weight since later, each photon can be tag and probe and this changes the length of the array
+                photons["weight"] = event_weights.weight()
                 # keep only photons matched to gen e+ or e-
                 photons = photons[photons.genPartFlav == 11]
 
@@ -127,6 +140,10 @@ class TagAndProbeProcessor(HggBaseProcessor):
                 gen_indices = photons.genPartIdx[photons.genPartIdx != -1]
                 gen_particles = gen_particles[gen_indices]
                 gen_particles = gen_particles[gen_particles.genPartIdxMother == 23]
+
+            # other event related variables need to be added before the tag&probe combination
+            # nPV just for validation of pileup reweighting
+            photons["nPV"] = events.PV.npvs
 
             # TODO: HLT matching for data
 
@@ -152,17 +169,24 @@ class TagAndProbeProcessor(HggBaseProcessor):
 
             # probe selections
             probe_mask = (tnp_candidates.probe.pfChargedIsoPFPV < 20) & (  # was: (tnp_candidates.probe.chargedHadronIso < 20)
-                tnp_candidates.probe.pfChargedIsoPFPV / tnp_candidates.tag.pt < 0.3  # was: tnp_candidates.probe.chargedHadronIso / tnp_candidates.probe.pt < 0.3
+                tnp_candidates.probe.pfChargedIsoPFPV / tnp_candidates.probe.pt < 0.3  # was: tnp_candidates.probe.chargedHadronIso / tnp_candidates.probe.pt < 0.3
             )
 
             # apply selections
             tnp_candidates = tnp_candidates[tag_mask & probe_mask]
-
             # candidates need to be flattened since we have each photon as a tag and probe, otherwise it can't be exported to numpy
             tnp_candidates = ak.flatten(tnp_candidates)
 
             if self.output_location is not None:
                 df = diphoton_list_to_pandas(self, tnp_candidates)
+
+                # since we annotated the photons with event variables, these exist now for tag and probe. Remove:
+                if self.data_kind == "mc":
+                    df["weight"] = df["tag_weight"]
+                    df.drop(["tag_weight", "probe_weight"], axis=1, inplace=True)
+                df["nPV"] = df["tag_nPV"]
+                df.drop(["tag_nPV", "probe_nPV"], axis=1, inplace=True)
+
                 fname = (
                     events.behavior["__events_factory__"]._partition_key.replace(
                         "/", "_"

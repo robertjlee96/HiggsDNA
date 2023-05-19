@@ -6,7 +6,7 @@ import numpy
 # cuts (pt, eta, sieie, mvaID, iso... etc)
 #
 def photon_preselection(
-    self, photons: awkward.Array, events: awkward.Array
+    self, photons: awkward.Array, events: awkward.Array, apply_electron_veto=True
 ) -> awkward.Array:
     """
     Apply preselection cuts to photons.
@@ -70,8 +70,10 @@ def photon_preselection(
         )
     )
 
+    # not apply electron veto for for TnP workflow
+    e_veto = self.e_veto if apply_electron_veto else -1
     return photons[
-        (photons.electronVeto > self.e_veto)
+        (photons.electronVeto > e_veto)
         & (photons.pt > self.min_pt_photon)
         & (photons.isScEtaEB | photons.isScEtaEE)
         & (photons.mvaID > self.min_mvaid)

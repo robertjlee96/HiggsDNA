@@ -15,14 +15,10 @@ def photon_preselection(
     # hlt-mimicking cuts
     rho = events.Rho.fixedGridRhoAll * awkward.ones_like(photons.pt)
     photon_abs_eta = numpy.abs(photons.eta)
-    isEB_high_r9 = (photon_abs_eta < self.gap_barrel_eta) & (
-        photons.r9 > self.min_full5x5_r9_EB_high_r9
-    )
-    isEE_high_r9 = (photon_abs_eta > self.gap_endcap_eta) & (
-        photons.r9 > self.min_full5x5_r9_EE_high_r9
-    )
+    isEB_high_r9 = (photons.isScEtaEB) & (photons.r9 > self.min_full5x5_r9_EB_high_r9)
+    isEE_high_r9 = (photons.isScEtaEE) & (photons.r9 > self.min_full5x5_r9_EE_high_r9)
     isEB_low_r9 = (
-        (photon_abs_eta < self.gap_barrel_eta)
+        (photons.isScEtaEB)
         & (photons.r9 > self.min_full5x5_r9_EB_low_r9)
         & (photons.r9 < self.min_full5x5_r9_EB_high_r9)
         & (
@@ -48,7 +44,7 @@ def photon_preselection(
         )
     )
     isEE_low_r9 = (
-        (photon_abs_eta > self.gap_endcap_eta)
+        (photons.isScEtaEE)
         & (photons.r9 > self.min_full5x5_r9_EE_low_r9)
         & (photons.r9 < self.min_full5x5_r9_EE_high_r9)
         & (
@@ -79,11 +75,7 @@ def photon_preselection(
     return photons[
         (photons.electronVeto > e_veto)
         & (photons.pt > self.min_pt_photon)
-        & (photon_abs_eta < self.max_sc_eta)
-        & (
-            (photon_abs_eta < self.gap_barrel_eta)
-            | (photon_abs_eta > self.gap_endcap_eta)
-        )
+        & (photons.isScEtaEB | photons.isScEtaEE)
         & (photons.mvaID > self.min_mvaid)
         & (photons.hoe < self.max_hovere)
         & (

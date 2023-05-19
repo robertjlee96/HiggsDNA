@@ -5,6 +5,7 @@ from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_m
 from higgs_dna.tools.pileup_reweighting import add_pileup_weight
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array
+
 # from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
 from higgs_dna.metaconditions import photon_id_mva_weights
 from higgs_dna.metaconditions import diphoton as diphoton_mva_dir
@@ -70,7 +71,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.min_full5x5_r9_EE_high_r9 = 0.9
         self.min_full5x5_r9_EB_low_r9 = 0.5
         self.min_full5x5_r9_EE_low_r9 = 0.8
-        self.max_trkSumPtHollowConeDR03_EB_low_r9 = 6.0  # for v11, we cut on Photon_pfChargedIsoPFPV
+        self.max_trkSumPtHollowConeDR03_EB_low_r9 = (
+            6.0  # for v11, we cut on Photon_pfChargedIsoPFPV
+        )
         self.max_trkSumPtHollowConeDR03_EE_low_r9 = 6.0  # Leaving the names of the preselection cut variables the same to change as little as possible
         self.max_sieie_EB_low_r9 = 0.015
         self.max_sieie_EE_low_r9 = 0.035
@@ -220,7 +223,12 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     )
                     original_photons.add_systematic(
                         # passing the arguments here explicitly since I want to pass the events to the varying function. If there is a more elegant / flexible way, just change it!
-                        name=systematic_name, kind=systematic_dct["args"]["kind"], what=systematic_dct["args"]["what"], varying_function=functools.partial(systematic_dct["args"]["varying_function"], events=events)
+                        name=systematic_name,
+                        kind=systematic_dct["args"]["kind"],
+                        what=systematic_dct["args"]["what"],
+                        varying_function=functools.partial(
+                            systematic_dct["args"]["varying_function"], events=events
+                        )
                         # name=systematic_name, **systematic_dct["args"]
                     )
                 # to be implemented for other objects here
@@ -257,7 +265,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             # sort photons in each event descending in pt
             # make descending-pt combinations of photons
             photons = photons[awkward.argsort(photons.pt, ascending=False)]
-            photons["charge"] = awkward.zeros_like(photons.pt)  # added this because charge is not a property of photons in nanoAOD v11. We just assume every photon has charge zero...
+            photons["charge"] = awkward.zeros_like(
+                photons.pt
+            )  # added this because charge is not a property of photons in nanoAOD v11. We just assume every photon has charge zero...
             diphotons = awkward.combinations(
                 photons, 2, fields=["pho_lead", "pho_sublead"]
             )
@@ -348,6 +358,10 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 selection_mask = ~awkward.is_none(diphotons)
                 diphotons = diphotons[selection_mask]
 
+            # return if there is no surviving events
+            if len(diphotons) == 0:
+                logger.debug("No surviving events in this run, return now!")
+                return histos_etc
             if self.data_kind == "mc":
                 # initiate Weight container here, after selection, since event selection cannot easily be applied to weight container afterwards
                 event_weights = Weights(size=len(events[selection_mask]))
@@ -375,26 +389,48 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             logger.info(
                                 f"Adding systematic {systematic_name} to weight collection of dataset {dataset_name}"
                             )
-                            varying_function = available_weight_systematics[
-                                systematic_name
-                            ]
-                            event_weights = varying_function(
-                                events=events[selection_mask],
-                                photons=events[f"diphotons_{variation}"][
-                                    selection_mask
-                                ],
-                                weights=event_weights,
-                            )
-                    # event PDF/Scale/PS weights
-                    if hasattr(events, "LHEScaleWeight"):
-                        diphotons["nLHEScaleWeight"] = awkward.num(events.LHEScaleWeight[selection_mask],axis=1)
-                        diphotons["LHEScaleWeight"] = events.LHEScaleWeight[selection_mask]
-                    if hasattr(events, "LHEPdfWeight"):
-                        diphotons["nLHEPdfWeight"] = awkward.num(events.LHEPdfWeight[selection_mask],axis=1)
-                        diphotons["LHEPdfWeight"] = events.LHEPdfWeight[selection_mask]
-                    if hasattr(events, "PSWeight"):
-                        diphotons["nPSWeight"] = awkward.num(events.PSWeight[selection_mask],axis=1)
-                        diphotons["PSWeight"] = events.PSWeight[selection_mask]
+                            if systematic_name == "LHEScale":
+                                if hasattr(events, "LHEScaleWeight"):
+                                    diphotons["nLHEScaleWeight"] = awkward.num(
+                                        events.LHEScaleWeight[selection_mask], axis=1
+                                    )
+                                    diphotons["LHEScaleWeight"] = events.LHEScaleWeight[
+                                        selection_mask
+                                    ]
+                                else:
+                                    logger.info(
+                                        f"No {systematic_name} Weights in dataset {dataset_name}"
+                                    )
+                            elif systematic_name == "LHEPdf":
+                                if hasattr(events, "LHEPdfWeight"):
+                                    # two AlphaS weights are removed
+                                    diphotons["nLHEPdfWeight"] = (
+                                        awkward.num(
+                                            events.LHEPdfWeight[selection_mask], axis=1
+                                        )
+                                        - 2
+                                    )
+                                    diphotons["LHEPdfWeight"] = events.LHEPdfWeight[
+                                        selection_mask
+                                    ][:, :-2]
+                                else:
+                                    logger.info(
+                                        f"No {systematic_name} Weights in dataset {dataset_name}"
+                                    )
+                            else:
+                                varying_function = available_weight_systematics[
+                                    systematic_name
+                                ]
+                                event_weights = varying_function(
+                                    events=events[selection_mask],
+                                    photons=events[f"diphotons_{variation}"][
+                                        selection_mask
+                                    ],
+                                    weights=event_weights,
+                                    logger=logger,
+                                    dataset=dataset_name,
+                                    systematic=systematic_name,
+                                )
 
                 diphotons["weight"] = event_weights.weight()
                 if variation == "nominal":

@@ -352,7 +352,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 # initiate Weight container here, after selection, since event selection cannot easily be applied to weight container afterwards
                 event_weights = Weights(size=len(events[selection_mask]))
                 # _weight will correspond to "nominal" weight, what else has to be included here? (lumi? xSec? MC sum of weights?)
-                event_weights._weight = events["genWeight"][selection_mask] * events["weight_pileup"][selection_mask]
+                event_weights._weight = numpy.sign(events["genWeight"][selection_mask]) * events["weight_pileup"][selection_mask]
 
                 # corrections to event weights:
                 for correction_name in correction_names:

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import argparse
 import json
+import os
 from importlib import resources
 from higgs_dna.utils.logger_utils import setup_logger
 import pyarrow.parquet as pq
@@ -31,6 +32,10 @@ args = parser.parse_args()
 source_paths = args.source.split(",")
 target_paths = args.target.split(",")
 
+BASEDIR = os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))
+) + "/higgs_dna/"
+
 logger = setup_logger(level="INFO")
 
 if (
@@ -43,14 +48,18 @@ if (
 
 
 if args.cats_dict != "":
-    with resources.open_text("higgs_dna", "category.json") as pf:
+    with open(BASEDIR + "category.json") as pf:
         cat_dict = json.load(pf)
     for cat in cat_dict:
         logger.info(f"Found category: {cat}")
 else:
-    raise Exception(
+    logger.info(
         "You provided an invalid dictionary containing categories information, have a look at your version of prepare_output_file.py"
     )
+    logger.info(
+        "An inclusive NOTAG category is used as default"
+    )
+    cat_dict = {"NOTAG": {"cat_filter": [("pt", ">", -1.0)]}}
 
 
 for i, source_path in enumerate(source_paths):

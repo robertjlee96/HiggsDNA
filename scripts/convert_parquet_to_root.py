@@ -3,7 +3,9 @@ import argparse
 from higgs_dna.utils.logger_utils import setup_logger
 import pandas as pd
 import uproot
+import awkward as ak
 import numpy as np
+import os
 import json
 from importlib import resources
 
@@ -55,8 +57,15 @@ process = args.process if (args.process != "") else "data"
 
 logger = setup_logger(level=args.log)
 
+BASEDIR = os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))
+) + "/higgs_dna/"
+
 df_dict = {}
 outfiles = {
+    "ch": target_path.replace(
+        "merged.root", "output_cHToGG_M125_13TeV_amcatnloFXFX_pythia8.root"
+    ),
     "ggh": target_path.replace(
         "merged.root", "output_GluGluHToGG_M125_13TeV_amcatnloFXFX_pythia8.root"
     ),
@@ -74,19 +83,25 @@ outfiles = {
 
 # Loading category informations (used for naming of files to read/write)
 if args.cats_dict != "":
-    with resources.open_text("higgs_dna", args.cats_dict) as pf:
+    with open(BASEDIR + args.cats_dict) as pf:
+    # with resources.open_text("higgs_dna", args.cats_dict) as pf:
         cat_dict = json.load(pf)
     for cat in cat_dict:
         logger.debug(f"Found category: {cat}")
 else:
-    raise Exception(
+    logger.info(
         "You provided an invalid dictionary containing categories information, have a look at your version of prepare_output_file.py"
     )
+    logger.info(
+        "An inclusive NOTAG category is used as default"
+    )
+    cat_dict = {"NOTAG": {"cat_filter": [("pt", ">", -1.0)]}}
 
 # Loading variation informations (used for naming of files to read/write)
 # Active object systematics, weight systematics are just different sets of weights contained in the nominal file
 if args.vars_dict != "":
-    with resources.open_text("higgs_dna", args.vars_dict) as pf:
+    # with resources.open_text("higgs_dna", args.vars_dict) as pf:
+    with open(BASEDIR + args.vars_dict) as pf:
         variation_dict = json.load(pf)
     for var in variation_dict:
         logger.debug(f"Found variation: {var}")
@@ -108,22 +123,20 @@ if args.do_syst:
                 f"Starting conversion of one parquet file to ROOT. Attempting to read file {var_path} for category: {cat}."
             )
 
-            df = pd.read_parquet(var_path)
-            logger.debug(df)
-            df = df.select_dtypes(include=np.number)
-            df = df.astype("float32")
-            df = df.astype("Float32")
-            # df = df.convert_dtypes()
+            eve = ak.from_parquet(var_path)
 
-            logger.info("Successfully read pandas dataframe from parquet file.")
-            dict = df.to_dict(
-                orient="list"
-            )  # to save it in proper format (default does it row-wise = bad)
+            logger.info("Successfully read from parquet file with awkward.")
+
+            dict = {}
+            for i in eve.fields:
+                dict[i] = ak.to_numpy(eve[i])
+                
             df_dict[var][cat] = dict
 
             logger.debug(
-                f"Successfully created dict from pandas dataframe for {var} variation for category: {cat}."
+                f"Successfully created dict from awkward arrays for {var} variation for category: {cat}."
             )
+            
     logger.info(f"Attempting to write dict to ROOT file {target_path}.")
 else:
     for cat in cat_dict:
@@ -131,19 +144,19 @@ else:
         logger.info(
             f"Starting conversion of one parquet file to ROOT. Attempting to read file {var_path}."
         )
-        df = pd.read_parquet(var_path)
-        logger.debug(df)
-        df = df.select_dtypes(include=np.number)
-        df = df.astype("float32")
-        df = df.astype("Float32")
-        # df = df.convert_dtypes()
-        logger.info("Successfully read pandas dataframe from parquet file.")
-        dict = df.to_dict(
-            orient="list"
-        )  # to save it in proper format (default does it row-wise = bad)
+
+        eve = ak.from_parquet(var_path)
+
+        logger.info("Successfully read from parquet file wit awkward.")
+
+        dict = {}
+        for i in eve.fields:
+            dict[i] = ak.to_numpy(eve[i])
+            
         df_dict[cat] = dict
-        logger.info(
-            "Successfully created dict from pandas dataframe without variations."
+
+        logger.debug(
+            f"Successfully created dict from awkward arrays without variation for category: {cat}."
         )
 
 cat_postfix = {"ggh": "GG2H", "vbf": "VBF", "tth": "TTH", "vh": "VH"}

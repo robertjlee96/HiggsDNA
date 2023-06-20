@@ -35,7 +35,7 @@ def activate_final_fit(path, command):
 
 # --------------------------------------------------------------------------------------------------------------------------#
 # - USAGE: -----------------------------------------------------------------------------------------------------------------#
-# - python3 run_postprocess_steps.py --input ../out_dir_syst_090323/ --merged --root --ws --syst --cats --args "--do_syst" -#
+# - python3 prepare_output_file.py --input ../out_dir_syst_090323/ --merge --root --ws --syst --cats --args "--do_syst" -#
 # --------------------------------------------------------------------------------------------------------------------------#
 
 # Read options from command line
@@ -112,15 +112,15 @@ if (opt.verbose != "INFO") and (opt.verbose != "DEBUG"):
 logger = setup_logger(level=opt.verbose)
 
 os.system(
-    f"ls -l {opt.input} | tail -n +2 | grep -v .coffea | grep 201 | "
+    f"ls -l {opt.input} | tail -n +2 | grep -v .coffea | grep -v merged | grep -v root |"
     + "awk '{print $NF}' > dirlist.txt"
 )
 
 EXEC_PATH = os.getcwd()
-os.chdir(EXEC_PATH + "/" + opt.input)
+os.chdir(opt.input)
 IN_PATH = os.getcwd()
 SCRIPT_DIR = os.path.dirname(
-    os.path.abspath(inspect.getfile(inspect.currentframe()))
+    os.path.abspath(__file__)
 )  # script directory
 
 process_dict = {
@@ -148,7 +148,7 @@ if opt.cats:
             "cat_filter": [
                 ("bdt_score", ">", 0.8),
                 ("bdt_score", "<=", 0.9),
-                ("ge_one_jet_cut", "==", False),
+                ("n_jets", "==", 0),
                 ("pt", "<=", 10),
             ]
         },
@@ -156,21 +156,21 @@ if opt.cats:
             "cat_filter": [
                 ("bdt_score", ">", 0.8),
                 ("bdt_score", "<=", 0.9),
-                ("ge_one_jet_cut", "==", False),
+                ("n_jets", "==", 0),
                 ("pt", ">", 10),
             ]
         },
         "BDT_HIG_0J_PT_LOW": {
             "cat_filter": [
                 ("bdt_score", ">", 0.9),
-                ("ge_one_jet_cut", "==", False),
+                ("n_jets", "==", 0),
                 ("pt", "<=", 10),
             ]
         },
         "BDT_HIG_0J_PT_HIG": {
             "cat_filter": [
                 ("bdt_score", ">", 0.9),
-                ("ge_one_jet_cut", "==", False),
+                ("n_jets", "==", 0),
                 ("pt", ">", 10),
             ]
         },
@@ -178,7 +178,7 @@ if opt.cats:
             "cat_filter": [
                 ("bdt_score", ">", 0.8),
                 ("bdt_score", "<=", 0.9),
-                ("ge_one_jet_cut", "==", True),
+                ("n_jets", ">", 0),
                 ("pt", "<=", 60),
             ]
         },
@@ -186,27 +186,27 @@ if opt.cats:
             "cat_filter": [
                 ("bdt_score", ">", 0.8),
                 ("bdt_score", "<=", 0.9),
-                ("ge_one_jet_cut", "==", True),
+                ("n_jets", ">", 0),
                 ("pt", ">", 60),
             ]
         },
         "BDT_HIG_GE1J_PT_LOW": {
             "cat_filter": [
                 ("bdt_score", ">", 0.9),
-                ("ge_one_jet_cut", "==", True),
+                ("n_jets", ">", 0),
                 ("pt", "<=", 60),
             ]
         },
         "BDT_HIG_GE1J_PT_HIG": {
             "cat_filter": [
                 ("bdt_score", ">", 0.9),
-                ("ge_one_jet_cut", "==", True),
+                ("n_jets", ">", 0),
                 ("pt", ">", 60),
             ]
         },
     }
 else:
-    cat_dict = {"NOTAG": {"cat_filter": [("pt", ">", -1.0)]}}
+    cat_dict = {"UNTAGGED": {"cat_filter": [("pt", ">", -1.0)]}}
 # I create a dictionary and save it to a temporary json so that this can be shared between the two scripts
 # and then gets deleted to not leave trash around. We have to care for the environment :P.
 # Not super elegant, open for suggestions
@@ -226,6 +226,7 @@ if opt.merge:
         files = fl.readlines()
         for file in files:
             file = file.split("\n")[0]
+            # MC dataset are supposed to have M125 in the name, this should be changed!
             if "M125" in file:
                 if os.path.exists(f"{IN_PATH}/merged/{file}"):
                     raise Exception(
@@ -267,12 +268,22 @@ if opt.merge:
                     f'python3 merge_parquet.py --source {IN_PATH}/{file} --target {IN_PATH}/merged/Data_{file.split("_")[-1]}/{file}_ --cats {cat_dict}'
                 )
 
-        # at this point Data will be split in eras, here we merge them again in one allData file to rule them all
-        os.system(
-            f'python3 merge_parquet.py --source {IN_PATH}/merged/Data_{file.split("_")[-1]} --target {IN_PATH}/merged/Data_{file.split("_")[-1]}/allData_ --cats {cat_dict}'
-        )
+        # at this point Data will be split in eras if any Data dataset is present, here we merge them again in one allData file to rule them all
+        # we also skip this step if there is no Data
+        for file in files:
+            file = file.split("\n")[0] # otherwise it contains an end of line and messes up the os.walk() call
+            if "Data" in file:
+                dirpath, dirnames, filenames = next(os.walk(f'{IN_PATH}/merged/Data_{file.split("_")[-1]}'))
+                if len(filenames) > 0:
+                    os.system(
+                        f'python3 merge_parquet.py --source {IN_PATH}/merged/Data_{file.split("_")[-1]} --target {IN_PATH}/merged/Data_{file.split("_")[-1]}/allData_ --cats {cat_dict}'
+                    )
+                    break
+                else:
+                    logger.info(f'No merged parquet found for {file} in the directory: {IN_PATH}/merged/Data_{file.split("_")[-1]}')
 
 if opt.root:
+    logger.info("Starting root step")
     # Note, in my version of HiggsDNA I run the analysis splitting data per Era in different datasets
     # the treatment of data here is tested just with that structure
     with open(f"{EXEC_PATH}/dirlist.txt") as fl:
@@ -289,7 +300,6 @@ if opt.root:
                     logger.info(f"Found merged files {IN_PATH}/merged/{file}/")
                 else:
                     raise Exception(f"Merged parquet not found at {IN_PATH}/merged/")
-
                 MKDIRP(f"{IN_PATH}/root/{file}")
                 os.chdir(SCRIPT_DIR)
                 os.system(
@@ -332,6 +342,8 @@ if opt.ws:
     if os.path.exists(f"{IN_PATH}/root/Data"):
         os.system(f"echo Data >> {EXEC_PATH}/dirlist.txt")
 
+    data_done = False
+
     with open(f"{EXEC_PATH}/dirlist.txt") as fl:
         files = fl.readlines()
         if opt.syst:
@@ -339,10 +351,6 @@ if opt.ws:
         else:
             doSystematics = ""
         for dir in files:
-            # skipping not important directories (they were used in previous steps)
-            if "DoubleEG" in dir:
-                logger.debug(f"Skipping directory {dir}")
-                continue
             dir = dir.split("\n")[0]
             if "M125" in dir and dir in process_dict:
                 if os.listdir(f"{IN_PATH}/root/{dir}/"):
@@ -357,10 +365,10 @@ if opt.ws:
                     )
                 command = f"python trees2ws.py --inputConfig {opt.config} --productionMode {process_dict[dir]} --year 2017 {doSystematics} --inputTreeFile {filename}"
                 activate_final_fit(opt.final_fit, command)
-            else:
-                if os.listdir(f"{IN_PATH}/root/{dir}/"):
+            elif "Data" in dir and not data_done:
+                if os.listdir(f"{IN_PATH}/root/Data/"):
                     filename = subprocess.check_output(
-                        f"find {IN_PATH}/root/{dir} -name *.root -type f",
+                        f"find {IN_PATH}/root/Data -name *.root -type f",
                         shell=True,
                         universal_newlines=True,
                     )
@@ -370,6 +378,7 @@ if opt.ws:
                     )
                 command = f"python trees2ws_data.py --inputConfig {opt.config} --inputTreeFile {filename}"
                 activate_final_fit(opt.final_fit, command)
+                data_done = True
     os.chdir(EXEC_PATH)
 
 # We don't want to leave trash around

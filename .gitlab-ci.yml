@@ -6,6 +6,7 @@ image: "python:3.9"
 
 stages:
   - build
+  - build docker
   - static analysis
   - test
 
@@ -13,6 +14,22 @@ build:
   stage: build
   script:
     - pip install -e .[dev]
+
+build_docker:
+  stage: build docker
+  variables:
+    TO: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+  tags:
+    - docker-privileged
+  image: docker:19.03.1
+  services:
+    - docker:19.03.1-dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_BUILD_TOKEN $CI_REGISTRY
+  script:
+    - docker build -f docker/Dockerfile_lxplus -t $TO .
+    - docker run -v $(pwd):/root/pyinstall/HiggsDNA $TO /bin/bash HiggsDNA/docker/install.sh
+    - docker push $TO
 
 static_analysis:
   stage: static analysis

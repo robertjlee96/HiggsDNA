@@ -19,6 +19,7 @@ build_docker:
   stage: build docker
   variables:
     TO: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+    TOL: $CI_REGISTRY_IMAGE:latest
   tags:
     - docker-privileged
   image: docker:19.03.1
@@ -29,7 +30,9 @@ build_docker:
   script:
     - docker build -f docker/Dockerfile_lxplus -t $TO .
     - docker run -v $(pwd):/root/pyinstall/HiggsDNA $TO /bin/bash HiggsDNA/docker/install.sh
+    - docker tag $TO $TOL
     - docker push $TO
+    - docker push $TOL
 
 static_analysis:
   stage: static analysis

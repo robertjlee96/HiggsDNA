@@ -3,6 +3,7 @@ from higgs_dna.tools.diphoton_mva import calculate_diphoton_mva
 from higgs_dna.tools.xgb_loader import load_bdt
 from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_mva
 from higgs_dna.tools.pileup_reweighting import add_pileup_weight
+from higgs_dna.tools.SC_eta import add_photon_SC_eta
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array
 
@@ -183,6 +184,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
 
         # apply filters and triggers
         events = self.apply_filters_and_triggers(events)
+
+        # we need ScEta for corrections and systematics, which is not present in NanoAODv11 but can be calculated using PV
+        events.Photon = add_photon_SC_eta(events.Photon, events.PV)
 
         # here we start recording possible coffea accumulators
         # most likely histograms, could be counters, arrays, ...

@@ -4,6 +4,7 @@ from higgs_dna.tools.xgb_loader import load_bdt
 from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_mva
 from higgs_dna.tools.pileup_reweighting import add_pileup_weight
 from higgs_dna.selections.photon_selections import photon_preselection
+from higgs_dna.selections.jet_selections import select_jets
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array
 
 # from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
@@ -84,6 +85,17 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.low_eta_rho_corr = 0.16544
         self.high_eta_rho_corr = 0.13212
         self.e_veto = 0.5
+
+        # jet selection variables
+        self.jet_pho_min_dr = 0.4
+        self.jet_ele_min_dr = 0.4
+        self.jet_muo_min_dr = 0.4
+        self.jet_min_pt = 20
+        self.jet_max_eta = 4.7
+
+        self.clean_jet_pho = True
+        self.clean_jet_ele = False
+        self.clean_jet_muo = False
 
         logger.debug(f"Setting up processor with metaconditions: {self.meta}")
 
@@ -213,6 +225,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 continue
 
         original_photons = events.Photon
+        original_jets = events.Jet
         # systematic object variations
         for systematic_name in systematic_names:
             if systematic_name in available_object_systematics.keys():
@@ -222,6 +235,20 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         f"Adding systematic {systematic_name} to photons collection of dataset {dataset_name}"
                     )
                     original_photons.add_systematic(
+                        # passing the arguments here explicitly since I want to pass the events to the varying function. If there is a more elegant / flexible way, just change it!
+                        name=systematic_name,
+                        kind=systematic_dct["args"]["kind"],
+                        what=systematic_dct["args"]["what"],
+                        varying_function=functools.partial(
+                            systematic_dct["args"]["varying_function"], events=events
+                        )
+                        # name=systematic_name, **systematic_dct["args"]
+                    )
+                elif systematic_dct["object"] == "Jet":
+                    logger.info(
+                        f"Adding systematic {systematic_name} to jets collection of dataset {dataset_name}"
+                    )
+                    original_jets.add_systematic(
                         # passing the arguments here explicitly since I want to pass the events to the varying function. If there is a more elegant / flexible way, just change it!
                         name=systematic_name,
                         kind=systematic_dct["args"]["kind"],
@@ -252,212 +279,310 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     original_photons.systematics[systematic][variation]
                 )
 
+        jets_dct = {}
+        jets_dct["nominal"] = original_jets
+        logger.debug(original_jets.systematics.fields)
+        for systematic in original_jets.systematics.fields:
+            for variation in original_jets.systematics[systematic].fields:
+                # deepcopy to allow for independent calculations on photon variables with CQR
+                jets_dct[f"{systematic}_{variation}"] = original_jets.systematics[
+                    systematic
+                ][variation]
+
         for variation, photons in photons_dct.items():
-            logger.debug(f"Variation: {variation}")
-            if self.chained_quantile is not None:
-                photons = self.chained_quantile.apply(photons, events)
-            # recompute photonid_mva on the fly
-            if self.photonid_mva_EB and self.photonid_mva_EE:
-                photons = self.add_photonid_mva(photons, events)
-
-            # photon preselection
-            photons = photon_preselection(self, photons, events)
-            # sort photons in each event descending in pt
-            # make descending-pt combinations of photons
-            photons = photons[awkward.argsort(photons.pt, ascending=False)]
-            photons["charge"] = awkward.zeros_like(
-                photons.pt
-            )  # added this because charge is not a property of photons in nanoAOD v11. We just assume every photon has charge zero...
-            diphotons = awkward.combinations(
-                photons, 2, fields=["pho_lead", "pho_sublead"]
-            )
-            # the remaining cut is to select the leading photons
-            # the previous sort assures the order
-            diphotons = diphotons[diphotons["pho_lead"].pt > self.min_pt_lead_photon]
-
-            # now turn the diphotons into candidates with four momenta and such
-            diphoton_4mom = diphotons["pho_lead"] + diphotons["pho_sublead"]
-            diphotons["pt"] = diphoton_4mom.pt
-            diphotons["eta"] = diphoton_4mom.eta
-            diphotons["phi"] = diphoton_4mom.phi
-            diphotons["mass"] = diphoton_4mom.mass
-            diphotons["charge"] = diphoton_4mom.charge
-            diphotons = awkward.with_name(diphotons, "PtEtaPhiMCandidate")
-
-            # sort diphotons by pT
-            diphotons = diphotons[awkward.argsort(diphotons.pt, ascending=False)]
-
-            # baseline modifications to diphotons
-            if self.diphoton_mva is not None:
-                diphotons = self.add_diphoton_mva(diphotons, events)
-
-            # workflow specific processing
-            events, process_extra = self.process_extra(events)
-            histos_etc.update(process_extra)
-
-            # run taggers on the events list with added diphotons
-            # the shape here is ensured to be broadcastable
-            for tagger in self.taggers:
-                (
-                    diphotons["_".join([tagger.name, str(tagger.priority)])],
-                    tagger_extra,
-                ) = tagger(
-                    events, diphotons
-                )  # creates new column in diphotons - tagger priority, or 0, also return list of histrograms here?
-                histos_etc.update(tagger_extra)
-
-            # if there are taggers to run, arbitrate by them first
-            # Deal with order of tagger priorities
-            # Turn from diphoton jagged array to whether or not an event was selected
-            if len(self.taggers):
-                counts = awkward.num(diphotons.pt, axis=1)
-                flat_tags = numpy.stack(
-                    (
-                        awkward.flatten(
-                            diphotons["_".join([tagger.name, str(tagger.priority)])]
+            for jet_variation, Jets in jets_dct.items():
+                # make sure no duplicate executions
+                if variation == "nominal" or jet_variation == "nominal":
+                    if variation != "nominal" and jet_variation != "nominal":
+                        continue
+                    do_variation = "nominal"
+                    if not (variation == "nominal" and jet_variation == "nominal"):
+                        do_variation = (
+                            variation if variation != "nominal" else jet_variation
                         )
-                        for tagger in self.taggers
-                    ),
-                    axis=1,
-                )
-                tags = awkward.from_regular(
-                    awkward.unflatten(flat_tags, counts), axis=2
-                )
-                winner = awkward.min(tags[tags != 0], axis=2)
-                diphotons["best_tag"] = winner
+                    logger.debug("Variation: {}".format(do_variation))
+                    if self.chained_quantile is not None:
+                        photons = self.chained_quantile.apply(photons, events)
+                    # recompute photonid_mva on the fly
+                    if self.photonid_mva_EB and self.photonid_mva_EE:
+                        photons = self.add_photonid_mva(photons, events)
 
-                # lowest priority is most important (ascending sort)
-                # leave in order of diphoton pT in case of ties (stable sort)
-                sorted = awkward.argsort(diphotons.best_tag, stable=True)
-                diphotons = diphotons[sorted]
+                    # photon preselection
+                    photons = photon_preselection(self, photons, events)
+                    # sort photons in each event descending in pt
+                    # make descending-pt combinations of photons
+                    photons = photons[awkward.argsort(photons.pt, ascending=False)]
+                    photons["charge"] = awkward.zeros_like(
+                        photons.pt
+                    )  # added this because charge is not a property of photons in nanoAOD v11. We just assume every photon has charge zero...
+                    diphotons = awkward.combinations(
+                        photons, 2, fields=["pho_lead", "pho_sublead"]
+                    )
+                    # the remaining cut is to select the leading photons
+                    # the previous sort assures the order
+                    diphotons = diphotons[diphotons["pho_lead"].pt > self.min_pt_lead_photon]
 
-            diphotons = awkward.firsts(diphotons)
-            # set diphotons as part of the event record
-            events[f"diphotons_{variation}"] = diphotons
-            # annotate diphotons with event information
-            diphotons["event"] = events.event
-            diphotons["lumi"] = events.luminosityBlock
-            diphotons["run"] = events.run
-            # nPV just for validation of pileup reweighting
-            diphotons["nPV"] = events.PV.npvs
-            # annotate diphotons with dZ information (difference between z position of GenVtx and PV) as required by flashggfinalfits
-            if self.data_kind == "mc":
-                diphotons["dZ"] = events.GenVtx.z - events.PV.z
-            # Fill zeros for data because there is no GenVtx for data, obviously
-            else:
-                diphotons["dZ"] = awkward.zeros_like(events.PV.z)
+                    # now turn the diphotons into candidates with four momenta and such
+                    diphoton_4mom = diphotons["pho_lead"] + diphotons["pho_sublead"]
+                    diphotons["pt"] = diphoton_4mom.pt
+                    diphotons["eta"] = diphoton_4mom.eta
+                    diphotons["phi"] = diphoton_4mom.phi
+                    diphotons["mass"] = diphoton_4mom.mass
+                    diphotons["charge"] = diphoton_4mom.charge
+                    diphotons = awkward.with_name(diphotons, "PtEtaPhiMCandidate")
 
-            # drop events without a preselected diphoton candidate
-            # drop events without a tag, if there are tags
-            if len(self.taggers):
-                selection_mask = ~(
-                    awkward.is_none(diphotons) | awkward.is_none(diphotons.best_tag)
-                )
-                diphotons = diphotons[selection_mask]
-            else:
-                selection_mask = ~awkward.is_none(diphotons)
-                diphotons = diphotons[selection_mask]
+                    # sort diphotons by pT
+                    diphotons = diphotons[awkward.argsort(diphotons.pt, ascending=False)]
 
-            # return if there is no surviving events
-            if len(diphotons) == 0:
-                logger.debug("No surviving events in this run, return now!")
-                return histos_etc
-            if self.data_kind == "mc":
-                # initiate Weight container here, after selection, since event selection cannot easily be applied to weight container afterwards
-                event_weights = Weights(size=len(events[selection_mask]))
-                # _weight will correspond to "nominal" weight, what else has to be included here? (lumi? xSec? MC sum of weights?)
-                event_weights._weight = numpy.sign(events["genWeight"][selection_mask]) * events["weight_pileup"][selection_mask]
+                    # baseline modifications to diphotons
+                    if self.diphoton_mva is not None:
+                        diphotons = self.add_diphoton_mva(diphotons, events)
 
-                # corrections to event weights:
-                for correction_name in correction_names:
-                    if correction_name in available_weight_corrections:
-                        logger.info(
-                            f"Adding correction {correction_name} to weight collection of dataset {dataset_name}"
+                    # workflow specific processing
+                    events, process_extra = self.process_extra(events)
+                    histos_etc.update(process_extra)
+
+                    # jet_variables
+                    jets = awkward.zip(
+                        {
+                            "pt": Jets.pt,
+                            "eta": Jets.eta,
+                            "phi": Jets.phi,
+                            "mass": Jets.mass,
+                            "charge": awkward.zeros_like(
+                                Jets.pt
+                            ),  # added this because jet charge is not a property of photons in nanoAOD v11. We just need the charge to build jet collection.
+                        }
+                    )
+                    jets = awkward.with_name(jets, "PtEtaPhiMCandidate")
+
+                    electrons = awkward.zip(
+                        {
+                            "pt": events.Electron.pt,
+                            "eta": events.Electron.eta,
+                            "phi": events.Electron.phi,
+                            "mass": events.Electron.mass,
+                            "charge": events.Electron.charge,
+                        }
+                    )
+                    electrons = awkward.with_name(electrons, "PtEtaPhiMCandidate")
+                    muons = awkward.zip(
+                        {
+                            "pt": events.Muon.pt,
+                            "eta": events.Muon.eta,
+                            "phi": events.Muon.phi,
+                            "mass": events.Muon.mass,
+                            "charge": events.Muon.charge,
+                        }
+                    )
+                    muons = awkward.with_name(muons, "PtEtaPhiMCandidate")
+
+                    # jet selection and pt ordering
+                    jets = select_jets(self, jets, diphotons, muons, electrons)
+                    jets = jets[awkward.argsort(jets.pt, ascending=False)]
+                    n_jets = awkward.num(jets)
+
+                    def choose_leading_jet(jets_variable, n):
+                        leading_jets_variable = jets_variable[
+                            awkward.local_index(jets_variable) == n
+                        ]
+                        leading_jets_variable = awkward.pad_none(
+                            leading_jets_variable, 1
                         )
-                        varying_function = available_weight_corrections[correction_name]
-                        event_weights = varying_function(
-                            events=events[selection_mask],
-                            photons=events[f"diphotons_{variation}"][selection_mask],
-                            weights=event_weights,
-                            dataset_name=dataset_name,
+                        leading_jets_variable = awkward.flatten(
+                            awkward.fill_none(leading_jets_variable, -999)
                         )
+                        return leading_jets_variable
 
-                # systematic variations of event weights go to nominal output dataframe:
-                if variation == "nominal":
-                    for systematic_name in systematic_names:
-                        if systematic_name in available_weight_systematics:
-                            logger.info(
-                                f"Adding systematic {systematic_name} to weight collection of dataset {dataset_name}"
-                            )
-                            if systematic_name == "LHEScale":
-                                if hasattr(events, "LHEScaleWeight"):
-                                    diphotons["nLHEScaleWeight"] = awkward.num(
-                                        events.LHEScaleWeight[selection_mask], axis=1
-                                    )
-                                    diphotons["LHEScaleWeight"] = events.LHEScaleWeight[
-                                        selection_mask
-                                    ]
-                                else:
-                                    logger.info(
-                                        f"No {systematic_name} Weights in dataset {dataset_name}"
-                                    )
-                            elif systematic_name == "LHEPdf":
-                                if hasattr(events, "LHEPdfWeight"):
-                                    # two AlphaS weights are removed
-                                    diphotons["nLHEPdfWeight"] = (
-                                        awkward.num(
-                                            events.LHEPdfWeight[selection_mask], axis=1
-                                        )
-                                        - 2
-                                    )
-                                    diphotons["LHEPdfWeight"] = events.LHEPdfWeight[
-                                        selection_mask
-                                    ][:, :-2]
-                                else:
-                                    logger.info(
-                                        f"No {systematic_name} Weights in dataset {dataset_name}"
-                                    )
-                            else:
-                                varying_function = available_weight_systematics[
-                                    systematic_name
-                                ]
+                    first_jet_pt = choose_leading_jet(jets.pt, 0)
+                    first_jet_eta = choose_leading_jet(jets.eta, 0)
+                    first_jet_phi = choose_leading_jet(jets.phi, 0)
+                    first_jet_mass = choose_leading_jet(jets.mass, 0)
+                    first_jet_charge = choose_leading_jet(jets.charge, 0)
+
+                    second_jet_pt = choose_leading_jet(jets.pt, 1)
+                    second_jet_eta = choose_leading_jet(jets.eta, 1)
+                    second_jet_phi = choose_leading_jet(jets.phi, 1)
+                    second_jet_mass = choose_leading_jet(jets.mass, 1)
+                    second_jet_charge = choose_leading_jet(jets.charge, 1)
+
+                    diphotons["first_jet_pt"] = first_jet_pt
+                    diphotons["first_jet_eta"] = first_jet_eta
+                    diphotons["first_jet_phi"] = first_jet_phi
+                    diphotons["first_jet_mass"] = first_jet_mass
+                    diphotons["first_jet_charge"] = first_jet_charge
+
+                    diphotons["second_jet_pt"] = second_jet_pt
+                    diphotons["second_jet_eta"] = second_jet_eta
+                    diphotons["second_jet_phi"] = second_jet_phi
+                    diphotons["second_jet_mass"] = second_jet_mass
+                    diphotons["second_jet_charge"] = second_jet_charge
+
+                    diphotons["n_jets"] = n_jets
+
+                    # run taggers on the events list with added diphotons
+                    # the shape here is ensured to be broadcastable
+                    for tagger in self.taggers:
+                        (
+                            diphotons["_".join([tagger.name, str(tagger.priority)])],
+                            tagger_extra,
+                        ) = tagger(
+                            events, diphotons
+                        )  # creates new column in diphotons - tagger priority, or 0, also return list of histrograms here?
+                        histos_etc.update(tagger_extra)
+
+                    # if there are taggers to run, arbitrate by them first
+                    # Deal with order of tagger priorities
+                    # Turn from diphoton jagged array to whether or not an event was selected
+                    if len(self.taggers):
+                        counts = awkward.num(diphotons.pt, axis=1)
+                        flat_tags = numpy.stack(
+                            (
+                                awkward.flatten(
+                                    diphotons["_".join([tagger.name, str(tagger.priority)])]
+                                )
+                                for tagger in self.taggers
+                            ),
+                            axis=1,
+                        )
+                        tags = awkward.from_regular(
+                            awkward.unflatten(flat_tags, counts), axis=2
+                        )
+                        winner = awkward.min(tags[tags != 0], axis=2)
+                        diphotons["best_tag"] = winner
+
+                        # lowest priority is most important (ascending sort)
+                        # leave in order of diphoton pT in case of ties (stable sort)
+                        sorted = awkward.argsort(diphotons.best_tag, stable=True)
+                        diphotons = diphotons[sorted]
+
+                    diphotons = awkward.firsts(diphotons)
+                    # set diphotons as part of the event record
+                    events[f"diphotons_{do_variation}"] = diphotons
+                    # annotate diphotons with event information
+                    diphotons["event"] = events.event
+                    diphotons["lumi"] = events.luminosityBlock
+                    diphotons["run"] = events.run
+                    # nPV just for validation of pileup reweighting
+                    diphotons["nPV"] = events.PV.npvs
+                    # annotate diphotons with dZ information (difference between z position of GenVtx and PV) as required by flashggfinalfits
+                    if self.data_kind == "mc":
+                        diphotons["dZ"] = events.GenVtx.z - events.PV.z
+                    # Fill zeros for data because there is no GenVtx for data, obviously
+                    else:
+                        diphotons["dZ"] = awkward.zeros_like(events.PV.z)
+
+                    # drop events without a preselected diphoton candidate
+                    # drop events without a tag, if there are tags
+                    if len(self.taggers):
+                        selection_mask = ~(
+                            awkward.is_none(diphotons) | awkward.is_none(diphotons.best_tag)
+                        )
+                        diphotons = diphotons[selection_mask]
+                    else:
+                        selection_mask = ~awkward.is_none(diphotons)
+                        diphotons = diphotons[selection_mask]
+
+                    # return if there is no surviving events
+                    if len(diphotons) == 0:
+                        logger.debug("No surviving events in this run, return now!")
+                        return histos_etc
+                    if self.data_kind == "mc":
+                        # initiate Weight container here, after selection, since event selection cannot easily be applied to weight container afterwards
+                        event_weights = Weights(size=len(events[selection_mask]))
+                        # _weight will correspond to "nominal" weight, what else has to be included here? (lumi? xSec? MC sum of weights?)
+                        event_weights._weight = numpy.sign(events["genWeight"][selection_mask]) * events["weight_pileup"][selection_mask]
+
+                        # corrections to event weights:
+                        for correction_name in correction_names:
+                            if correction_name in available_weight_corrections:
+                                logger.info(
+                                    f"Adding correction {correction_name} to weight collection of dataset {dataset_name}"
+                                )
+                                varying_function = available_weight_corrections[correction_name]
                                 event_weights = varying_function(
                                     events=events[selection_mask],
-                                    photons=events[f"diphotons_{variation}"][
-                                        selection_mask
-                                    ],
+                                    photons=events[f"diphotons_{do_variation}"][selection_mask],
                                     weights=event_weights,
-                                    logger=logger,
-                                    dataset=dataset_name,
-                                    systematic=systematic_name,
+                                    dataset_name=dataset_name,
                                 )
 
-                diphotons["weight"] = event_weights.weight()
-                if variation == "nominal":
-                    if len(event_weights.variations):
-                        logger.info(
-                            "Adding systematic weight variations to nominal output file."
-                        )
-                    for modifier in event_weights.variations:
-                        diphotons["weight_" + modifier] = event_weights.weight(
-                            modifier=modifier
-                        )
+                        # systematic variations of event weights go to nominal output dataframe:
+                        if do_variation == "nominal":
+                            for systematic_name in systematic_names:
+                                if systematic_name in available_weight_systematics:
+                                    logger.info(
+                                        f"Adding systematic {systematic_name} to weight collection of dataset {dataset_name}"
+                                    )
+                                    if systematic_name == "LHEScale":
+                                        if hasattr(events, "LHEScaleWeight"):
+                                            diphotons["nLHEScaleWeight"] = awkward.num(
+                                                events.LHEScaleWeight[selection_mask], axis=1
+                                            )
+                                            diphotons["LHEScaleWeight"] = events.LHEScaleWeight[
+                                                selection_mask
+                                            ]
+                                        else:
+                                            logger.info(
+                                                f"No {systematic_name} Weights in dataset {dataset_name}"
+                                            )
+                                    elif systematic_name == "LHEPdf":
+                                        if hasattr(events, "LHEPdfWeight"):
+                                            # two AlphaS weights are removed
+                                            diphotons["nLHEPdfWeight"] = (
+                                                awkward.num(
+                                                    events.LHEPdfWeight[selection_mask], axis=1
+                                                )
+                                                - 2
+                                            )
+                                            diphotons["LHEPdfWeight"] = events.LHEPdfWeight[
+                                                selection_mask
+                                            ][:, :-2]
+                                        else:
+                                            logger.info(
+                                                f"No {systematic_name} Weights in dataset {dataset_name}"
+                                            )
+                                    else:
+                                        varying_function = available_weight_systematics[
+                                            systematic_name
+                                        ]
+                                        event_weights = varying_function(
+                                            events=events[selection_mask],
+                                            photons=events[f"diphotons_{do_variation}"][
+                                                selection_mask
+                                            ],
+                                            weights=event_weights,
+                                            logger=logger,
+                                            dataset=dataset_name,
+                                            systematic=systematic_name,
+                                        )
 
-            if self.output_location is not None:
-                # df = diphoton_list_to_pandas(self, diphotons)
-                akarr = diphoton_ak_array(self, diphotons)
-                fname = (
-                    events.behavior["__events_factory__"]._partition_key.replace(
-                        "/", "_"
-                    )
-                    + ".parquet"
-                )
-                subdirs = []
-                if "dataset" in events.metadata:
-                    subdirs.append(events.metadata["dataset"])
-                subdirs.append(variation)
-                # dump_pandas(self, df, fname, self.output_location, subdirs)
-                dump_ak_array(self, akarr, fname, self.output_location, subdirs)
+                        diphotons["weight"] = event_weights.weight()
+                        if do_variation == "nominal":
+                            if len(event_weights.variations):
+                                logger.info(
+                                    "Adding systematic weight variations to nominal output file."
+                                )
+                            for modifier in event_weights.variations:
+                                diphotons["weight_" + modifier] = event_weights.weight(
+                                    modifier=modifier
+                                )
+
+                    if self.output_location is not None:
+                        # df = diphoton_list_to_pandas(self, diphotons)
+                        akarr = diphoton_ak_array(self, diphotons)
+                        fname = (
+                            events.behavior["__events_factory__"]._partition_key.replace(
+                                "/", "_"
+                            )
+                            + ".parquet"
+                        )
+                        subdirs = []
+                        if "dataset" in events.metadata:
+                            subdirs.append(events.metadata["dataset"])
+                        subdirs.append(do_variation)
+                        # dump_pandas(self, df, fname, self.output_location, subdirs)
+                        dump_ak_array(self, akarr, fname, self.output_location, subdirs)
 
         return histos_etc
 

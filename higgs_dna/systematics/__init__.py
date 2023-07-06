@@ -6,6 +6,7 @@ from .event_weight_systematics import (
     AlphaS,
     PartonShower,
 )
+from .jet_systematics import Scale_jet
 from functools import partial
 
 # using add_systematic function of coffea.nanoevents.methods.nanoaod objects as Photon to store object systematics in addition to nominal objects
@@ -42,6 +43,14 @@ object_systematics = {
             "varying_function": partial(ShowerShape, year="2017", is_correction=False),
         },
     },
+    "Scale_2022": {
+        "object": "Jet",
+        "args": {
+            "kind": "UpDownSystematic",
+            "what": "pt",
+            "varying_function": partial(Scale_jet, year="2022", is_correction=False),
+        },
+    },
 }
 
 # functions correcting nominal object quantities to be placed here
@@ -52,6 +61,7 @@ object_corrections = {
     ),
     "FNUF": partial(FNUF, pt=None, year="2017", is_correction=True),
     "ShowerShape": partial(ShowerShape, pt=None, year="2017", is_correction=True),
+    "Scale_2022": partial(Scale_jet, pt=None, year="2022", is_correction=True),
 }
 
 # functions adding systematic variations to event weights to be placed here

@@ -203,7 +203,7 @@ if opt.cats:
                 ("n_jets", ">", 0),
                 ("pt", ">", 60),
             ]
-        },
+        }
     }
 else:
     cat_dict = {"UNTAGGED": {"cat_filter": [("pt", ">", -1.0)]}}
@@ -239,16 +239,12 @@ if opt.merge:
                     # otherwise they will be all merged at once in the same output file
                     for var in var_dict:
                         os.chdir(IN_PATH)
-                        MKDIRP(f"{IN_PATH}/{file}/{var}")
-                        os.system(
-                            f"mv {IN_PATH}/{file}/*{var_dict[var]}.parquet {IN_PATH}/{file}/{var}"
-                        )
 
-                        MKDIRP(f"{IN_PATH}/merged/{file}/{var}")
+                        MKDIRP(f"{IN_PATH}/merged/{file}/{var_dict[var]}")
 
                         os.chdir(SCRIPT_DIR)
                         os.system(
-                            f"python3 merge_parquet.py --source {IN_PATH}/{file}/{var} --target {IN_PATH}/merged/{file}/{var}/ --cats {cat_dict}"
+                            f"python3 merge_parquet.py --source {IN_PATH}/{file}/{var_dict[var]} --target {IN_PATH}/merged/{file}/{var_dict[var]}/ --cats {cat_dict}"
                         )
 
                 else:
@@ -272,7 +268,7 @@ if opt.merge:
         # we also skip this step if there is no Data
         for file in files:
             file = file.split("\n")[0] # otherwise it contains an end of line and messes up the os.walk() call
-            if "Data" in file:
+            if "Data" in file or "DoubleEG" in file:
                 dirpath, dirnames, filenames = next(os.walk(f'{IN_PATH}/merged/Data_{file.split("_")[-1]}'))
                 if len(filenames) > 0:
                     os.system(

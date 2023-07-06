@@ -48,7 +48,6 @@ parser.add_argument(
     help="Dictionary containing variations.",
 )
 args = parser.parse_args()
-
 source_path = args.source
 target_path = args.target
 type = args.type
@@ -117,7 +116,7 @@ if args.do_syst:
         df_dict[var] = {}
         for cat in cat_dict:
             var_path = source_path.replace(
-                "merged.parquet", f"{var}/{cat}_merged.parquet"
+                "merged.parquet", f"{variation_dict[var]}/{cat}_merged.parquet"
             )
             logger.info(
                 f"Starting conversion of one parquet file to ROOT. Attempting to read file {var_path} for category: {cat}."
@@ -129,7 +128,7 @@ if args.do_syst:
 
             dict = {}
             for i in eve.fields:
-                dict[i] = ak.to_numpy(eve[i])
+                dict[i] = eve[i]
                 
             df_dict[var][cat] = dict
 
@@ -151,7 +150,7 @@ else:
 
         dict = {}
         for i in eve.fields:
-            dict[i] = ak.to_numpy(eve[i])
+            dict[i] = eve[i]
             
         df_dict[cat] = dict
 
@@ -236,37 +235,56 @@ with uproot.recreate(outfiles[process]) as file:
     # For data: {inputTreeDir}/Data_{sqrts}_{category}
     for cat in cat_dict:
         logger.debug("writing category:", cat)
+
         if args.do_syst:
-            file[names[cat]] = df_dict["NOMINAL"][cat]
-            if notag:
-                file[name_notag] = df_dict["NOMINAL"][cat]  # this is wrong, to be fixed
-            for syst_name, weight, syst_, c in labels[cat]:
-                logger.debug(syst_name, weight, syst_, c)
-                # If the name is not in the variation dictionary it is assumed to be a weight systematic
-                if syst_ not in variation_dict:
-                    red_dict = {
-                        new_key: df_dict["NOMINAL"][cat][key]
-                        for key, new_key in (
-                            ["CMS_hgg_mass", "CMS_hgg_mass"],
-                            [weight, "weight"],
-                        )
-                    }
-                    logger.info(f"Adding {syst_name}01sigma to out tree...")
-                    file[syst_name + "01sigma"] = red_dict
-                else:
-                    red_dict = {
-                        new_key: df_dict[syst_][cat][key]
-                        for key, new_key in (
-                            ["CMS_hgg_mass", "CMS_hgg_mass"],
-                            [weight, "weight"],
-                        )
-                    }
-                    logger.info(f"Adding {syst_name}01sigma to out tree...")
-                    file[syst_name + "01sigma"] = red_dict
+            # check that the category actually contains something, otherwise the slattening step will make the script crash,
+            # an improvement (not sure if needed) may be to also write an empty TTree to not confuse FinalFit
+            if len(df_dict["NOMINAL"][cat]["weight"]):
+                for branch in df_dict["NOMINAL"][cat]:
+                    # here I had to add a flattening step to help uproot with the type of the awkward arrays,
+                    # if you don't flatten (event if you don't have a nested field) you end up having a type like (len_of_array) * ?type, which make uproot very mad apparently
+                    df_dict["NOMINAL"][cat][branch] = ak.flatten(df_dict["NOMINAL"][cat][branch], axis=0)  
+                file[names[cat]] = df_dict["NOMINAL"][cat]
+                if notag:
+                    file[name_notag] = df_dict["NOMINAL"][cat]  # this is wrong, to be fixed
+                for syst_name, weight, syst_, c in labels[cat]:
+                    logger.debug(syst_name, weight, syst_, c)
+                    # If the name is not in the variation dictionary it is assumed to be a weight systematic
+                    if syst_ not in variation_dict:
+                        red_dict = {
+                            new_key: df_dict["NOMINAL"][cat][key]
+                            for key, new_key in (
+                                ["CMS_hgg_mass", "CMS_hgg_mass"],
+                                [weight, "weight"],
+                            )
+                        }
+                        logger.info(f"Adding {syst_name}01sigma to out tree...")
+                        file[syst_name + "01sigma"] = red_dict
+                    else:
+                        red_dict = {
+                            new_key: ak.flatten(df_dict[syst_][cat][key], 0)
+                            for key, new_key in (
+                                ["CMS_hgg_mass", "CMS_hgg_mass"],
+                                [weight, "weight"],
+                            )
+                        }
+                        logger.info(f"Adding {syst_name}01sigma to out tree...")
+                        file[syst_name + "01sigma"] = red_dict
+            else:
+                logger.info(f"no events survived category selection for cat: {cat}")
+
         else:
-            file[names[cat]] = df_dict[cat]
-            if notag:
-                file[name_notag] = df_dict[cat]  # this is wrong, to be fixed
+            # if there are no syst there is no df_dict["NOMINAL"] entry in the dict
+            if len(df_dict[cat][[*df_dict[cat]][0]]):
+                # same as before
+                for branch in df_dict[cat]:
+                    df_dict[cat][branch] = ak.flatten(df_dict[cat][branch], axis=0)  
+                file[names[cat]] = df_dict[cat]
+                if notag:
+                    file[name_notag] = df_dict[cat]  # this is wrong, to be fixed
+            else:
+                logger.info(f"no events survived category selection for cat: {cat}")
+
     logger.info(
         f"Successfully converted parquet file to ROOT file for process {process}."
     )

@@ -3,6 +3,7 @@ from higgs_dna.systematics import object_systematics as available_object_systema
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
 from higgs_dna.tools.pileup_reweighting import add_pileup_weight
+from higgs_dna.tools.SC_eta import add_photon_SC_eta
 from typing import Any, Dict, List, Optional
 import awkward as ak
 import logging
@@ -81,6 +82,9 @@ class TagAndProbeProcessor(HggBaseProcessor):
 
         # apply filters and triggers
         events = self.apply_filters_and_triggers(events)
+
+        # we need ScEta for corrections and systematics, which is not present in NanoAODv11 but can be calculated using PV
+        events.Photon = add_photon_SC_eta(events.Photon, events.PV)
 
         # Whole systematics business
         dataset_name = events.metadata["dataset"]

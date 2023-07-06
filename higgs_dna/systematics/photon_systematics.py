@@ -27,7 +27,7 @@ def Scale(pt, events, year="2016postVFP", is_correction=True):
     # otherwise uncomment the following line:
     # run = ak.flatten(events.run)
     gain = ak.flatten(events.Photon.seedGain)
-    eta = ak.flatten(events.Photon.eta)
+    eta = ak.flatten(events.Photon.ScEta)
     # this JSON does not have all r9 bins. Setting it to 0.8 here for tests
     r9 = 0.8
     # r9 = ak.flatten(events.Photon.r9)
@@ -74,7 +74,7 @@ def FNUF(pt, events, year="2017", is_correction=True):
 
     # for later unflattening:
     counts = ak.num(events.Photon.pt)
-    eta = ak.flatten(events.Photon.eta)
+    eta = ak.flatten(events.Photon.ScEta)
     r9 = ak.flatten(events.Photon.r9)
     _energy = ak.flatten(events.Photon.energy)
     _pt = ak.flatten(events.Photon.pt)
@@ -123,7 +123,7 @@ def ShowerShape(pt, events, year="2017", is_correction=True):
 
     # for later unflattening:
     counts = ak.num(events.Photon.pt)
-    eta = ak.flatten(events.Photon.eta)
+    eta = ak.flatten(events.Photon.ScEta)
     r9 = ak.flatten(events.Photon.r9)
     _energy = ak.flatten(events.Photon.energy)
     _pt = ak.flatten(events.Photon.pt)

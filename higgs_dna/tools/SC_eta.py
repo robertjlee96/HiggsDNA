@@ -17,6 +17,8 @@ def add_photon_SC_eta(photons: ak.Array, PV: ak.Array) -> ak.Array:
     mask_endcap = photons.isScEtaEE
 
     tg_theta_over_2 = np.exp(-photons.eta)
+    # avoid dividion by zero
+    tg_theta_over_2 = np.where(tg_theta_over_2 == 1., 1 - 1e-10, tg_theta_over_2)
     tg_theta = 2 * tg_theta_over_2 / (1 - tg_theta_over_2 * tg_theta_over_2)  # tg(a+b) = tg(a)+tg(b) / (1-tg(a)*tg(b))
 
     # calculations for EB

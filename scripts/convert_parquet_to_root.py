@@ -60,6 +60,11 @@ BASEDIR = os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))
 ) + "/higgs_dna/"
 
+# Dictionary for renaming variables in ROOT tree output for final fits
+rename_dict = {
+    "mass": "CMS_hgg_mass"
+}
+
 df_dict = {}
 outfiles = {
     "ch": target_path.replace(
@@ -128,7 +133,8 @@ if args.do_syst:
 
             dict = {}
             for i in eve.fields:
-                dict[i] = eve[i]
+                i_re = rename_dict[i] if i in rename_dict else i
+                dict[i_re] = eve[i]
                 
             df_dict[var][cat] = dict
 
@@ -150,7 +156,8 @@ else:
 
         dict = {}
         for i in eve.fields:
-            dict[i] = eve[i]
+            i_re = rename_dict[i] if i in rename_dict else i
+            dict[i_re] = eve[i]
             
         df_dict[cat] = dict
 
@@ -175,37 +182,17 @@ if type == "mc":
     if args.do_syst:
         for var in variation_dict:
             for cat in cat_dict:
-                if var == "NOMINAL":
-                    for field in df_dict[var][cat]:
-                        # weight systematics as stored as different sets of weights in the nominal merged parquet
-                        if "weight_" in field:
-                            syst_ = field.split(("weight_"))[1]
-                            logger.info(
-                                "found syst: %s for category: %s" % (syst_, cat)
-                            )
-                            labels[cat].append(
-                                [
-                                    "DiphotonTree/"
-                                    + process
-                                    + f"_125_13TeV_{cat}_"
-                                    + syst_,
-                                    field,
-                                    syst_,
-                                    cat,
-                                ]
-                            )
-                else:
-                    # for object systematics we have different files storing the variated collections with the nominal weights
-                    syst_ = var
-                    logger.info("found syst: %s for category: %s" % (syst_, cat))
-                    labels[cat].append(
-                        [
-                            "DiphotonTree/" + process + f"_125_13TeV_{cat}_" + syst_,
-                            "weight",
-                            syst_,
-                            cat,
-                        ]
-                    )
+                # for object systematics we have different files storing the variated collections with the nominal weights
+                syst_ = var
+                logger.info("found syst: %s for category: %s" % (syst_, cat))
+                labels[cat].append(
+                    [
+                        "DiphotonTree/" + process + f"_125_13TeV_{cat}_" + syst_,
+                        "weight",
+                        syst_,
+                        cat,
+                    ]
+                )
     else:
         for cat in cat_dict:
             syst_ = ""
@@ -243,11 +230,14 @@ with uproot.recreate(outfiles[process]) as file:
                 for branch in df_dict["NOMINAL"][cat]:
                     # here I had to add a flattening step to help uproot with the type of the awkward arrays,
                     # if you don't flatten (event if you don't have a nested field) you end up having a type like (len_of_array) * ?type, which make uproot very mad apparently
-                    df_dict["NOMINAL"][cat][branch] = ak.flatten(df_dict["NOMINAL"][cat][branch], axis=0)  
+                    df_dict["NOMINAL"][cat][branch] = ak.flatten(df_dict["NOMINAL"][cat][branch], axis=0)
                 file[names[cat]] = df_dict["NOMINAL"][cat]
                 if notag:
                     file[name_notag] = df_dict["NOMINAL"][cat]  # this is wrong, to be fixed
                 for syst_name, weight, syst_, c in labels[cat]:
+                    # Skip "NOMINAL" as information included in nominal tree
+                    if syst_ == "NOMINAL":
+                        continue
                     logger.debug(syst_name, weight, syst_, c)
                     # If the name is not in the variation dictionary it is assumed to be a weight systematic
                     if syst_ not in variation_dict:
@@ -278,7 +268,7 @@ with uproot.recreate(outfiles[process]) as file:
             if len(df_dict[cat][[*df_dict[cat]][0]]):
                 # same as before
                 for branch in df_dict[cat]:
-                    df_dict[cat][branch] = ak.flatten(df_dict[cat][branch], axis=0)  
+                    df_dict[cat][branch] = ak.flatten(df_dict[cat][branch], axis=0)
                 file[names[cat]] = df_dict[cat]
                 if notag:
                     file[name_notag] = df_dict[cat]  # this is wrong, to be fixed

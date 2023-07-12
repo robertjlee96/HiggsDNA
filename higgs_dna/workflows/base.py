@@ -190,9 +190,17 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         # data or monte carlo?
         self.data_kind = "mc" if hasattr(events, "GenPart") else "data"
 
-        # calculate pileup weights (should be according to a setting in Metaconditions, later)
+        # metadata array to append to higgsdna output
+        metadata = {}
+
         if self.data_kind == "mc":
+            # calculate pileup weights (should be according to a setting in Metaconditions, later)
             events = add_pileup_weight(events)
+
+            # Add sum of gen weights before selection for normalisation in postprocessing
+            metadata['sum_genw_presel'] = str(awkward.sum(events.genWeight))
+        else:
+            metadata['sum_genw_presel'] = 'Data'
 
         # apply filters and triggers
         events = self.apply_filters_and_triggers(events)
@@ -494,8 +502,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     if self.data_kind == "mc":
                         # initiate Weight container here, after selection, since event selection cannot easily be applied to weight container afterwards
                         event_weights = Weights(size=len(events[selection_mask]))
-                        # _weight will correspond to "nominal" weight, what else has to be included here? (lumi? xSec? MC sum of weights?)
-                        event_weights._weight = numpy.sign(events["genWeight"][selection_mask]) * events["weight_pileup"][selection_mask]
+                        # _weight will correspond to the product of genWeight and the scale factors
+                        event_weights._weight = events["weight_pileup"][selection_mask]
 
                         # corrections to event weights:
                         for correction_name in correction_names:
@@ -561,7 +569,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                             systematic=systematic_name,
                                         )
 
-                        diphotons["weight"] = event_weights.weight()
+                        diphotons["weight_central"] = event_weights.weight()
+                        # Store variations with respect to central weight
                         if do_variation == "nominal":
                             if len(event_weights.variations):
                                 logger.info(
@@ -571,6 +580,15 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                 diphotons["weight_" + modifier] = event_weights.weight(
                                     modifier=modifier
                                 )
+
+                        # Multiply weight by genWeight for normalisation in post-processing chain
+                        event_weights._weight = events["genWeight"][selection_mask] * diphotons["weight_central"]
+                        diphotons["weight"] = event_weights.weight()
+
+                    # Add weight variables (=1) for data for consistent datasets
+                    else:
+                        diphotons["weight_central"] = awkward.ones_like(diphotons["event"])
+                        diphotons["weight"] = awkward.ones_like(diphotons["event"])
 
                     if self.output_location is not None:
                         # df = diphoton_list_to_pandas(self, diphotons)
@@ -586,7 +604,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             subdirs.append(events.metadata["dataset"])
                         subdirs.append(do_variation)
                         # dump_pandas(self, df, fname, self.output_location, subdirs)
-                        dump_ak_array(self, akarr, fname, self.output_location, subdirs)
+                        dump_ak_array(self, akarr, fname, self.output_location, metadata, subdirs)
 
         return histos_etc
 

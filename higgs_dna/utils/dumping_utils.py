@@ -5,6 +5,7 @@ import pandas
 import os
 import pathlib
 import shutil
+import pyarrow.parquet as pq
 
 
 def diphoton_list_to_pandas(self, diphotons: awkward.Array) -> pandas.DataFrame:
@@ -114,6 +115,7 @@ def dump_ak_array(
     akarr: awkward.Array,
     fname: str,
     location: str,
+    metadata: None,
     subdirs: Optional[List[str]] = None,
 ) -> None:
     """
@@ -144,7 +146,16 @@ def dump_ak_array(
         if xrootd
         else os.path.join(location, os.path.join(merged_subdirs, fname))
     )
-    awkward.to_parquet(akarr, local_file)
+
+    pa_table = awkward.to_arrow_table(akarr)
+    # If metadata is not None then write to pyarrow table
+    if metadata:
+        merged_metadata = {**metadata, **(pa_table.schema.metadata or {})}
+        pa_table = pa_table.replace_schema_metadata(merged_metadata)
+
+    # Write pyarrow table to parquet file
+    pq.write_table(pa_table, local_file)
+
     if xrootd:
         copyproc = XRootD.client.CopyProcess()
         copyproc.add_job(local_file, destination)

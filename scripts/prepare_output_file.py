@@ -5,9 +5,9 @@ import subprocess
 from optparse import OptionParser
 import json
 from higgs_dna.utils.logger_utils import setup_logger
-import inspect
 
 # ---------------------- A few helping functions  ----------------------
+
 
 def MKDIRP(dirpath, verbose=False, dry_run=False):
     if verbose:
@@ -90,6 +90,13 @@ parser.add_option(
     action="store_true",
     default=False,
     help="Split into categories",
+)
+parser.add_option(
+    "--skip-normalisation",
+    dest="skip_normalisation",
+    action="store_true",
+    default=False,
+    help="Independent of file type, skip normalisation step",
 )
 parser.add_option(
     "--args",
@@ -221,6 +228,9 @@ os.system(f"mv category.json {SCRIPT_DIR}/../higgs_dna/category.json")
 os.system(f"mv variation.json {SCRIPT_DIR}/../higgs_dna/variation.json")
 cat_dict = "category.json"
 
+# Define string if normalisation to be skipped
+skip_normalisation_str = "--skip-normalisation" if opt.skip_normalisation else ""
+
 if opt.merge:
     with open(f"{EXEC_PATH}/dirlist.txt") as fl:
         files = fl.readlines()
@@ -244,13 +254,13 @@ if opt.merge:
 
                         os.chdir(SCRIPT_DIR)
                         os.system(
-                            f"python3 merge_parquet.py --source {IN_PATH}/{file}/{var_dict[var]} --target {IN_PATH}/merged/{file}/{var_dict[var]}/ --cats {cat_dict}"
+                            f"python3 merge_parquet.py --source {IN_PATH}/{file}/{var_dict[var]} --target {IN_PATH}/merged/{file}/{var_dict[var]}/ --cats {cat_dict} {skip_normalisation_str}"
                         )
 
                 else:
                     os.chdir(SCRIPT_DIR)
                     os.system(
-                        f"python3 merge_parquet.py --source {IN_PATH}/{file} --target {IN_PATH}/merged/{file}/ --cats {cat_dict}"
+                        f"python3 merge_parquet.py --source {IN_PATH}/{file}/nominal --target {IN_PATH}/merged/{file}/ --cats {cat_dict} {skip_normalisation_str}"
                     )
             else:
                 if os.path.exists(f"{IN_PATH}/merged/{file}/{file}_merged.parquet"):
@@ -261,18 +271,18 @@ if opt.merge:
                     MKDIRP(f'{IN_PATH}/merged/Data_{file.split("_")[-1]}')
                 os.chdir(SCRIPT_DIR)
                 os.system(
-                    f'python3 merge_parquet.py --source {IN_PATH}/{file} --target {IN_PATH}/merged/Data_{file.split("_")[-1]}/{file}_ --cats {cat_dict}'
+                    f'python3 merge_parquet.py --source {IN_PATH}/{file}/nominal --target {IN_PATH}/merged/Data_{file.split("_")[-1]}/{file}_ --cats {cat_dict} --is-data'
                 )
 
         # at this point Data will be split in eras if any Data dataset is present, here we merge them again in one allData file to rule them all
         # we also skip this step if there is no Data
         for file in files:
-            file = file.split("\n")[0] # otherwise it contains an end of line and messes up the os.walk() call
+            file = file.split("\n")[0]  # otherwise it contains an end of line and messes up the os.walk() call
             if "Data" in file or "DoubleEG" in file:
                 dirpath, dirnames, filenames = next(os.walk(f'{IN_PATH}/merged/Data_{file.split("_")[-1]}'))
                 if len(filenames) > 0:
                     os.system(
-                        f'python3 merge_parquet.py --source {IN_PATH}/merged/Data_{file.split("_")[-1]} --target {IN_PATH}/merged/Data_{file.split("_")[-1]}/allData_ --cats {cat_dict}'
+                        f'python3 merge_parquet.py --source {IN_PATH}/merged/Data_{file.split("_")[-1]} --target {IN_PATH}/merged/Data_{file.split("_")[-1]}/allData_ --cats {cat_dict} --is-data'
                     )
                     break
                 else:

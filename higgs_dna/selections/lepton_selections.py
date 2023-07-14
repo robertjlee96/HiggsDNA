@@ -3,24 +3,51 @@ import awkward
 
 
 def select_electrons(
+    self,
     electrons: awkward.highlevel.Array,
     diphotons: awkward.highlevel.Array,
-    electron_pt_threshold: float,
 ) -> awkward.highlevel.Array:
-    pt_cut = electrons.pt > electron_pt_threshold
-    eta_cut = abs(electrons.eta) < 2.4
-    id_cut = electrons.mvaFall17V2Iso_WP90
+    pt_cut = electrons.pt > self.electron_pt_threshold
+
+    eta_cut = abs(electrons.eta) < self.electron_max_eta
+
+    if self.el_iso_wp == "WP90":
+        id_cut = electrons.mvaIso_Fall17V2_WP90
+    elif self.el_iso_wp == "WP80":
+        id_cut = electrons.mvaIso_Fall17V2_WP80
+    elif self.el_iso_wp == "WPL":
+        id_cut = electrons.mvaIso_Fall17V2_WPL
+    else:
+        id_cut = electrons.pt > 0.
+
     dr_pho_cut = delta_r_mask(electrons, diphotons, 0.2)
 
     return pt_cut & eta_cut & id_cut & dr_pho_cut
 
 
 def select_muons(
-    muons: awkward.highlevel.Array, diphotons: awkward.highlevel.Array
+    self,
+    muons: awkward.highlevel.Array,
+    diphotons: awkward.highlevel.Array
 ) -> awkward.highlevel.Array:
-    pt_cut = muons.pt > 25
-    eta_cut = abs(muons.eta) < 2.4
-    id_cut = muons.mediumId
+    pt_cut = muons.pt > self.muon_pt_threshold
+
+    eta_cut = abs(muons.eta) < self.muon_max_eta
+
+    if self.mu_iso_wp == "tight":
+        id_cut = muons.tightId
+    elif self.mu_iso_wp == "medium":
+        id_cut = muons.mediumId
+    elif self.mu_iso_wp == "loose":
+        id_cut = muons.looseId
+    else:
+        id_cut = muons.pt > 0
+
+    if self.global_muon:
+        global_cut = muons.isGlobal
+    else:
+        global_cut = muons.pt > 0
+
     dr_pho_cut = delta_r_mask(muons, diphotons, 0.2)
 
-    return pt_cut & eta_cut & id_cut & dr_pho_cut
+    return pt_cut & eta_cut & id_cut & dr_pho_cut & global_cut

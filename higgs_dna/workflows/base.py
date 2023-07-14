@@ -5,6 +5,7 @@ from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_m
 from higgs_dna.tools.pileup_reweighting import add_pileup_weight
 from higgs_dna.tools.SC_eta import add_photon_SC_eta
 from higgs_dna.selections.photon_selections import photon_preselection
+from higgs_dna.selections.lepton_selections import select_electrons, select_muons
 from higgs_dna.selections.jet_selections import select_jets
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array
 
@@ -57,6 +58,30 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.analysis = analysis
         self.skipCQR = skipCQR
 
+        # muon selection cuts
+        self.muon_pt_threshold = 10
+        self.muon_max_eta = 2.4
+        self.mu_iso_wp = "medium"
+        self.global_muon = False
+
+        # electron selection cuts
+        self.electron_pt_threshold = 15
+        self.electron_max_eta = 2.4
+        self.el_iso_wp = "WP80"
+
+        # jet selection cuts
+        self.jet_dipho_min_dr = 0.4
+        self.jet_pho_min_dr = 0.4
+        self.jet_ele_min_dr = 0.4
+        self.jet_muo_min_dr = 0.4
+        self.jet_pt_threshold = 20
+        self.jet_max_eta = 4.7
+
+        self.clean_jet_dipho = True
+        self.clean_jet_pho = True
+        self.clean_jet_ele = False
+        self.clean_jet_muo = False
+
         # diphoton preselection cuts
         self.min_pt_photon = 25.0
         self.min_pt_lead_photon = 35.0
@@ -86,17 +111,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.low_eta_rho_corr = 0.16544
         self.high_eta_rho_corr = 0.13212
         self.e_veto = 0.5
-
-        # jet selection variables
-        self.jet_pho_min_dr = 0.4
-        self.jet_ele_min_dr = 0.4
-        self.jet_muo_min_dr = 0.4
-        self.jet_min_pt = 20
-        self.jet_max_eta = 4.7
-
-        self.clean_jet_pho = True
-        self.clean_jet_ele = False
-        self.clean_jet_muo = False
 
         logger.debug(f"Setting up processor with metaconditions: {self.meta}")
 
@@ -375,9 +389,13 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             "phi": events.Electron.phi,
                             "mass": events.Electron.mass,
                             "charge": events.Electron.charge,
+                            "mvaIso_Fall17V2_WP90": events.Electron.mvaIso_Fall17V2_WP90,
+                            "mvaIso_Fall17V2_WP80": events.Electron.mvaIso_Fall17V2_WP80,
+                            "mvaIso_Fall17V2_WPL": events.Electron.mvaIso_Fall17V2_WPL,
                         }
                     )
                     electrons = awkward.with_name(electrons, "PtEtaPhiMCandidate")
+
                     muons = awkward.zip(
                         {
                             "pt": events.Muon.pt,
@@ -385,12 +403,20 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             "phi": events.Muon.phi,
                             "mass": events.Muon.mass,
                             "charge": events.Muon.charge,
+                            "tightId": events.Muon.tightId,
+                            "mediumId": events.Muon.mediumId,
+                            "looseId": events.Muon.looseId,
+                            "isGlobal": events.Muon.isGlobal,
                         }
                     )
                     muons = awkward.with_name(muons, "PtEtaPhiMCandidate")
 
+                    # lepton cleaning
+                    sel_electrons = electrons[select_electrons(self, electrons, diphotons)]
+                    sel_muons = muons[select_muons(self, muons, diphotons)]
+
                     # jet selection and pt ordering
-                    jets = select_jets(self, jets, diphotons, muons, electrons)
+                    jets = jets[select_jets(self, jets, diphotons, sel_muons, sel_electrons)]
                     jets = jets[awkward.argsort(jets.pt, ascending=False)]
                     n_jets = awkward.num(jets)
 

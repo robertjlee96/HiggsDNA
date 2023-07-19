@@ -3,6 +3,8 @@ import json
 import os
 from scipy.interpolate import interp1d
 import correctionlib
+import awkward as ak
+from higgs_dna.utils.misc_utils import choose_jet
 
 
 def SF_photon_ID(
@@ -16,7 +18,7 @@ def SF_photon_ID(
     """
 
     # have to think about how to specify era/year, using 2017 test-wise here, defined as parameter of the function
-    jsonpog_file = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/EGM/2017_UL/photon.json.gz"
+    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/SF_photon_ID/photon.json.gz")
     evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["UL-Photon-ID-SF"]
 
     if is_correction:
@@ -229,5 +231,194 @@ def PartonShower(photons, events, weights, logger, dataset, systematic):
     except:
         logger.info(f"No PS Weights in dataset {dataset}, skip systematic {systematic}")
         return weights
+
+    return weights
+
+
+def cTagSF(
+    events, weights, is_correction=True, era="2017", **kwargs
+):
+    """
+    Add c-tagging reshaping SFs as from /https://github.com/higgs-charm/flashgg/blob/dev/cH_UL_Run2_withBDT/Systematics/scripts/applyCTagCorrections.py
+    BTV scale factor Wiki: https://btv-wiki.docs.cern.ch/ScaleFactors/
+    events must contain jet objects, moreover evaluation of SFs works by calculating the scale factors for all the jets in the event,
+    to do this in columnar style the only thing I could think of was to pad the jet collection to the max(n_jets) keep track of the "fake jets" introduced
+    by this procedure and fill these position wit 1s before actually setting the weights in the collection. If someone has better ideas I'm open for suggestions
+    """
+    ctag_systematics = [
+        'Extrap', 'Interp',
+        'LHEScaleWeight_muF', 'LHEScaleWeight_muR', 'PSWeightFSR', 'PSWeightISR',
+        'PUWeight', 'Stat',
+        'XSec_BRUnc_DYJets_b', 'XSec_BRUnc_DYJets_c', 'XSec_BRUnc_WJets_c',
+        'jer', 'jesTotal'
+    ]
+
+    ctag_correction_configs = {
+        '2016preVFP': {
+            'file': os.path.join(os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2016preVFP.json.gz"),
+            'method': 'deepJet_shape',
+            'systs': ctag_systematics,
+        },
+        '2016postVFP': {
+            'file': os.path.join(os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2016postVFP.json.gz"),
+            'method': 'deepJet_shape',
+            'systs': ctag_systematics,
+        },
+        '2017': {
+            'file': os.path.join(os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2017.json.gz"),
+            'method': 'deepJet_shape',
+            'systs': ctag_systematics,
+        },
+        '2018': {
+            'file': os.path.join(os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2018.json.gz"),
+            'method': 'deepJet_shape',
+            'systs': ctag_systematics,
+        },
+    }
+
+    jsonpog_file = os.path.join(os.path.dirname(__file__), ctag_correction_configs[era]['file'])
+    evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)[ctag_correction_configs[era]['method']]
+
+    events["n_jets"] = ak.num(events["sel_jets"])
+    max_n_jet = max(events["n_jets"])
+
+    dummy_sf = ak.ones_like(events["event"])
+
+    if is_correction:
+        # only calculate correction to nominal weight
+        # we will append the scale factors relative to all jets to be multiplied
+        _sf = []
+        # we need a seres of masks to remember where there were no jets
+        masks = []
+        # to calculate the SFs we have to distinguish for different number of jets
+        for i in range(max_n_jet):
+            masks.append(events["n_jets"] > i)
+
+            # I select the nth jet column
+            nth_jet_hFlav = choose_jet(events["sel_jets"].hFlav, i, 0)
+            nth_jet_DeepFlavour_CvsL = choose_jet(events["sel_jets"].btagDeepFlav_CvL, i, 0)
+            nth_jet_DeepFlavour_CvsB = choose_jet(events["sel_jets"].btagDeepFlav_CvB, i, 0)
+            _sf.append(
+                evaluator.evaluate(
+                    'central',
+                    nth_jet_hFlav,
+                    nth_jet_DeepFlavour_CvsL,
+                    nth_jet_DeepFlavour_CvsB,
+                )
+            )
+
+            # and fill the places where we had dummies with ones
+            _sf[i] = ak.where(
+                masks[i],
+                _sf[i],
+                dummy_sf,
+            )
+
+        sfup, sfdown = None, None
+        # here we multiply all the sf for different jets in the event
+        sf = dummy_sf
+        for nth in _sf:
+            sf = sf * nth
+
+        sfs_up = []
+        sfs_down = []
+        for syst in ctag_systematics:
+            sfs_up.append(ak.values_astype(dummy_sf, np.float))
+            sfs_down.append(ak.values_astype(dummy_sf, np.float))
+
+        weights.add_multivariation(name="cTagSF", weight=sf, modifierNames=ctag_systematics, weightsUp=sfs_up, weightsDown=sfs_down)
+
+    else:
+        # only calculate correction to nominal weight
+        # we will append the scale factors relative to all jets to be multiplied
+        _sf = []
+        # we need a seres of masks to remember where there were no jets
+        masks = []
+        # to calculate the SFs we have to distinguish for different number of jets
+        for i in range(max_n_jet):
+            masks.append(events["n_jets"] > i)
+
+            # I select the nth jet column
+            nth_jet_hFlav = choose_jet(events["sel_jets"].hFlav, i, 0)
+            nth_jet_DeepFlavour_CvsL = choose_jet(events["sel_jets"].btagDeepFlav_CvL, i, 0)
+            nth_jet_DeepFlavour_CvsB = choose_jet(events["sel_jets"].btagDeepFlav_CvB, i, 0)
+            _sf.append(
+                evaluator.evaluate(
+                    'central',
+                    nth_jet_hFlav,
+                    nth_jet_DeepFlavour_CvsL,
+                    nth_jet_DeepFlavour_CvsB,
+                )
+            )
+
+            # and fill the places where we had dummies with ones
+            _sf[i] = ak.where(
+                masks[i],
+                _sf[i],
+                dummy_sf,
+            )
+
+        # here we multiply all the sf for different jets in the event
+        sf = dummy_sf
+        for nth in _sf:
+            sf = sf * nth
+
+        variations = {}
+        for syst_name in ctag_correction_configs[era]['systs']:
+            # we will append the scale factors relative to all jets to be multiplied
+            _sfup = []
+            _sfdown = []
+            variations[syst_name] = {}
+            for i in range(max_n_jet):
+
+                # I select the nth jet column
+                nth_jet_hFlav = choose_jet(events["sel_jets"].hFlav, i, 0)
+                nth_jet_DeepFlavour_CvsL = choose_jet(events["sel_jets"].btagDeepFlav_CvL, i, 0)
+                nth_jet_DeepFlavour_CvsB = choose_jet(events["sel_jets"].btagDeepFlav_CvB, i, 0)
+
+                _sfup.append(
+                    evaluator.evaluate(
+                        'up_' + syst_name,
+                        nth_jet_hFlav,
+                        nth_jet_DeepFlavour_CvsL,
+                        nth_jet_DeepFlavour_CvsB,
+                    )
+                )
+
+                _sfdown.append(
+                    evaluator.evaluate(
+                        'down_' + syst_name,
+                        nth_jet_hFlav,
+                        nth_jet_DeepFlavour_CvsL,
+                        nth_jet_DeepFlavour_CvsB,
+                    )
+                )
+
+                # and fill the places where we had dummies with ones
+                _sfup[i] = ak.where(
+                    masks[i],
+                    _sfup[i],
+                    dummy_sf,
+                )
+                _sfdown[i] = ak.where(
+                    masks[i],
+                    _sfdown[i],
+                    dummy_sf,
+                )
+            # here we multiply all the sf for different jets in the event
+            sfup = dummy_sf
+            sfdown = dummy_sf
+            for i in range(len(_sf)):
+                sfup = sfup * _sfup[i]
+                sfdown = sfdown * _sfdown[i]
+
+            variations[syst_name]["up"] = sfup
+            variations[syst_name]["down"] = sfdown
+
+        # coffea weights.add_multivariation() wants a list of arrays for the multiple up and down variations
+        sfs_up = [variations[syst_name]["up"] / sf for syst_name in ctag_systematics]
+        sfs_down = [variations[syst_name]["down"] / sf for syst_name in ctag_systematics]
+
+        weights.add_multivariation(name="cTagSF", weight=dummy_sf, modifierNames=ctag_systematics, weightsUp=sfs_up, weightsDown=sfs_down, shift=False)
 
     return weights

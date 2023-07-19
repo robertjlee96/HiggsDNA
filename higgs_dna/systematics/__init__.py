@@ -5,6 +5,7 @@ from .event_weight_systematics import (
     NNLOPS,
     AlphaS,
     PartonShower,
+    cTagSF,
 )
 from .jet_systematics import Scale_jet
 from functools import partial
@@ -69,6 +70,7 @@ object_corrections = {
 weight_systematics = {
     "SF_photon_ID": partial(SF_photon_ID, is_correction=False),
     "LooseMvaSF": partial(LooseMvaSF, is_correction=False),
+    "cTagSF": partial(cTagSF, is_correction=False),
     "AlphaS": partial(AlphaS),
     "PartonShower": partial(PartonShower),
     "LHEScale": None,
@@ -80,6 +82,7 @@ weight_systematics = {
 weight_corrections = {
     "SF_photon_ID": partial(SF_photon_ID, is_correction=True),
     "LooseMvaSF": partial(LooseMvaSF, is_correction=True),
+    "cTagSF": partial(cTagSF, is_correction=True),
     "NNLOPS": partial(NNLOPS, is_correction=True),
 }
 

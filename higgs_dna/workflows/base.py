@@ -8,6 +8,7 @@ from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.selections.lepton_selections import select_electrons, select_muons
 from higgs_dna.selections.jet_selections import select_jets
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array
+from higgs_dna.utils.misc_utils import choose_jet
 
 # from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
 from higgs_dna.metaconditions import photon_id_mva_weights
@@ -378,6 +379,11 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             "charge": awkward.zeros_like(
                                 Jets.pt
                             ),  # added this because jet charge is not a property of photons in nanoAOD v11. We just need the charge to build jet collection.
+                            "hFlav": Jets.hadronFlavour,
+                            "btagDeepFlav_B": Jets.btagDeepFlavB,
+                            "btagDeepFlav_CvB": Jets.btagDeepFlavCvB,
+                            "btagDeepFlav_CvL": Jets.btagDeepFlavCvL,
+                            "btagDeepFlav_QG": Jets.btagDeepFlavQG,
                         }
                     )
                     jets = awkward.with_name(jets, "PtEtaPhiMCandidate")
@@ -418,31 +424,22 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     # jet selection and pt ordering
                     jets = jets[select_jets(self, jets, diphotons, sel_muons, sel_electrons)]
                     jets = jets[awkward.argsort(jets.pt, ascending=False)]
+
+                    # adding selected jets to events to be used in ctagging SF calculation
+                    events["sel_jets"] = jets
                     n_jets = awkward.num(jets)
 
-                    def choose_leading_jet(jets_variable, n):
-                        leading_jets_variable = jets_variable[
-                            awkward.local_index(jets_variable) == n
-                        ]
-                        leading_jets_variable = awkward.pad_none(
-                            leading_jets_variable, 1
-                        )
-                        leading_jets_variable = awkward.flatten(
-                            awkward.fill_none(leading_jets_variable, -999)
-                        )
-                        return leading_jets_variable
+                    first_jet_pt = choose_jet(jets.pt, 0, -999.)
+                    first_jet_eta = choose_jet(jets.eta, 0, -999.)
+                    first_jet_phi = choose_jet(jets.phi, 0, -999.)
+                    first_jet_mass = choose_jet(jets.mass, 0, -999.)
+                    first_jet_charge = choose_jet(jets.charge, 0, -999.)
 
-                    first_jet_pt = choose_leading_jet(jets.pt, 0)
-                    first_jet_eta = choose_leading_jet(jets.eta, 0)
-                    first_jet_phi = choose_leading_jet(jets.phi, 0)
-                    first_jet_mass = choose_leading_jet(jets.mass, 0)
-                    first_jet_charge = choose_leading_jet(jets.charge, 0)
-
-                    second_jet_pt = choose_leading_jet(jets.pt, 1)
-                    second_jet_eta = choose_leading_jet(jets.eta, 1)
-                    second_jet_phi = choose_leading_jet(jets.phi, 1)
-                    second_jet_mass = choose_leading_jet(jets.mass, 1)
-                    second_jet_charge = choose_leading_jet(jets.charge, 1)
+                    second_jet_pt = choose_jet(jets.pt, 1, -999.)
+                    second_jet_eta = choose_jet(jets.eta, 1, -999.)
+                    second_jet_phi = choose_jet(jets.phi, 1, -999.)
+                    second_jet_mass = choose_jet(jets.mass, 1, -999.)
+                    second_jet_charge = choose_jet(jets.charge, 1, -999.)
 
                     diphotons["first_jet_pt"] = first_jet_pt
                     diphotons["first_jet_eta"] = first_jet_eta

@@ -6,7 +6,9 @@ from typing import Optional
 LOGGER_NAME = "higgs_dna"
 
 
-def setup_logger(level: str = "INFO", logfile: Optional[str] = None) -> logging.Logger:
+def setup_logger(
+    level: str = "INFO", logfile: Optional[str] = None, time: Optional[bool] = False
+) -> logging.Logger:
     """Setup a logger that uses RichHandler to write the same message both in stdout
     and in a log file called logfile. Level of information can be customized and
     dumping a logfile is optional.
@@ -31,6 +33,8 @@ def setup_logger(level: str = "INFO", logfile: Optional[str] = None) -> logging.
     logger.setLevel(getattr(logging, level))
 
     formatter = logging.Formatter("%(message)s")
+    if time:
+        formatter = logging.Formatter("%(asctime)s %(message)s")
 
     # Set up stream handler (for stdout)
     stream_handler = RichHandler(show_time=False, rich_tracebacks=True)

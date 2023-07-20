@@ -23,6 +23,7 @@ class DYStudiesProcessor(HggBaseProcessor):
         output_location: Optional[str] = None,
         taggers: Optional[List[Any]] = None,
         skipCQR: bool = False,
+        year: Dict[str, List[str]] = None,
     ) -> None:
         super().__init__(
             metaconditions,
@@ -34,6 +35,7 @@ class DYStudiesProcessor(HggBaseProcessor):
             trigger_group=".*DoubleEG.*",
             analysis="mainAnalysis",
             skipCQR=skipCQR,
+            year=year,
         )
         self.trigger_group = ".*DoubleEG.*"
         self.analysis = "mainAnalysis"
@@ -102,7 +104,12 @@ class TagAndProbeProcessor(HggBaseProcessor):
                 )
                 original_photons.add_systematic(
                     # name=systematic_name, **systematic_dct["args"]
-                    name=systematic_name, kind=systematic_dct["args"]["kind"], what=systematic_dct["args"]["what"], varying_function=functools.partial(systematic_dct["args"]["varying_function"], events=events)
+                    name=systematic_name,
+                    kind=systematic_dct["args"]["kind"],
+                    what=systematic_dct["args"]["what"],
+                    varying_function=functools.partial(
+                        systematic_dct["args"]["varying_function"], events=events
+                    ),
                 )
 
         photons_dct = {}
@@ -130,7 +137,9 @@ class TagAndProbeProcessor(HggBaseProcessor):
                 photons = self.add_photonid_mva(photons, events)
 
             # photon preselection
-            photons = photon_preselection(self, photons, events, apply_electron_veto=False)
+            photons = photon_preselection(
+                self, photons, events, apply_electron_veto=False
+            )
 
             if self.data_kind == "mc":
                 # TODO: add weight systs (if needed)
@@ -167,13 +176,20 @@ class TagAndProbeProcessor(HggBaseProcessor):
                 (tnp_candidates.tag.pt > 40)
                 & (tnp_candidates.tag.electronIdx != -1)
                 & (tnp_candidates.tag.pixelSeed)
-                & (tnp_candidates.tag.pfChargedIsoPFPV < 20)  # was: (tnp_candidates.tag.chargedHadronIso < 20)
-                & (tnp_candidates.tag.pfChargedIsoPFPV / tnp_candidates.tag.pt < 0.3)  # was: (tnp_candidates.tag.chargedHadronIso / tnp_candidates.tag.pt < 0.3)
+                & (
+                    tnp_candidates.tag.pfChargedIsoPFPV < 20
+                )  # was: (tnp_candidates.tag.chargedHadronIso < 20)
+                & (
+                    tnp_candidates.tag.pfChargedIsoPFPV / tnp_candidates.tag.pt < 0.3
+                )  # was: (tnp_candidates.tag.chargedHadronIso / tnp_candidates.tag.pt < 0.3)
             )
 
             # probe selections
-            probe_mask = (tnp_candidates.probe.pfChargedIsoPFPV < 20) & (  # was: (tnp_candidates.probe.chargedHadronIso < 20)
-                tnp_candidates.probe.pfChargedIsoPFPV / tnp_candidates.probe.pt < 0.3  # was: tnp_candidates.probe.chargedHadronIso / tnp_candidates.probe.pt < 0.3
+            probe_mask = (
+                tnp_candidates.probe.pfChargedIsoPFPV < 20
+            ) & (  # was: (tnp_candidates.probe.chargedHadronIso < 20)
+                tnp_candidates.probe.pfChargedIsoPFPV / tnp_candidates.probe.pt
+                < 0.3  # was: tnp_candidates.probe.chargedHadronIso / tnp_candidates.probe.pt < 0.3
             )
 
             # apply selections

@@ -54,6 +54,12 @@ def calculate_photonid_mva(
     mvaID = photonid_mva.predict(tempmatrix)
 
     # Only needed to compare to TMVA
-    mvaID = 1.0 - 2.0 / (1.0 + numpy.exp(2.0 * mvaID))
+    # mvaID = 1.0 - 2.0 / (1.0 + numpy.exp(2.0 * mvaID))
+
+    # the previous transformation was not working correctly, peakin at about 0.7
+    # since we can't really remember why that functional form was picked in the first place we decided
+    # to switch to a simpler stretch of the output that works better, even though not perfectly.
+    # Open for changes/ideas
+    mvaID = -1 + 2 * mvaID
 
     return mvaID

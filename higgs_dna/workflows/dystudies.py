@@ -148,6 +148,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
             # other event related variables need to be added before the tag&probe combination
             # nPV just for validation of pileup reweighting
             photons["nPV"] = events.PV.npvs
+            photons["fixedGridRhoAll"] = events.Rho.fixedGridRhoAll
 
             # TODO: HLT matching for data
 
@@ -184,12 +185,14 @@ class TagAndProbeProcessor(HggBaseProcessor):
             if self.output_location is not None:
                 df = diphoton_list_to_pandas(self, tnp_candidates)
 
-                # since we annotated the photons with event variables, these exist now for tag and probe. Remove:
+                # since we annotated the photons with event variables, these exist now for tag and probe. This concerns weights as well as nPV and fixedGridRhoAll Remove:
                 if self.data_kind == "mc":
                     df["weight"] = df["tag_weight"]
                     df.drop(["tag_weight", "probe_weight"], axis=1, inplace=True)
                 df["nPV"] = df["tag_nPV"]
                 df.drop(["tag_nPV", "probe_nPV"], axis=1, inplace=True)
+                df["fixedGridRhoAll"] = df["tag_fixedGridRhoAll"]
+                df.drop(["tag_fixedGridRhoAll", "probe_fixedGridRhoAll"], axis=1, inplace=True)
 
                 fname = (
                     events.behavior["__events_factory__"]._partition_key.replace(

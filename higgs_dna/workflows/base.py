@@ -500,6 +500,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     diphotons["run"] = events.run
                     # nPV just for validation of pileup reweighting
                     diphotons["nPV"] = events.PV.npvs
+                    diphotons["fixedGridRhoAll"] = events.Rho.fixedGridRhoAll
                     # annotate diphotons with dZ information (difference between z position of GenVtx and PV) as required by flashggfinalfits
                     if self.data_kind == "mc":
                         diphotons["dZ"] = events.GenVtx.z - events.PV.z
@@ -616,6 +617,10 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     if self.output_location is not None:
                         # df = diphoton_list_to_pandas(self, diphotons)
                         akarr = diphoton_ak_array(self, diphotons)
+
+                        # Remove fixedGridRhoAll from photons to avoid having event-level info per photon
+                        akarr = akarr[[field for field in akarr.fields if "lead_fixedGridRhoAll" not in field]]
+
                         fname = (
                             events.behavior["__events_factory__"]._partition_key.replace(
                                 "/", "_"

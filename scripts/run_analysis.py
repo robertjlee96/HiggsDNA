@@ -89,10 +89,11 @@ if __name__ == "__main__":
     samplejson = analysis["samplejson"]
     systematics = analysis["systematics"]
     corrections = analysis["corrections"]
+    year = analysis["year"]
     logger.info(f"Corrections: {corrections}")
     logger.info(f"Systematics: {systematics}")
+    logger.info(f"Year: {year}")
     check_corr_syst_combinations(corrections, systematics, logger)
-    
 
     if args.output == parser.get_default("output"):
         args.output = (
@@ -182,6 +183,7 @@ if __name__ == "__main__":
                 args.dump,
                 wf_taggers,
                 args.skipCQR,
+                year,
             )  # additional args can go here to configure a processor
     else:
         raise NotImplementedError
@@ -337,7 +339,7 @@ if __name__ == "__main__":
                     else f'"{args.queue}"',
                 },
                 env_extra=env_extra,
-                #shared_temp_directory="/tmp"
+                # shared_temp_directory="/tmp"
             )
         elif "slurm" in args.executor:
             cluster = SLURMCluster(
@@ -383,10 +385,19 @@ if __name__ == "__main__":
             )
     elif args.executor == "vanilla_lxplus":
         from higgs_dna.submission.lxplus import LXPlusVanillaSubmitter
+
         for cmd_str in env_extra:
             g_var = cmd_str.split()[-1]
             var, var_value = g_var.split("=")
             os.environ[var] = var_value
         args_string = " ".join(sys.argv[1:])
-        vanilla_submitter = LXPlusVanillaSubmitter(analysis_name, analysis, args.json_analysis_file, sample_dict, args_string, queue=args.queue, memory=args.memory)
+        vanilla_submitter = LXPlusVanillaSubmitter(
+            analysis_name,
+            analysis,
+            args.json_analysis_file,
+            sample_dict,
+            args_string,
+            queue=args.queue,
+            memory=args.memory,
+        )
         output = vanilla_submitter.submit()

@@ -7,6 +7,7 @@ from higgs_dna.tools.SC_eta import add_photon_SC_eta
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.selections.lepton_selections import select_electrons, select_muons
 from higgs_dna.selections.jet_selections import select_jets
+from higgs_dna.selections.lumi_selections import select_lumis
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array
 from higgs_dna.utils.misc_utils import choose_jet
 
@@ -49,6 +50,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         trigger_group: str,
         analysis: str,
         skipCQR: bool,
+        year: Optional[Dict[str, List[str]]],
     ) -> None:
         self.meta = metaconditions
         self.systematics = systematics if systematics is not None else {}
@@ -58,6 +60,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.trigger_group = trigger_group
         self.analysis = analysis
         self.skipCQR = skipCQR
+        self.year = year if year is not None else {}
 
         # muon selection cuts
         self.muon_pt_threshold = 10
@@ -202,8 +205,20 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         return events[filtered & triggered]
 
     def process(self, events: awkward.Array) -> Dict[Any, Any]:
+        dataset_name = events.metadata["dataset"]
+
         # data or monte carlo?
         self.data_kind = "mc" if hasattr(events, "GenPart") else "data"
+
+        # lumi mask
+        if self.data_kind == "data":
+            try:
+                lumimask = select_lumis(self.year[dataset_name][0], events, logger)
+                events = events[lumimask]
+            except:
+                logger.info(
+                    f"[ lumimask ] Skip now! Unable to find year info of {dataset_name}"
+                )
 
         # metadata array to append to higgsdna output
         metadata = {}
@@ -213,9 +228,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             events = add_pileup_weight(events)
 
             # Add sum of gen weights before selection for normalisation in postprocessing
-            metadata['sum_genw_presel'] = str(awkward.sum(events.genWeight))
+            metadata["sum_genw_presel"] = str(awkward.sum(events.genWeight))
         else:
-            metadata['sum_genw_presel'] = 'Data'
+            metadata["sum_genw_presel"] = "Data"
 
         # apply filters and triggers
         events = self.apply_filters_and_triggers(events)
@@ -228,7 +243,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         histos_etc = {}
 
         # read which systematics and corrections to process
-        dataset_name = events.metadata["dataset"]
         try:
             correction_names = self.corrections[dataset_name]
         except KeyError:
@@ -347,7 +361,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     )
                     # the remaining cut is to select the leading photons
                     # the previous sort assures the order
-                    diphotons = diphotons[diphotons["pho_lead"].pt > self.min_pt_lead_photon]
+                    diphotons = diphotons[
+                        diphotons["pho_lead"].pt > self.min_pt_lead_photon
+                    ]
 
                     # now turn the diphotons into candidates with four momenta and such
                     diphoton_4mom = diphotons["pho_lead"] + diphotons["pho_sublead"]
@@ -359,7 +375,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     diphotons = awkward.with_name(diphotons, "PtEtaPhiMCandidate")
 
                     # sort diphotons by pT
-                    diphotons = diphotons[awkward.argsort(diphotons.pt, ascending=False)]
+                    diphotons = diphotons[
+                        awkward.argsort(diphotons.pt, ascending=False)
+                    ]
 
                     # baseline modifications to diphotons
                     if self.diphoton_mva is not None:
@@ -418,28 +436,32 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     muons = awkward.with_name(muons, "PtEtaPhiMCandidate")
 
                     # lepton cleaning
-                    sel_electrons = electrons[select_electrons(self, electrons, diphotons)]
+                    sel_electrons = electrons[
+                        select_electrons(self, electrons, diphotons)
+                    ]
                     sel_muons = muons[select_muons(self, muons, diphotons)]
 
                     # jet selection and pt ordering
-                    jets = jets[select_jets(self, jets, diphotons, sel_muons, sel_electrons)]
+                    jets = jets[
+                        select_jets(self, jets, diphotons, sel_muons, sel_electrons)
+                    ]
                     jets = jets[awkward.argsort(jets.pt, ascending=False)]
 
                     # adding selected jets to events to be used in ctagging SF calculation
                     events["sel_jets"] = jets
                     n_jets = awkward.num(jets)
 
-                    first_jet_pt = choose_jet(jets.pt, 0, -999.)
-                    first_jet_eta = choose_jet(jets.eta, 0, -999.)
-                    first_jet_phi = choose_jet(jets.phi, 0, -999.)
-                    first_jet_mass = choose_jet(jets.mass, 0, -999.)
-                    first_jet_charge = choose_jet(jets.charge, 0, -999.)
+                    first_jet_pt = choose_jet(jets.pt, 0, -999.0)
+                    first_jet_eta = choose_jet(jets.eta, 0, -999.0)
+                    first_jet_phi = choose_jet(jets.phi, 0, -999.0)
+                    first_jet_mass = choose_jet(jets.mass, 0, -999.0)
+                    first_jet_charge = choose_jet(jets.charge, 0, -999.0)
 
-                    second_jet_pt = choose_jet(jets.pt, 1, -999.)
-                    second_jet_eta = choose_jet(jets.eta, 1, -999.)
-                    second_jet_phi = choose_jet(jets.phi, 1, -999.)
-                    second_jet_mass = choose_jet(jets.mass, 1, -999.)
-                    second_jet_charge = choose_jet(jets.charge, 1, -999.)
+                    second_jet_pt = choose_jet(jets.pt, 1, -999.0)
+                    second_jet_eta = choose_jet(jets.eta, 1, -999.0)
+                    second_jet_phi = choose_jet(jets.phi, 1, -999.0)
+                    second_jet_mass = choose_jet(jets.mass, 1, -999.0)
+                    second_jet_charge = choose_jet(jets.charge, 1, -999.0)
 
                     diphotons["first_jet_pt"] = first_jet_pt
                     diphotons["first_jet_eta"] = first_jet_eta
@@ -474,7 +496,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         flat_tags = numpy.stack(
                             (
                                 awkward.flatten(
-                                    diphotons["_".join([tagger.name, str(tagger.priority)])]
+                                    diphotons[
+                                        "_".join([tagger.name, str(tagger.priority)])
+                                    ]
                                 )
                                 for tagger in self.taggers
                             ),
@@ -511,7 +535,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     # drop events without a tag, if there are tags
                     if len(self.taggers):
                         selection_mask = ~(
-                            awkward.is_none(diphotons) | awkward.is_none(diphotons.best_tag)
+                            awkward.is_none(diphotons)
+                            | awkward.is_none(diphotons.best_tag)
                         )
                         diphotons = diphotons[selection_mask]
                     else:
@@ -534,10 +559,14 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                 logger.info(
                                     f"Adding correction {correction_name} to weight collection of dataset {dataset_name}"
                                 )
-                                varying_function = available_weight_corrections[correction_name]
+                                varying_function = available_weight_corrections[
+                                    correction_name
+                                ]
                                 event_weights = varying_function(
                                     events=events[selection_mask],
-                                    photons=events[f"diphotons_{do_variation}"][selection_mask],
+                                    photons=events[f"diphotons_{do_variation}"][
+                                        selection_mask
+                                    ],
                                     weights=event_weights,
                                     dataset_name=dataset_name,
                                 )
@@ -552,11 +581,12 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                     if systematic_name == "LHEScale":
                                         if hasattr(events, "LHEScaleWeight"):
                                             diphotons["nLHEScaleWeight"] = awkward.num(
-                                                events.LHEScaleWeight[selection_mask], axis=1
+                                                events.LHEScaleWeight[selection_mask],
+                                                axis=1,
                                             )
-                                            diphotons["LHEScaleWeight"] = events.LHEScaleWeight[
-                                                selection_mask
-                                            ]
+                                            diphotons[
+                                                "LHEScaleWeight"
+                                            ] = events.LHEScaleWeight[selection_mask]
                                         else:
                                             logger.info(
                                                 f"No {systematic_name} Weights in dataset {dataset_name}"
@@ -566,13 +596,16 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                             # two AlphaS weights are removed
                                             diphotons["nLHEPdfWeight"] = (
                                                 awkward.num(
-                                                    events.LHEPdfWeight[selection_mask], axis=1
+                                                    events.LHEPdfWeight[selection_mask],
+                                                    axis=1,
                                                 )
                                                 - 2
                                             )
-                                            diphotons["LHEPdfWeight"] = events.LHEPdfWeight[
-                                                selection_mask
-                                            ][:, :-2]
+                                            diphotons[
+                                                "LHEPdfWeight"
+                                            ] = events.LHEPdfWeight[selection_mask][
+                                                :, :-2
+                                            ]
                                         else:
                                             logger.info(
                                                 f"No {systematic_name} Weights in dataset {dataset_name}"
@@ -605,21 +638,26 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                 )
 
                         # Multiply weight by genWeight for normalisation in post-processing chain
-                        event_weights._weight = events["genWeight"][selection_mask] * diphotons["weight_central"]
+                        event_weights._weight = (
+                            events["genWeight"][selection_mask]
+                            * diphotons["weight_central"]
+                        )
                         diphotons["weight"] = event_weights.weight()
 
                     # Add weight variables (=1) for data for consistent datasets
                     else:
-                        diphotons["weight_central"] = awkward.ones_like(diphotons["event"])
+                        diphotons["weight_central"] = awkward.ones_like(
+                            diphotons["event"]
+                        )
                         diphotons["weight"] = awkward.ones_like(diphotons["event"])
 
                     if self.output_location is not None:
                         # df = diphoton_list_to_pandas(self, diphotons)
                         akarr = diphoton_ak_array(self, diphotons)
                         fname = (
-                            events.behavior["__events_factory__"]._partition_key.replace(
-                                "/", "_"
-                            )
+                            events.behavior[
+                                "__events_factory__"
+                            ]._partition_key.replace("/", "_")
                             + ".parquet"
                         )
                         subdirs = []
@@ -627,7 +665,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             subdirs.append(events.metadata["dataset"])
                         subdirs.append(do_variation)
                         # dump_pandas(self, df, fname, self.output_location, subdirs)
-                        dump_ak_array(self, akarr, fname, self.output_location, metadata, subdirs)
+                        dump_ak_array(
+                            self, akarr, fname, self.output_location, metadata, subdirs
+                        )
 
         return histos_etc
 

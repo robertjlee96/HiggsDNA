@@ -216,14 +216,14 @@ def PartonShower(photons, events, weights, logger, dataset, systematic):
     """
     try:
         weights.add(
-            name="PS_FSR",
+            name="PS_ISR",
             weight=np.ones(len(events)),
             weightUp=events.PSWeight[:, 0],
             weightDown=events.PSWeight[:, 2],
         )
 
         weights.add(
-            name="PS_ISR",
+            name="PS_FSR",
             weight=np.ones(len(events)),
             weightUp=events.PSWeight[:, 1],
             weightDown=events.PSWeight[:, 3],

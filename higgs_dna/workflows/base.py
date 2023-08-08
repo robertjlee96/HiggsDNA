@@ -532,6 +532,11 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     else:
                         diphotons["dZ"] = awkward.zeros_like(events.PV.z)
 
+                    ### Add mass resolution uncertainty
+                    # Note that pt*cosh(eta) is equal to the energy of a four vector
+                    # Note that you need to call it slightly different than in the output of HiggsDNA as pho_lead -> lead is only done in dumping utils
+                    diphotons["sigma_m_over_m"] = 0.5 * numpy.sqrt((diphotons["pho_lead"].energyErr / (diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))**2 + (diphotons["pho_sublead"].energyErr / (diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))**2)
+
                     # drop events without a preselected diphoton candidate
                     # drop events without a tag, if there are tags
                     if len(self.taggers):

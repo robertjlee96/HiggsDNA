@@ -2,7 +2,6 @@ from higgs_dna.tools.chained_quantile import ChainedQuantileRegression
 from higgs_dna.tools.diphoton_mva import calculate_diphoton_mva
 from higgs_dna.tools.xgb_loader import load_bdt
 from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_mva
-from higgs_dna.tools.pileup_reweighting import add_pileup_weight
 from higgs_dna.tools.SC_eta import add_photon_SC_eta
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.selections.lepton_selections import select_electrons, select_muons
@@ -224,9 +223,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         metadata = {}
 
         if self.data_kind == "mc":
-            # calculate pileup weights (should be according to a setting in Metaconditions, later)
-            events = add_pileup_weight(events)
-
             # Add sum of gen weights before selection for normalisation in postprocessing
             metadata["sum_genw_presel"] = str(awkward.sum(events.genWeight))
         else:
@@ -556,8 +552,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     if self.data_kind == "mc":
                         # initiate Weight container here, after selection, since event selection cannot easily be applied to weight container afterwards
                         event_weights = Weights(size=len(events[selection_mask]))
-                        # _weight will correspond to the product of genWeight and the scale factors
-                        event_weights._weight = events["weight_pileup"][selection_mask]
 
                         # corrections to event weights:
                         for correction_name in correction_names:
@@ -575,6 +569,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                     ],
                                     weights=event_weights,
                                     dataset_name=dataset_name,
+                                    year=self.year[dataset_name][0]
                                 )
 
                         # systematic variations of event weights go to nominal output dataframe:
@@ -629,6 +624,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                             logger=logger,
                                             dataset=dataset_name,
                                             systematic=systematic_name,
+                                            year=self.year[dataset_name][0],
                                         )
 
                         diphotons["weight_central"] = event_weights.weight()

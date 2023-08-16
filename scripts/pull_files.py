@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import argparse
-import datetime
 import os
 from higgs_dna.utils.logger_utils import setup_logger
 import urllib.request
@@ -17,8 +16,9 @@ parser.add_argument(
     dest="target",
     help="Choose the target to download (default: %(default)s)",
     default="GoldenJson",
-    choices=["GoldenJSON", "cTag", "PhotonID"],
+    choices=["GoldenJSON", "cTag", "PhotonID", "PileupRun2"],
 )
+
 parser.add_argument(
     "-a",
     "--all",
@@ -106,7 +106,7 @@ def fetch_file(target_name, logger, from_to_dict, type="url"):
 
 
 def get_ctag_json(logger, target_dir):
-    if target_dir != None:
+    if target_dir is not None:
         to_prefix = target_dir
     else:
         to_prefix = os.path.join(
@@ -135,7 +135,7 @@ def get_ctag_json(logger, target_dir):
 
 
 def get_photonid_json(logger, target_dir):
-    if target_dir != None:
+    if target_dir is not None:
         to_prefix = target_dir
     else:
         to_prefix = os.path.join(
@@ -154,7 +154,7 @@ def get_photonid_json(logger, target_dir):
 def get_goldenjson(logger, target_dir):
     # References:
     # https://twiki.cern.ch/twiki/bin/view/CMS/PdmVRun3Analysis#Data
-    if target_dir != None:
+    if target_dir is not None:
         to_prefix = target_dir
     else:
         to_prefix = os.path.dirname(__file__)
@@ -179,6 +179,39 @@ def get_goldenjson(logger, target_dir):
     fetch_file("GoldenJSON", logger, from_to_dict, type="url")
 
 
+def get_pileup_Run2(logger, target_dir):
+    # Base URL for pileup JSONs
+    base_path = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/LUM"
+
+    if target_dir is not None:
+        to_prefix = target_dir
+    else:
+        to_prefix = os.path.join(
+            os.path.dirname(__file__), "../higgs_dna/metaconditions/pileup"
+        )
+
+    from_to_dict = {
+        "2016preVFP": {
+            "from": f"{base_path}/2016preVFP_UL/puWeights.json.gz",
+            "to": f"{to_prefix}/pileup_2016preVFP.json.gz",
+        },
+        "2016postVFP": {
+            "from": f"{base_path}/2016postVFP_UL/puWeights.json.gz",
+            "to": f"{to_prefix}/pileup_2016postVFP.json.gz",
+        },
+        "2017": {
+            "from": f"{base_path}/2017_UL/puWeights.json.gz",
+            "to": f"{to_prefix}/pileup_2017.json.gz",
+        },
+        "2018": {
+            "from": f"{base_path}/2018_UL/puWeights.json.gz",
+            "to": f"{to_prefix}/pileup_2018.json.gz",
+        },
+    }
+
+    fetch_file("Pileup_Run2", logger, from_to_dict, type="copy")
+
+
 if __name__ == "__main__":
     # log output
     logfile = os.path.join(args.log_dir, f"{args.analysis}_jsons.log")
@@ -187,23 +220,16 @@ if __name__ == "__main__":
     p.mkdir(parents=True, exist_ok=True)
 
     logger = setup_logger(level=args.log, logfile=logfile, time=True)
-    logger.info("-" * 60)
-    logger.info("{:^60}".format("Fetching jsons"))
-    logger.info("   _____                 . . . . . o o o o o")
-    logger.info("  __|[_]|__ ___________ _______    ____      o")
-    logger.info(" |[] [] []| [] [] [] [] [_____(__  ][]]_n_n__][.")
-    logger.info("_|________|_[_________]_[________]_|__|________)<")
-    logger.info("  oo    oo 'oo      oo ' oo    oo 'oo 0000---oo\_")
-    logger.info("~" * 60)
-
-    logger.info("-" * 60)
 
     if args.all:
         get_goldenjson(logger, args.target_dir)
         get_ctag_json(logger, args.target_dir)
         get_photonid_json(logger, args.target_dir)
+        get_pileup_Run2(logger, args.target_dir)
     elif args.target == "GoldenJSON":
         get_goldenjson(logger, args.target_dir)
+    elif args.target == "PileupRun2":
+        get_pileup_Run2(logger, args.target_dir)
     elif args.target == "cTag":
         get_ctag_json(logger, args.target_dir)
     elif args.target == "PhotonID":

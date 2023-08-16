@@ -71,6 +71,45 @@ def SF_photon_ID(
     return weights
 
 
+def Pileup(
+    events, weights, year, is_correction=True, **kwargs
+):
+    """
+    Function to apply either the pileup correction to MC to make it match the pileup profile of a certain year/period,
+    or the respective uncertainties.
+    The parameter `year` needs to be specified to be one of ["2016preVFP", "2016postVFP", "2017", "2018"]
+    By now, only the Run-2 files are available from LUM POG, but for Run-3, it should work analogously once the files are provided.
+    The pileup JSONs first need to be pulled with `scripts/pull_files.py`!
+    """
+
+    path_to_json = os.path.join(os.path.dirname(__file__), "../metaconditions/pileup/pileup_{}.json.gz".format(year))
+    if "16" in year:
+        name = "Collisions16_UltraLegacy_goldenJSON"
+    elif "17" in year:
+        name = "Collisions17_UltraLegacy_goldenJSON"
+    elif "18" in year:
+        name = "Collisions18_UltraLegacy_goldenJSON"
+
+    evaluator = correctionlib.CorrectionSet.from_file(path_to_json)[name]
+
+    if is_correction:
+
+        sf = evaluator.evaluate(events.Pileup.nPU, "nominal")
+        sfup, sfdown = None, None
+
+    else:
+
+        sf = np.ones(len(weights._weight))
+        sf_nom = evaluator.evaluate(events.Pileup.nPU, "nominal")
+
+        sfup = evaluator.evaluate(events.Pileup.nPU, "up") / sf_nom
+        sfdown = evaluator.evaluate(events.Pileup.nPU, "down") / sf_nom
+
+    weights.add(name="SF_photon_ID", weight=sf, weightUp=sfup, weightDown=sfdown)
+
+    return weights
+
+
 def LooseMvaSF(photons, weights, year="2017", WP="Loose", is_correction=True, **kwargs):
     """
     LooseMvaSF: correction to the event weight on a per photon level, impacting one of the high importance input variable of the DiphotonBDT, binned in eta and r9.

@@ -1,5 +1,6 @@
 from .photon_systematics import photon_pt_scale_dummy, Scale, FNUF, ShowerShape
 from .event_weight_systematics import (
+    Pileup,
     SF_photon_ID,
     LooseMvaSF,
     NNLOPS,
@@ -68,6 +69,7 @@ object_corrections = {
 # functions adding systematic variations to event weights to be placed here
 # dict containing "name": varying_function
 weight_systematics = {
+    "Pileup": partial(Pileup, is_correction=False),
     "SF_photon_ID": partial(SF_photon_ID, is_correction=False),
     "LooseMvaSF": partial(LooseMvaSF, is_correction=False),
     "cTagSF": partial(cTagSF, is_correction=False),
@@ -80,6 +82,7 @@ weight_systematics = {
 # functions correcting nominal event weights to be placed here
 # dict containing "name": varying_function
 weight_corrections = {
+    "Pileup": partial(Pileup, is_correction=True),
     "SF_photon_ID": partial(SF_photon_ID, is_correction=True),
     "LooseMvaSF": partial(LooseMvaSF, is_correction=True),
     "cTagSF": partial(cTagSF, is_correction=True),

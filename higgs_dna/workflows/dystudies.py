@@ -2,7 +2,6 @@ from higgs_dna.workflows.base import HggBaseProcessor
 from higgs_dna.systematics import object_systematics as available_object_systematics
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
-from higgs_dna.tools.pileup_reweighting import add_pileup_weight
 from higgs_dna.tools.SC_eta import add_photon_SC_eta
 from typing import Any, Dict, List, Optional
 import awkward as ak
@@ -78,10 +77,6 @@ class TagAndProbeProcessor(HggBaseProcessor):
         # data or mc?
         self.data_kind = "mc" if "GenPart" in ak.fields(events) else "data"
 
-        # calculate pileup weights (should be according to a setting in Metaconditions, later)
-        if self.data_kind == "mc":
-            events = add_pileup_weight(events)
-
         # apply filters and triggers
         events = self.apply_filters_and_triggers(events)
 
@@ -124,7 +119,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
         if self.data_kind == "mc":
             event_weights = Weights(size=len(events))
             # _weight will correspond to "nominal" weight, what else has to be included here? (lumi? xSec? MC sum of weights?)
-            event_weights._weight = events["genWeight"] * events["weight_pileup"]
+            event_weights._weight = events["genWeight"]
 
         for variation, photons in photons_dct.items():
             logger.debug(f"Variation: {variation}")

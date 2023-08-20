@@ -251,6 +251,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         # object corrections:
         for correction_name in correction_names:
             if correction_name in available_object_corrections.keys():
+                logger.info(
+                    f"Applying correction {correction_name} to dataset {dataset_name}"
+                )
                 varying_function = available_object_corrections[correction_name]
                 events = varying_function(events=events)
             elif correction_name in available_weight_corrections:
@@ -277,7 +280,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         kind=systematic_dct["args"]["kind"],
                         what=systematic_dct["args"]["what"],
                         varying_function=functools.partial(
-                            systematic_dct["args"]["varying_function"], events=events
+                            systematic_dct["args"]["varying_function"], events=events, year=self.year[dataset_name][0]
                         )
                         # name=systematic_name, **systematic_dct["args"]
                     )

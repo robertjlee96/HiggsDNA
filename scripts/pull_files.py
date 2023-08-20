@@ -16,7 +16,7 @@ parser.add_argument(
     dest="target",
     help="Choose the target to download (default: %(default)s)",
     default="GoldenJson",
-    choices=["GoldenJSON", "cTag", "PhotonID", "PileupRun2"],
+    choices=["GoldenJSON", "cTag", "PhotonID", "PileupRun2", "SS"],
 )
 
 parser.add_argument(
@@ -150,6 +150,22 @@ def get_photonid_json(logger, target_dir):
     }
     fetch_file("PhotonID", logger, from_to_dict, type="copy")
 
+def get_scale_and_smearing(logger, target_dir):
+    if target_dir is not None:
+        to_prefix = target_dir
+    else:
+        to_prefix = os.path.join(
+            os.path.dirname(__file__), "../higgs_dna/metaconditions/scaleAndSmearing"
+        )
+
+    from_to_dict = {
+        "2022FG": {
+            "from": "/eos/cms/store/group/phys_egamma/akapoor/S+SJSON/Prompt2022FG/SS.json",
+            "to": f"{to_prefix}/2022FG/SS.json",
+        },
+    }
+    fetch_file("PhotonID", logger, from_to_dict, type="copy")
+
 
 def get_goldenjson(logger, target_dir):
     # References:
@@ -157,7 +173,9 @@ def get_goldenjson(logger, target_dir):
     if target_dir is not None:
         to_prefix = target_dir
     else:
-        to_prefix = os.path.dirname(__file__)
+        to_prefix = os.path.join(
+            os.path.dirname(__file__), "../higgs_dna/metaconditions/pileup"
+        )
 
     from_to_dict = {
         "2022": {
@@ -230,6 +248,8 @@ if __name__ == "__main__":
         get_goldenjson(logger, args.target_dir)
     elif args.target == "PileupRun2":
         get_pileup_Run2(logger, args.target_dir)
+    elif args.target == "SS":
+        get_scale_and_smearing(logger, args.target_dir)
     elif args.target == "cTag":
         get_ctag_json(logger, args.target_dir)
     elif args.target == "PhotonID":

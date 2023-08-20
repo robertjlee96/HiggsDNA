@@ -1,5 +1,8 @@
 from higgs_dna.workflows.base import HggBaseProcessor
 from higgs_dna.systematics import object_systematics as available_object_systematics
+from higgs_dna.systematics import object_corrections as available_object_corrections
+from higgs_dna.systematics import weight_systematics as available_weight_systematics
+from higgs_dna.systematics import weight_corrections as available_weight_corrections
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
 from higgs_dna.tools.SC_eta import add_photon_SC_eta
@@ -7,6 +10,7 @@ from typing import Any, Dict, List, Optional
 import awkward as ak
 import logging
 import functools
+import warnings
 from coffea.analysis_tools import Weights
 
 logger = logging.getLogger(__name__)
@@ -56,6 +60,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
         output_location: Optional[str] = None,
         taggers: Optional[List[Any]] = None,
         skipCQR: bool = False,
+        year: Optional[Dict[str, List[str]]] = None,
     ) -> None:
         super().__init__(
             metaconditions,
@@ -67,6 +72,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
             trigger_group=".*SingleEle.*",
             analysis="tagAndProbe",
             skipCQR=skipCQR,
+            year=year if year is not None else {}
         )
         self.trigger_group = ".*SingleEle.*"
         self.analysis = "tagAndProbe"
@@ -74,6 +80,9 @@ class TagAndProbeProcessor(HggBaseProcessor):
         self.prefixes = {"tag": "tag", "probe": "probe"}
 
     def process(self, events: ak.Array) -> Dict[Any, Any]:
+
+        dataset_name = events.metadata["dataset"]
+
         # data or mc?
         self.data_kind = "mc" if "GenPart" in ak.fields(events) else "data"
 
@@ -83,29 +92,60 @@ class TagAndProbeProcessor(HggBaseProcessor):
         # we need ScEta for corrections and systematics, which is not present in NanoAODv11 but can be calculated using PV
         events.Photon = add_photon_SC_eta(events.Photon, events.PV)
 
-        # Whole systematics business
-        dataset_name = events.metadata["dataset"]
+        # read which systematics and corrections to process
+        try:
+            correction_names = self.corrections[dataset_name]
+        except KeyError:
+            correction_names = []
         try:
             systematic_names = self.systematics[dataset_name]
         except KeyError:
             systematic_names = []
 
-        original_photons = events.Photon
-        for systematic_name in systematic_names:
-            systematic_dct = available_object_systematics[systematic_name]
-            if systematic_dct["object"] == "Photon":
+        # object corrections:
+        for correction_name in correction_names:
+            if correction_name in available_object_corrections.keys():
                 logger.info(
-                    f"Adding systematic {systematic_name} to photons collection of dataset {dataset_name}"
+                    f"\nApplying correction {correction_name} to dataset {dataset_name}\n"
                 )
-                original_photons.add_systematic(
-                    # name=systematic_name, **systematic_dct["args"]
-                    name=systematic_name,
-                    kind=systematic_dct["args"]["kind"],
-                    what=systematic_dct["args"]["what"],
-                    varying_function=functools.partial(
-                        systematic_dct["args"]["varying_function"], events=events
-                    ),
+                varying_function = available_object_corrections[correction_name]
+                events = varying_function(events=events)
+            elif correction_name in available_weight_corrections:
+                # event weight corrections will be applied after photon preselection / application of further taggers
+                continue
+            else:
+                # may want to throw an error instead, needs to be discussed
+                warnings.warn(f"Could not process correction {correction_name}.")
+                continue
+
+        original_photons = events.Photon
+        # systematic object variations
+        for systematic_name in systematic_names:
+            if systematic_name in available_object_systematics.keys():
+                systematic_dct = available_object_systematics[systematic_name]
+                if systematic_dct["object"] == "Photon":
+                    logger.info(
+                        f"Adding systematic {systematic_name} to photons collection of dataset {dataset_name}"
+                    )
+                    original_photons.add_systematic(
+                        # passing the arguments here explicitly since I want to pass the events to the varying function. If there is a more elegant / flexible way, just change it!
+                        name=systematic_name,
+                        kind=systematic_dct["args"]["kind"],
+                        what=systematic_dct["args"]["what"],
+                        varying_function=functools.partial(
+                            systematic_dct["args"]["varying_function"], events=events, year=self.year[dataset_name][0]
+                        )
+                        # name=systematic_name, **systematic_dct["args"]
+                    )
+            elif systematic_name in available_weight_systematics:
+                # event weight systematics will be applied after photon preselection / application of further taggers
+                continue
+            else:
+                # may want to throw an error instead, needs to be discussed
+                warnings.warn(
+                    f"Could not process systematic variation {systematic_name}."
                 )
+                continue
 
         photons_dct = {}
         photons_dct["nominal"] = original_photons
@@ -137,7 +177,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
             )
 
             if self.data_kind == "mc":
-                # TODO: add weight systs (if needed)
+                # TODO: add weight systs and corrections! (if needed)
                 # need to annotate the photons already here with a weight since later, each photon can be tag and probe and this changes the length of the array
                 photons["weight"] = event_weights.weight()
                 # keep only photons matched to gen e+ or e-

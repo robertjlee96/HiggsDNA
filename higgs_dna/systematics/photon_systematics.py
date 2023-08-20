@@ -12,29 +12,27 @@ def photon_pt_scale_dummy(pt, **kwargs):
 
 # Not nice but working: if the functions are called in the base processor by Photon.add_systematic(... "what"="pt"...), the pt is passed to the function as first argument.
 # I need the full events here, so I pass in addition the events. Seems to only work if it is explicitly a function of pt, but I might be missing something. Open for better solutions.
-def Scale(pt, events, year="2016postVFP", is_correction=True):
+def Scale(pt, events, year="2022postEE", is_correction=True):
     """
-    ---This is a dummy, meant to be replaced by the Run-3 photon scale uncertainties later, which only shows how a scale uncertainty/correction can be implemented---
-    --- Preliminary JSON file taken from https://github.com/a-kapoor/ScaleFactorsJSON/tree/master/2016postVFP_UL ---
-    Applies the photon pt scale corrections and corresponding uncertainties.
-    The official JSON to use should apper in https://gitlab.cern.ch/cms-nanoAOD/jsonpog-integration later.
+    Applies the photon pt scale corrections (use on data!) and corresponding uncertainties (on MC!).
+    JSON needs to be pulled first with scripts/pull_files.py
     """
 
     # for later unflattening:
     counts = ak.num(events.Photon.pt)
-    # dummy value to test on MC/data which are not 2016postVFP:
-    run = 278769.
-    # otherwise uncomment the following line:
-    # run = ak.flatten(events.run)
+
+    run = ak.flatten(ak.broadcast_arrays(events.run, events.Photon.pt)[0])
     gain = ak.flatten(events.Photon.seedGain)
     eta = ak.flatten(events.Photon.ScEta)
-    # this JSON does not have all r9 bins. Setting it to 0.8 here for tests
-    r9 = 0.8
-    # r9 = ak.flatten(events.Photon.r9)
+    r9 = ak.flatten(events.Photon.r9)
     _pt = ak.flatten(events.Photon.pt)
 
-    jsonpog_file = os.path.join(os.path.dirname(__file__), 'JSONs/SS_2016postVFP_preliminary.json')
-    evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["2016postVFP_ScaleJSON"]
+    if year == "2022postEE":
+        path_json = os.path.join(os.path.dirname(__file__), '../metaconditions/scaleAndSmearing/2022FG/SS.json')
+        evaluator = correctionlib.CorrectionSet.from_file(path_json)["Prompt2022FG_ScaleJSON"]
+    else:
+        print("\n WARNING: there is only a scale correction for year=2022postEE by now! \n Exiting. \n")
+        exit()
 
     if is_correction:
 
@@ -57,6 +55,63 @@ def Scale(pt, events, year="2016postVFP", is_correction=True):
         # divide by correction since it is already applied before
         corr_up_variation = (correction + uncertainty) / correction
         corr_down_variation = (correction - uncertainty) / correction
+
+        # coffea does the unflattenning step itself and sets this value as pt of the up/down variations
+        return np.concatenate((corr_up_variation.reshape(-1,1), corr_down_variation.reshape(-1,1)), axis=1) * _pt[:, None]
+
+
+def Smearing(pt, events, year="2022postEE", is_correction=True):
+    """
+    Applies the photon smearing corrections and corresponding uncertainties (on MC!).
+    JSON needs to be pulled first with scripts/pull_files.py
+    """
+
+    # for later unflattening:
+    counts = ak.num(events.Photon.pt)
+
+    eta = ak.flatten(events.Photon.ScEta)
+    r9 = ak.flatten(events.Photon.r9)
+    _pt = ak.flatten(events.Photon.pt)
+
+    # we need reproducible random numbers since in the systematics call, the previous correction needs to be cancelled out
+    rng = np.random.default_rng(seed=125)
+
+    if year == "2022postEE":
+        path_json = os.path.join(os.path.dirname(__file__), '../metaconditions/scaleAndSmearing/2022FG/SS.json')
+        evaluator = correctionlib.CorrectionSet.from_file(path_json)["Prompt2022FG_SmearingJSON"]
+    else:
+        print("\n WARNING: there is only a smearing correction for year=2022postEE by now! \n Exiting. \n")
+        exit()
+
+    if is_correction:
+
+        rho = evaluator.evaluate("rho", eta, r9)
+        smearing = rng.normal(loc=1., scale=rho)
+        pt_corr = _pt * smearing
+
+        corrected_photons = deepcopy(events.Photon)
+        pt_corr = ak.unflatten(pt_corr, counts)
+        corrected_photons["pt"] = pt_corr
+
+        events.Photon = corrected_photons
+
+        return events
+
+    else:
+
+        rho = evaluator.evaluate("rho", eta, r9)
+        # produce the same numbers as in correction step
+        smearing = rng.normal(loc=1., scale=rho)
+
+        err_rho = evaluator.evaluate("err_rho", eta, r9)
+        rho_up = rho + err_rho
+        rho_down = rho - err_rho
+        smearing_up = rng.normal(loc=1., scale=rho_up)
+        smearing_down = rng.normal(loc=1., scale=rho_down)
+
+        # divide by correction since it is already applied before
+        corr_up_variation = smearing_up / smearing
+        corr_down_variation = smearing_down / smearing
 
         # coffea does the unflattenning step itself and sets this value as pt of the up/down variations
         return np.concatenate((corr_up_variation.reshape(-1,1), corr_down_variation.reshape(-1,1)), axis=1) * _pt[:, None]

@@ -131,19 +131,13 @@ SCRIPT_DIR = os.path.dirname(
 )  # script directory
 
 process_dict = {
-    "cH_4FS_FXFX_M125_2017": "ch",
-    "ggh_M125_2017": "ggh",
-    "tth_M125_2017": "tth",
-    "vbf_M125_2017": "vbf",
-    "vh_M125_2017": "vh",
+    "GluGluHtoGG_postEE_M125_2022": "ggh",
+    "VBFHtoGG_postEE_M125_2022": "vbf",
+    "ttHtoGG_postEE_M125_2022": "tth",
 }
 
 var_dict = {
     "NOMINAL": "nominal",
-    "FNUFUp": "FNUF_up",
-    "FNUFDown": "FNUF_down",
-    "ShowerShapeUp": "ShowerShape_up",
-    "ShowerShapeDown": "ShowerShape_down",
 }
 
 # Here we prepare to split the output into categories, in the dictionary are defined the cuts to be applyed by pyarrow.ParquetDataset
@@ -151,64 +145,91 @@ var_dict = {
 # This can be improved by passing the configuration via json loading
 if opt.cats:
     cat_dict = {
-        "BDT_LOW_0J_PT_LOW": {
+        "EBEB_highR9highR9": {
             "cat_filter": [
-                ("bdt_score", ">", 0.8),
-                ("bdt_score", "<=", 0.9),
-                ("n_jets", "==", 0),
-                ("pt", "<=", 10),
+                ("lead_isScEtaEB", "==", True),
+                ("lead_r9", ">=", 0.85),
+                ("sublead_isScEtaEB", "==", True),
+                ("sublead_r9", ">=", 0.85),
             ]
         },
-        "BDT_LOW_0J_PT_HIG": {
+        "EBEB_highR9lowR9": {
             "cat_filter": [
-                ("bdt_score", ">", 0.8),
-                ("bdt_score", "<=", 0.9),
-                ("n_jets", "==", 0),
-                ("pt", ">", 10),
+                ("lead_isScEtaEB", "==", True),
+                ("lead_r9", ">=", 0.85),
+                ("sublead_isScEtaEB", "==", True),
+                ("sublead_r9", "<", 0.85),
+                ("sublead_r9", ">=", 0.5),
             ]
         },
-        "BDT_HIG_0J_PT_LOW": {
+        "EBEB_lowR9highR9": {
             "cat_filter": [
-                ("bdt_score", ">", 0.9),
-                ("n_jets", "==", 0),
-                ("pt", "<=", 10),
+                ("lead_isScEtaEB", "==", True),
+                ("lead_r9", "<", 0.85),
+                ("lead_r9", ">=", 0.5),
+                ("sublead_isScEtaEB", "==", True),
+                ("sublead_r9", ">=", 0.85),
             ]
         },
-        "BDT_HIG_0J_PT_HIG": {
+
+        "EBEE_highR9highR9": {
             "cat_filter": [
-                ("bdt_score", ">", 0.9),
-                ("n_jets", "==", 0),
-                ("pt", ">", 10),
+                ("lead_isScEtaEB", "==", True),
+                ("lead_r9", ">=", 0.85),
+                ("sublead_isScEtaEE", "==", True),
+                ("sublead_r9", ">=", 0.9),
             ]
         },
-        "BDT_LOW_GE1J_PT_LOW": {
+        "EBEE_highR9lowR9": {
             "cat_filter": [
-                ("bdt_score", ">", 0.8),
-                ("bdt_score", "<=", 0.9),
-                ("n_jets", ">", 0),
-                ("pt", "<=", 60),
+                ("lead_isScEtaEB", "==", True),
+                ("lead_r9", ">=", 0.85),
+                ("sublead_isScEtaEE", "==", True),
+                ("sublead_r9", "<", 0.9),
+                ("sublead_r9", ">=", 0.8),
             ]
         },
-        "BDT_LOW_GE1J_PT_HIG": {
+        "EBEE_lowR9highR9": {
             "cat_filter": [
-                ("bdt_score", ">", 0.8),
-                ("bdt_score", "<=", 0.9),
-                ("n_jets", ">", 0),
-                ("pt", ">", 60),
+                ("lead_isScEtaEB", "==", True),
+                ("lead_r9", "<", 0.85),
+                ("lead_r9", ">=", 0.5),
+                ("sublead_isScEtaEE", "==", True),
+                ("sublead_r9", ">=", 0.9),
             ]
         },
-        "BDT_HIG_GE1J_PT_LOW": {
+
+        "EEEB_highR9highR9": {
             "cat_filter": [
-                ("bdt_score", ">", 0.9),
-                ("n_jets", ">", 0),
-                ("pt", "<=", 60),
+                ("lead_isScEtaEE", "==", True),
+                ("lead_r9", ">=", 0.9),
+                ("sublead_isScEtaEB", "==", True),
+                ("sublead_r9", ">=", 0.85),
             ]
         },
-        "BDT_HIG_GE1J_PT_HIG": {
+        "EEEB_highR9lowR9": {
             "cat_filter": [
-                ("bdt_score", ">", 0.9),
-                ("n_jets", ">", 0),
-                ("pt", ">", 60),
+                ("lead_isScEtaEE", "==", True),
+                ("lead_r9", ">=", 0.9),
+                ("sublead_isScEtaEB", "==", True),
+                ("sublead_r9", "<", 0.85),
+                ("sublead_r9", ">=", 0.5),
+            ]
+        },
+        "EEEB_lowR9highR9": {
+            "cat_filter": [
+                ("lead_isScEtaEE", "==", True),
+                ("lead_r9", "<", 0.9),
+                ("lead_r9", ">=", 0.8),
+                ("sublead_isScEtaEB", "==", True),
+                ("sublead_r9", ">=", 0.85),
+            ]
+        },
+
+        "EEEE_incl": {
+            "cat_filter": [
+                ("lead_isScEtaEE", "==", True),
+                ("sublead_isScEtaEE", "==", True),
             ]
         }
     }

@@ -28,7 +28,7 @@ def Scale(pt, events, year="2022postEE", is_correction=True):
     _pt = ak.flatten(events.Photon.pt)
 
     if year == "2022postEE":
-        path_json = os.path.join(os.path.dirname(__file__), '../metaconditions/scaleAndSmearing/2022FG/SS.json')
+        path_json = os.path.join(os.path.dirname(__file__), '../systematics/scaleAndSmearing/2022FG/SS.json')
         evaluator = correctionlib.CorrectionSet.from_file(path_json)["Prompt2022FG_ScaleJSON"]
     else:
         print("\n WARNING: there is only a scale correction for year=2022postEE by now! \n Exiting. \n")
@@ -77,7 +77,7 @@ def Smearing(pt, events, year="2022postEE", is_correction=True):
     rng = np.random.default_rng(seed=125)
 
     if year == "2022postEE":
-        path_json = os.path.join(os.path.dirname(__file__), '../metaconditions/scaleAndSmearing/2022FG/SS.json')
+        path_json = os.path.join(os.path.dirname(__file__), '../systematics/scaleAndSmearing/2022FG/SS.json')
         evaluator = correctionlib.CorrectionSet.from_file(path_json)["Prompt2022FG_SmearingJSON"]
     else:
         print("\n WARNING: there is only a smearing correction for year=2022postEE by now! \n Exiting. \n")

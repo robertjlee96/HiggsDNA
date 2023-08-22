@@ -155,7 +155,7 @@ def get_scale_and_smearing(logger, target_dir):
         to_prefix = target_dir
     else:
         to_prefix = os.path.join(
-            os.path.dirname(__file__), "../higgs_dna/metaconditions/scaleAndSmearing"
+            os.path.dirname(__file__), "../higgs_dna/systematics/scaleAndSmearing"
         )
 
     from_to_dict = {
@@ -164,32 +164,35 @@ def get_scale_and_smearing(logger, target_dir):
             "to": f"{to_prefix}/2022FG/SS.json",
         },
     }
-    fetch_file("PhotonID", logger, from_to_dict, type="copy")
+    fetch_file("Scale and Smearing", logger, from_to_dict, type="copy")
 
 
 def get_goldenjson(logger, target_dir):
     # References:
     # https://twiki.cern.ch/twiki/bin/view/CMS/PdmVRun3Analysis#Data
-    if target_dir is not None:
-        to_prefix = target_dir
-    else:
-        to_prefix = os.path.join(
-            os.path.dirname(__file__), "../higgs_dna/metaconditions/pileup"
-        )
+    # This is not really a correction JSON, so we only allow saving to a specific location
+    # Commnenting out the code below, this was the previous method
+    #if target_dir is not None:
+    #    to_prefix = target_dir
+    #else:
+    #    to_prefix = os.path.join(
+    #        os.path.dirname(__file__), "../metaconditions/pileup"
+    #    )
 
+    prefix = "../higgs_dna/metaconditions/CAF/certification/"
     from_to_dict = {
         "2022": {
             "from": "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions22/Cert_Collisions2022_355100_362760_Golden.json",
             "to": os.path.join(
-                to_prefix,
-                "../higgs_dna/metaconditions/CAF/certification/Collisions22/Cert_Collisions2022_355100_362760_Golden.json",
+                prefix,
+                "Collisions22/Cert_Collisions2022_355100_362760_Golden.json",
             ),
         },
         "2023": {
             "from": "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions23/Cert_Collisions2023_366442_370092_Golden.json",
             "to": os.path.join(
-                to_prefix,
-                "../higgs_dna/metaconditions/CAF/certification/Collisions23/Cert_Collisions2023_366442_370092_Golden.json",
+                prefix,
+                "Collisions23/Cert_Collisions2023_366442_370092_Golden.json",
             ),
         },
     }
@@ -241,6 +244,8 @@ if __name__ == "__main__":
 
     if args.all:
         get_goldenjson(logger, args.target_dir)
+        get_pileup_Run2(logger, args.target_dir)
+        get_scale_and_smearing(logger, args.target_dir)
         get_ctag_json(logger, args.target_dir)
         get_photonid_json(logger, args.target_dir)
         get_pileup_Run2(logger, args.target_dir)

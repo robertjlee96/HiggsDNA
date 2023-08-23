@@ -174,6 +174,12 @@ def get_main_parser():
         help="Do not apply chained quantile regression (CQR) corrections",
     )
     parser.add_argument(
+        "--skipJetVetoMap",
+        default=False,
+        action="store_true",
+        help="Do not apply jet vetomap selections",
+    )
+    parser.add_argument(
         "--debug",
         default=False,
         action="store_true",

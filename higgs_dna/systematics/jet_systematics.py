@@ -10,7 +10,7 @@ import os
 # from coffea.nanoevents import NanoEventsFactory, NanoAODSchema
 
 
-def Scale_jet(pt, events, year="2022", is_correction=True):
+def JERC_jet(pt, events, year="2022postEE", is_correction=True):
     # n_jets = ak.num(events.Jet.pt)
     ext = extractor()
     ext.add_weight_sets(

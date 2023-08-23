@@ -26,6 +26,7 @@ class DYStudiesProcessor(HggBaseProcessor):
         output_location: Optional[str] = None,
         taggers: Optional[List[Any]] = None,
         skipCQR: bool = False,
+        skipJetVetoMap: bool = False,
         year: Dict[str, List[str]] = None,
     ) -> None:
         super().__init__(
@@ -38,6 +39,7 @@ class DYStudiesProcessor(HggBaseProcessor):
             trigger_group=".*DoubleEG.*",
             analysis="mainAnalysis",
             skipCQR=skipCQR,
+            skipJetVetoMap=skipJetVetoMap,
             year=year,
         )
         self.trigger_group = ".*DoubleEG.*"
@@ -243,7 +245,11 @@ class TagAndProbeProcessor(HggBaseProcessor):
                 df["nPV"] = df["tag_nPV"]
                 df.drop(["tag_nPV", "probe_nPV"], axis=1, inplace=True)
                 df["fixedGridRhoAll"] = df["tag_fixedGridRhoAll"]
-                df.drop(["tag_fixedGridRhoAll", "probe_fixedGridRhoAll"], axis=1, inplace=True)
+                df.drop(
+                    ["tag_fixedGridRhoAll", "probe_fixedGridRhoAll"],
+                    axis=1,
+                    inplace=True,
+                )
 
                 fname = (
                     events.behavior["__events_factory__"]._partition_key.replace(

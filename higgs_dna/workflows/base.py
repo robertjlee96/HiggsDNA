@@ -212,6 +212,29 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         # data or monte carlo?
         self.data_kind = "mc" if hasattr(events, "GenPart") else "data"
 
+        # here we start recording possible coffea accumulators
+        # most likely histograms, could be counters, arrays, ...
+        histos_etc = {}
+        histos_etc[dataset_name] = {}
+        if self.data_kind == "mc":
+            histos_etc[dataset_name]["nTot"] = int(
+                awkward.num(events.genWeight, axis=0)
+            )
+            histos_etc[dataset_name]["nPos"] = int(awkward.sum(events.genWeight > 0))
+            histos_etc[dataset_name]["nNeg"] = int(awkward.sum(events.genWeight < 0))
+            histos_etc[dataset_name]["nEff"] = int(
+                histos_etc[dataset_name]["nPos"] - histos_etc[dataset_name]["nNeg"]
+            )
+            histos_etc[dataset_name]["genWeightSum"] = float(
+                awkward.sum(events.genWeight)
+            )
+        else:
+            histos_etc[dataset_name]["nTot"] = int(len(events))
+            histos_etc[dataset_name]["nPos"] = int(histos_etc[dataset_name]["nTot"])
+            histos_etc[dataset_name]["nNeg"] = int(0)
+            histos_etc[dataset_name]["nEff"] = int(histos_etc[dataset_name]["nTot"])
+            histos_etc[dataset_name]["genWeightSum"] = float(len(events))
+
         # lumi mask
         if self.data_kind == "data":
             try:
@@ -247,10 +270,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             or self.year[dataset_name][0] == "2022postEE"
         ):
             events.Photon = veto_EEleak_flag(self, events.Photon)
-
-        # here we start recording possible coffea accumulators
-        # most likely histograms, could be counters, arrays, ...
-        histos_etc = {}
 
         # read which systematics and corrections to process
         try:
@@ -544,6 +563,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     diphotons["fixedGridRhoAll"] = events.Rho.fixedGridRhoAll
                     # annotate diphotons with dZ information (difference between z position of GenVtx and PV) as required by flashggfinalfits
                     if self.data_kind == "mc":
+                        diphotons["genWeight"] = events.genWeight
                         diphotons["dZ"] = events.GenVtx.z - events.PV.z
                     # Fill zeros for data because there is no GenVtx for data, obviously
                     else:

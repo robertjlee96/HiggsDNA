@@ -5,6 +5,7 @@ from scipy.interpolate import interp1d
 import correctionlib
 import awkward as ak
 from higgs_dna.utils.misc_utils import choose_jet
+import uproot
 
 
 def SF_photon_ID(
@@ -80,32 +81,76 @@ def Pileup(
     The parameter `year` needs to be specified to be one of ["2016preVFP", "2016postVFP", "2017", "2018"]
     By now, only the Run-2 files are available from LUM POG, but for Run-3, it should work analogously once the files are provided.
     The pileup JSONs first need to be pulled with `scripts/pull_files.py`!
+
+    For now, to do a preliminary pileup reweighting for 2022 data, a privately produced pileup file is included.
     """
 
-    path_to_json = os.path.join(os.path.dirname(__file__), "../metaconditions/pileup/pileup_{}.json.gz".format(year))
-    if "16" in year:
-        name = "Collisions16_UltraLegacy_goldenJSON"
-    elif "17" in year:
-        name = "Collisions17_UltraLegacy_goldenJSON"
-    elif "18" in year:
-        name = "Collisions18_UltraLegacy_goldenJSON"
+    if "22" in year:
+        """
+        This block should be removed when the official Run-3 pileup JSONs are available.
+        """
 
-    evaluator = correctionlib.CorrectionSet.from_file(path_to_json)[name]
+        print("\n Applying preliminary, privately produced 2022 pileup corrections. A corresponding uncertainty does not exist here.\n")
 
-    if is_correction:
+        if is_correction:
+            path_pileup = os.path.join(
+                os.path.dirname(__file__),
+                "../metaconditions/pileup/2022Preliminary/MyDataPileupHistogram2022FG.root",
+            )
+            pileup_profile = uproot.open(path_pileup)["pileup"]
+            pileup_profile = pileup_profile.to_numpy()[0]
+            # normalise
+            pileup_profile /= pileup_profile.sum()
 
-        sf = evaluator.evaluate(events.Pileup.nPU, "nominal")
-        sfup, sfdown = None, None
+            # here, we get the MC pileup distribution by histogramming
+            pileup_MC = np.histogram(ak.to_numpy(events.Pileup.nPU), bins=100, range=(0, 100))[0].astype("float64")
+            # avoid division by zero later
+            pileup_MC[pileup_MC == 0.] = 1
+            # normalise
+            pileup_MC /= pileup_MC.sum()
+
+            pileup_correction = pileup_profile / pileup_MC
+            # remove large MC reweighting factors to prevent artifacts
+            pileup_correction[pileup_correction > 10] = 10
+
+            sf = pileup_correction[ak.to_numpy(events.Pileup.nPU)]
+            sfup, sfdown = None, None
+
+        else:
+            # this preliminary pileup does not come with an uncertainty!
+            sf = np.ones(len(weights._weight))
+            sfup = np.ones(len(weights._weight))
+            sfdown = np.ones(len(weights._weight))
+
+        weights.add(name="Pileup", weight=sf, weightUp=sfup, weightDown=sfdown)
+
+        return weights
 
     else:
+        path_to_json = os.path.join(os.path.dirname(__file__), "../metaconditions/pileup/pileup_{}.json.gz".format(year))
+        if "16" in year:
+            name = "Collisions16_UltraLegacy_goldenJSON"
+        elif "17" in year:
+            name = "Collisions17_UltraLegacy_goldenJSON"
+        elif "18" in year:
+            name = "Collisions18_UltraLegacy_goldenJSON"
 
-        sf = np.ones(len(weights._weight))
-        sf_nom = evaluator.evaluate(events.Pileup.nPU, "nominal")
+        evaluator = correctionlib.CorrectionSet.from_file(path_to_json)[name]
 
-        sfup = evaluator.evaluate(events.Pileup.nPU, "up") / sf_nom
-        sfdown = evaluator.evaluate(events.Pileup.nPU, "down") / sf_nom
+        if is_correction:
 
-    weights.add(name="SF_photon_ID", weight=sf, weightUp=sfup, weightDown=sfdown)
+            sf = evaluator.evaluate(events.Pileup.nPU, "nominal")
+            sfup, sfdown = None, None
+
+        else:
+
+            sf = np.ones(len(weights._weight))
+            sf_nom = evaluator.evaluate(events.Pileup.nPU, "nominal")
+
+            sfup = evaluator.evaluate(events.Pileup.nPU, "up") / sf_nom
+            sfdown = evaluator.evaluate(events.Pileup.nPU, "down") / sf_nom
+
+    weights.add(name="Pileup", weight=sf, weightUp=sfup, weightDown=sfdown)
 
     return weights
 

@@ -6,7 +6,7 @@ from higgs_dna.tools.SC_eta import add_photon_SC_eta
 from higgs_dna.tools.EELeak_region import veto_EEleak_flag
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.selections.lepton_selections import select_electrons, select_muons
-from higgs_dna.selections.jet_selections import select_jets
+from higgs_dna.selections.jet_selections import select_jets, jetvetomap
 from higgs_dna.selections.lumi_selections import select_lumis
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array
 from higgs_dna.utils.misc_utils import choose_jet
@@ -50,6 +50,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         trigger_group: str,
         analysis: str,
         skipCQR: bool,
+        skipJetVetoMap: bool,
         year: Optional[Dict[str, List[str]]],
     ) -> None:
         self.meta = metaconditions
@@ -60,6 +61,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.trigger_group = trigger_group
         self.analysis = analysis
         self.skipCQR = skipCQR
+        self.skipJetVetoMap = skipJetVetoMap
         self.year = year if year is not None else {}
 
         # muon selection cuts
@@ -219,7 +221,11 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 logger.info(
                     f"[ lumimask ] Skip now! Unable to find year info of {dataset_name}"
                 )
-
+        # apply jetvetomap
+        if not self.skipJetVetoMap:
+            events = jetvetomap(
+                events, logger, dataset_name, year=self.year[dataset_name][0]
+            )
         # metadata array to append to higgsdna output
         metadata = {}
 

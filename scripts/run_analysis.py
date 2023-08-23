@@ -183,6 +183,7 @@ if __name__ == "__main__":
                 args.dump,
                 wf_taggers,
                 args.skipCQR,
+                args.skipJetVetoMap,
                 year,
             )  # additional args can go here to configure a processor
     else:

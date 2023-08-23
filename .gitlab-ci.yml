@@ -24,7 +24,7 @@ build_docker:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_REF_NAME == "master"'
   tags:
-    - docker-privileged
+    - docker-privileged-xl
   image: docker:19.03.1
   services:
     - docker:19.03.1-dind

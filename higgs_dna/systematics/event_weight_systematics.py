@@ -95,7 +95,7 @@ def Pileup(
         if is_correction:
             path_pileup = os.path.join(
                 os.path.dirname(__file__),
-                "../metaconditions/pileup/2022Preliminary/MyDataPileupHistogram2022FG.root",
+                "../higgs_dna/systematics/JSONs/pileup/2022Preliminary/MyDataPileupHistogram2022FG.root",
             )
             pileup_profile = uproot.open(path_pileup)["pileup"]
             pileup_profile = pileup_profile.to_numpy()[0]
@@ -127,7 +127,7 @@ def Pileup(
         return weights
 
     else:
-        path_to_json = os.path.join(os.path.dirname(__file__), "../metaconditions/pileup/pileup_{}.json.gz".format(year))
+        path_to_json = os.path.join(os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/pileup_{}.json.gz".format(year))
         if "16" in year:
             name = "Collisions16_UltraLegacy_goldenJSON"
         elif "17" in year:

@@ -208,7 +208,7 @@ def get_pileup_Run2(logger, target_dir):
         to_prefix = target_dir
     else:
         to_prefix = os.path.join(
-            os.path.dirname(__file__), "../higgs_dna/metaconditions/pileup"
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs"
         )
 
     from_to_dict = {

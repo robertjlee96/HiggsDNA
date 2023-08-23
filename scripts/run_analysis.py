@@ -10,6 +10,7 @@ import numpy as np
 import uproot
 from coffea import processor
 from coffea.util import save
+from coffea.nanoevents import NanoAODSchema, BaseSchema
 from dask.distributed import Client, Worker, WorkerPlugin
 
 from higgs_dna.utils.runner_utils import get_main_parser, get_proxy
@@ -65,6 +66,31 @@ def _worker_upload(dask_worker, data, fname):
         data=data,
         load=True,
     )
+
+
+def run_executor(_args, executor, sample_dict, processor_instance):
+    schema_list = {
+        "nano": NanoAODSchema,
+        "base": BaseSchema,
+    }
+    run = processor.Runner(
+        executor=executor,
+        schema=schema_list[_args.schema],
+        chunksize=_args.chunk,
+        maxchunks=_args.max,
+        format=_args.format,
+        skipbadfiles=_args.skipbadfiles,
+    )
+
+    output = run(
+        sample_dict,
+        treename="Events",
+        processor_instance=processor_instance,
+    )
+
+    # save event number to json
+    if _args.save != None:
+        save(output, _args.save)
 
 
 if __name__ == "__main__":
@@ -183,6 +209,7 @@ if __name__ == "__main__":
                 args.dump,
                 wf_taggers,
                 args.skipCQR,
+                args.skipJetVetoMap,
                 year,
             )  # additional args can go here to configure a processor
     else:
@@ -214,22 +241,10 @@ if __name__ == "__main__":
     # Execute
     if args.executor in ["futures", "iterative"]:
         if args.executor == "iterative":
-            _exec = processor.iterative_executor
+            executor = processor.IterativeExecutor()
         else:
-            _exec = processor.futures_executor
-        output = processor.run_uproot_job(
-            sample_dict,
-            treename="Events",
-            processor_instance=processor_instance,
-            executor=_exec,
-            executor_args={
-                "skipbadfiles": args.skipbadfiles,
-                "schema": processor.NanoAODSchema,
-                "workers": args.workers,
-            },
-            chunksize=args.chunk,
-            maxchunks=args.max,
-        )
+            executor = processor.FuturesExecutor(workers=args.workers)
+        run_executor(args, executor, sample_dict, processor_instance)
     elif "parsl" in args.executor:
         import parsl
         from parsl.addresses import address_by_hostname, address_by_query
@@ -281,20 +296,8 @@ if __name__ == "__main__":
 
         dfk = parsl.load(htex_config)
 
-        output = processor.run_uproot_job(
-            sample_dict,
-            treename="Events",
-            processor_instance=processor_instance,
-            executor=processor.parsl_executor,
-            executor_args={
-                "skipbadfiles": True,
-                "schema": processor.NanoAODSchema,
-                "config": None,
-            },
-            chunksize=args.chunk,
-            maxchunks=args.max,
-        )
-
+        executor = processor.ParslExecutor()
+        run_executor(args, executor, sample_dict, processor_instance)
     elif "dask" in args.executor:
         from dask.distributed import performance_report
         from dask_jobqueue import HTCondorCluster, SLURMCluster
@@ -369,20 +372,8 @@ if __name__ == "__main__":
             logger.info("Waiting for at least one worker...")
             client.wait_for_workers(1)
         with performance_report(filename="dask-report.html"):
-            output = processor.run_uproot_job(
-                sample_dict,
-                treename="Events",
-                processor_instance=processor_instance,
-                executor=processor.dask_executor,
-                executor_args={
-                    "client": client,
-                    "skipbadfiles": args.skipbadfiles,
-                    "schema": processor.NanoAODSchema,
-                    "retries": 50,
-                },
-                chunksize=args.chunk,
-                maxchunks=args.max,
-            )
+            executor = processor.DaskExecutor(client=client, retries=50)
+            run_executor(args, executor, sample_dict, processor_instance)
     elif args.executor == "vanilla_lxplus":
         from higgs_dna.submission.lxplus import LXPlusVanillaSubmitter
 

@@ -5,6 +5,7 @@ from higgs_dna.utils.logger_utils import setup_logger
 import urllib.request
 import pathlib
 import shutil
+from distutils.dir_util import copy_tree
 
 parser = argparse.ArgumentParser(
     description="Simple utility script to retrieve the needed files for corections, luminostiy mask, systematics uncertainties ..."
@@ -16,7 +17,7 @@ parser.add_argument(
     dest="target",
     help="Choose the target to download (default: %(default)s)",
     default="GoldenJson",
-    choices=["GoldenJSON", "cTag", "PhotonID", "PileupRun2", "SS"],
+    choices=["GoldenJSON", "cTag", "PhotonID", "PileupRun2", "SS", "JetMET"],
 )
 
 parser.add_argument(
@@ -88,7 +89,10 @@ def fetch_file(target_name, logger, from_to_dict, type="url"):
                 p = pathlib.Path(*p.parts[:-1])  # remove file name
                 p.mkdir(parents=True, exist_ok=True)
                 # copy
-                shutil.copy(from_to_dict[ikey]["from"], from_to_dict[ikey]["to"])
+                if os.path.isdir(from_to_dict[ikey]["from"]):
+                    copy_tree(from_to_dict[ikey]["from"], from_to_dict[ikey]["to"])
+                else:
+                    shutil.copy(from_to_dict[ikey]["from"], from_to_dict[ikey]["to"])
                 logger.info(
                     "[ {} ] {}: Copy from {} to {}".format(
                         target_name,
@@ -150,6 +154,7 @@ def get_photonid_json(logger, target_dir):
     }
     fetch_file("PhotonID", logger, from_to_dict, type="copy")
 
+
 def get_scale_and_smearing(logger, target_dir):
     if target_dir is not None:
         to_prefix = target_dir
@@ -172,15 +177,37 @@ def get_goldenjson(logger, target_dir):
     # https://twiki.cern.ch/twiki/bin/view/CMS/PdmVRun3Analysis#Data
     # This is not really a correction JSON, so we only allow saving to a specific location
     # Commnenting out the code below, this was the previous method
-    #if target_dir is not None:
+    # if target_dir is not None:
     #    to_prefix = target_dir
-    #else:
+    # else:
     #    to_prefix = os.path.join(
     #        os.path.dirname(__file__), "../metaconditions/pileup"
     #    )
 
     prefix = "../higgs_dna/metaconditions/CAF/certification/"
+
     from_to_dict = {
+        "2016": {
+            "from": "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions16/13TeV/Legacy_2016/Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON.txt",
+            "to": os.path.join(
+                prefix,
+                "Collisions16/Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON.txt",
+            ),
+        },
+        "2017": {
+            "from": "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_GoldenJSON.txt",
+            "to": os.path.join(
+                prefix,
+                "Collisions17/Cert_294927-306462_13TeV_UL2017_Collisions17_GoldenJSON.txt",
+            ),
+        },
+        "2018": {
+            "from": "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON.txt",
+            "to": os.path.join(
+                prefix,
+                "Collisions18/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON.txt",
+            ),
+        },
         "2022": {
             "from": "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions22/Cert_Collisions2022_355100_362760_Golden.json",
             "to": os.path.join(
@@ -198,6 +225,57 @@ def get_goldenjson(logger, target_dir):
     }
 
     fetch_file("GoldenJSON", logger, from_to_dict, type="url")
+
+
+def get_jetmet_json(logger, target_dir):
+    # References:
+    # json pog of JME: https://gitlab.cern.ch/cms-nanoAOD/jsonpog-integration/-/tree/master/POG/JME
+    # jetmapveto: https://twiki.cern.ch/twiki/bin/viewauth/CMS/PdmVRun3Analysis#From_JME
+    base_path = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/JME"
+    if target_dir is not None:
+        to_prefix = target_dir
+    else:
+        to_prefix = os.path.dirname(__file__)
+
+    from_to_dict = {
+        "2016preVFP": {
+            "from": os.path.join(base_path, "2016preVFP_UL"),
+            "to": os.path.join(
+                to_prefix,
+                "../higgs_dna/systematics/JSONs/POG/JME/2016preVFP_UL",
+            ),
+        },
+        "2016postVFP": {
+            "from": os.path.join(base_path, "2016postVFP_UL"),
+            "to": os.path.join(
+                to_prefix,
+                "../higgs_dna/systematics/JSONs/POG/JME/2016postVFP_UL",
+            ),
+        },
+        "2017": {
+            "from": os.path.join(base_path, "2017_UL"),
+            "to": os.path.join(
+                to_prefix,
+                "../higgs_dna/systematics/JSONs/POG/JME/2017_UL",
+            ),
+        },
+        "2018": {
+            "from": os.path.join(base_path, "2018_UL"),
+            "to": os.path.join(
+                to_prefix,
+                "../higgs_dna/systematics/JSONs/POG/JME/2018_UL",
+            ),
+        },
+        "2022Prompt": {
+            "from": os.path.join(base_path, "2022_Prompt"),
+            "to": os.path.join(
+                to_prefix,
+                "../higgs_dna/systematics/JSONs/POG/JME/2022_Prompt",
+            ),
+        },
+    }
+
+    fetch_file("JetMET", logger, from_to_dict, type="copy")
 
 
 def get_pileup_Run2(logger, target_dir):
@@ -249,6 +327,7 @@ if __name__ == "__main__":
         get_ctag_json(logger, args.target_dir)
         get_photonid_json(logger, args.target_dir)
         get_pileup_Run2(logger, args.target_dir)
+        get_jetmet_json(logger, args.target_dir)
     elif args.target == "GoldenJSON":
         get_goldenjson(logger, args.target_dir)
     elif args.target == "PileupRun2":
@@ -259,6 +338,8 @@ if __name__ == "__main__":
         get_ctag_json(logger, args.target_dir)
     elif args.target == "PhotonID":
         get_photonid_json(logger, args.target_dir)
+    elif args.target == "JetMET":
+        get_jetmet_json(logger, args.target_dir)
     else:
         logger.info("Unknown target, exit now!")
         exit(0)

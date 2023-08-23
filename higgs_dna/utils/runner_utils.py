@@ -51,6 +51,24 @@ def get_main_parser():
         default=r"output.coffea",
         help="Output filename (default: %(default)s)",
     )
+    parser.add_argument(
+        "--schema",
+        default="nano",
+        help="input file format schema(default: %(default)s)",
+        choices=("nano", "base"),
+    )
+    parser.add_argument(
+        "-f",
+        "--format",
+        default="root",
+        help="input file format (default: %(default)s)",
+        choices=("root", "parquet"),
+    )
+    parser.add_argument(
+        "--save",
+        default=None,
+        help="If not None, save the coffea output, e.g., --save run_summary.coffea",
+    )
 
     # Scale out
     parser.add_argument(
@@ -172,6 +190,12 @@ def get_main_parser():
         default=False,
         action="store_true",
         help="Do not apply chained quantile regression (CQR) corrections",
+    )
+    parser.add_argument(
+        "--skipJetVetoMap",
+        default=False,
+        action="store_true",
+        help="Do not apply jet vetomap selections",
     )
     parser.add_argument(
         "--debug",

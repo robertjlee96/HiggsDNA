@@ -6,6 +6,9 @@ import correctionlib
 import awkward as ak
 from higgs_dna.utils.misc_utils import choose_jet
 import uproot
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def SF_photon_ID(
@@ -17,9 +20,15 @@ def SF_photon_ID(
     as specified in https://gitlab.cern.ch/cms-nanoAOD/jsonpog-integration.
     **kwargs used here since I pass the full events object to these functions as some other systematics might need more information than only the Photon container.
     """
-
+    systematic = "Photon ID SFs"
     # have to think about how to specify era/year, using 2017 test-wise here, defined as parameter of the function
-    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/SF_photon_ID/photon.json.gz")
+    logger.info(
+        f"[{systematic}] now only test year: 2017, need to consider other years asap"
+    )
+    year = "2017"  # FIXME: now only use 2017 for example
+    jsonpog_file = os.path.join(
+        os.path.dirname(__file__), "JSONs/SF_photon_ID/photon.json.gz"
+    )
     evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["UL-Photon-ID-SF"]
 
     if is_correction:
@@ -49,7 +58,11 @@ def SF_photon_ID(
             year, "sfup", "Loose", photons["pho_lead"].ScEta, photons["pho_lead"].pt
         )
         sfup_sublead = evaluator.evaluate(
-            year, "sfup", "Loose", photons["pho_sublead"].ScEta, photons["pho_sublead"].pt
+            year,
+            "sfup",
+            "Loose",
+            photons["pho_sublead"].ScEta,
+            photons["pho_sublead"].pt,
         )
         # Temporary fix: the .weight function of coffea.processor.Weights multiplies the systematic variations by the nominal SF itself
         # so divide by it to remove this additional factor
@@ -72,9 +85,7 @@ def SF_photon_ID(
     return weights
 
 
-def Pileup(
-    events, weights, year, is_correction=True, **kwargs
-):
+def Pileup(events, weights, year, is_correction=True, **kwargs):
     """
     Function to apply either the pileup correction to MC to make it match the pileup profile of a certain year/period,
     or the respective uncertainties.
@@ -90,7 +101,9 @@ def Pileup(
         This block should be removed when the official Run-3 pileup JSONs are available.
         """
 
-        print("\n Applying preliminary, privately produced 2022 pileup corrections. A corresponding uncertainty does not exist here.\n")
+        print(
+            "\n Applying preliminary, privately produced 2022 pileup corrections. A corresponding uncertainty does not exist here.\n"
+        )
 
         if is_correction:
             path_pileup = os.path.join(
@@ -103,9 +116,11 @@ def Pileup(
             pileup_profile /= pileup_profile.sum()
 
             # here, we get the MC pileup distribution by histogramming
-            pileup_MC = np.histogram(ak.to_numpy(events.Pileup.nPU), bins=100, range=(0, 100))[0].astype("float64")
+            pileup_MC = np.histogram(
+                ak.to_numpy(events.Pileup.nPU), bins=100, range=(0, 100)
+            )[0].astype("float64")
             # avoid division by zero later
-            pileup_MC[pileup_MC == 0.] = 1
+            pileup_MC[pileup_MC == 0.0] = 1
             # normalise
             pileup_MC /= pileup_MC.sum()
 
@@ -138,12 +153,10 @@ def Pileup(
         evaluator = correctionlib.CorrectionSet.from_file(path_to_json)[name]
 
         if is_correction:
-
             sf = evaluator.evaluate(events.Pileup.nPU, "nominal")
             sfup, sfdown = None, None
 
         else:
-
             sf = np.ones(len(weights._weight))
             sf_nom = evaluator.evaluate(events.Pileup.nPU, "nominal")
 
@@ -271,12 +284,13 @@ def NNLOPS(
     return weights
 
 
-def AlphaS(photons, events, weights, logger, dataset, systematic):
+def AlphaS(photons, events, weights, dataset_name, **kwargs):
     """
     AlphaS weights variations are the last two of the PDF replicas, e.g.,
     https://github.com/cms-sw/cmssw/blob/d37d2797dffc978a78da2fafec3ba480071a0e67/PhysicsTools/NanoAOD/python/genWeightsTable_cfi.py#L10
     https://lhapdfsets.web.cern.ch/current/NNPDF31_nnlo_as_0118_mc_hessian_pdfas/NNPDF31_nnlo_as_0118_mc_hessian_pdfas.info
     """
+    systematic = "AlphaS Weight"
     try:
         weights.add(
             name="AlphaS",
@@ -285,19 +299,20 @@ def AlphaS(photons, events, weights, logger, dataset, systematic):
             weightDown=events.LHEPdfWeight[:, -2],
         )
     except:
-        logger.info(
-            f"No LHEPdf Weights in dataset {dataset}, skip systematic {systematic}"
+        logger.debug(
+            f"No LHEPdf Weights in dataset {dataset_name}, skip systematic: {systematic}"
         )
         return weights
 
     return weights
 
 
-def PartonShower(photons, events, weights, logger, dataset, systematic):
+def PartonShower(photons, events, weights, dataset_name, **kwargs):
     """
     Parton Shower weights:
     https://github.com/cms-sw/cmssw/blob/caeae4110ddbada1cfdac195404b3c618584e8fb/PhysicsTools/NanoAOD/plugins/GenWeightsTableProducer.cc#L533-L534
     """
+    systematic = "PartonShower weight"
     try:
         weights.add(
             name="PS_ISR",
@@ -313,15 +328,15 @@ def PartonShower(photons, events, weights, logger, dataset, systematic):
             weightDown=events.PSWeight[:, 3],
         )
     except:
-        logger.info(f"No PS Weights in dataset {dataset}, skip systematic {systematic}")
+        logger.debug(
+            f"No PS Weights in dataset {dataset_name}, skip systematic: {systematic}"
+        )
         return weights
 
     return weights
 
 
-def cTagSF(
-    events, weights, is_correction=True, era="2017", **kwargs
-):
+def cTagSF(events, weights, is_correction=True, year="2017", **kwargs):
     """
     Add c-tagging reshaping SFs as from /https://github.com/higgs-charm/flashgg/blob/dev/cH_UL_Run2_withBDT/Systematics/scripts/applyCTagCorrections.py
     BTV scale factor Wiki: https://btv-wiki.docs.cern.ch/ScaleFactors/
@@ -330,38 +345,58 @@ def cTagSF(
     by this procedure and fill these position wit 1s before actually setting the weights in the collection. If someone has better ideas I'm open for suggestions
     """
     ctag_systematics = [
-        'Extrap', 'Interp',
-        'LHEScaleWeight_muF', 'LHEScaleWeight_muR', 'PSWeightFSR', 'PSWeightISR',
-        'PUWeight', 'Stat',
-        'XSec_BRUnc_DYJets_b', 'XSec_BRUnc_DYJets_c', 'XSec_BRUnc_WJets_c',
-        'jer', 'jesTotal'
+        "Extrap",
+        "Interp",
+        "LHEScaleWeight_muF",
+        "LHEScaleWeight_muR",
+        "PSWeightFSR",
+        "PSWeightISR",
+        "PUWeight",
+        "Stat",
+        "XSec_BRUnc_DYJets_b",
+        "XSec_BRUnc_DYJets_c",
+        "XSec_BRUnc_WJets_c",
+        "jer",
+        "jesTotal",
     ]
 
     ctag_correction_configs = {
-        '2016preVFP': {
-            'file': os.path.join(os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2016preVFP.json.gz"),
-            'method': 'deepJet_shape',
-            'systs': ctag_systematics,
+        "2016preVFP": {
+            "file": os.path.join(
+                os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2016preVFP.json.gz"
+            ),
+            "method": "deepJet_shape",
+            "systs": ctag_systematics,
         },
-        '2016postVFP': {
-            'file': os.path.join(os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2016postVFP.json.gz"),
-            'method': 'deepJet_shape',
-            'systs': ctag_systematics,
+        "2016postVFP": {
+            "file": os.path.join(
+                os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2016postVFP.json.gz"
+            ),
+            "method": "deepJet_shape",
+            "systs": ctag_systematics,
         },
-        '2017': {
-            'file': os.path.join(os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2017.json.gz"),
-            'method': 'deepJet_shape',
-            'systs': ctag_systematics,
+        "2017": {
+            "file": os.path.join(
+                os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2017.json.gz"
+            ),
+            "method": "deepJet_shape",
+            "systs": ctag_systematics,
         },
-        '2018': {
-            'file': os.path.join(os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2018.json.gz"),
-            'method': 'deepJet_shape',
-            'systs': ctag_systematics,
+        "2018": {
+            "file": os.path.join(
+                os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2018.json.gz"
+            ),
+            "method": "deepJet_shape",
+            "systs": ctag_systematics,
         },
     }
 
-    jsonpog_file = os.path.join(os.path.dirname(__file__), ctag_correction_configs[era]['file'])
-    evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)[ctag_correction_configs[era]['method']]
+    jsonpog_file = os.path.join(
+        os.path.dirname(__file__), ctag_correction_configs[year]["file"]
+    )
+    evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)[
+        ctag_correction_configs[year]["method"]
+    ]
 
     events["n_jets"] = ak.num(events["sel_jets"])
     max_n_jet = max(events["n_jets"])
@@ -380,11 +415,15 @@ def cTagSF(
 
             # I select the nth jet column
             nth_jet_hFlav = choose_jet(events["sel_jets"].hFlav, i, 0)
-            nth_jet_DeepFlavour_CvsL = choose_jet(events["sel_jets"].btagDeepFlav_CvL, i, 0)
-            nth_jet_DeepFlavour_CvsB = choose_jet(events["sel_jets"].btagDeepFlav_CvB, i, 0)
+            nth_jet_DeepFlavour_CvsL = choose_jet(
+                events["sel_jets"].btagDeepFlav_CvL, i, 0
+            )
+            nth_jet_DeepFlavour_CvsB = choose_jet(
+                events["sel_jets"].btagDeepFlav_CvB, i, 0
+            )
             _sf.append(
                 evaluator.evaluate(
-                    'central',
+                    "central",
                     nth_jet_hFlav,
                     nth_jet_DeepFlavour_CvsL,
                     nth_jet_DeepFlavour_CvsB,
@@ -410,7 +449,13 @@ def cTagSF(
             sfs_up.append(ak.values_astype(dummy_sf, np.float))
             sfs_down.append(ak.values_astype(dummy_sf, np.float))
 
-        weights.add_multivariation(name="cTagSF", weight=sf, modifierNames=ctag_systematics, weightsUp=sfs_up, weightsDown=sfs_down)
+        weights.add_multivariation(
+            name="cTagSF",
+            weight=sf,
+            modifierNames=ctag_systematics,
+            weightsUp=sfs_up,
+            weightsDown=sfs_down,
+        )
 
     else:
         # only calculate correction to nominal weight
@@ -424,11 +469,15 @@ def cTagSF(
 
             # I select the nth jet column
             nth_jet_hFlav = choose_jet(events["sel_jets"].hFlav, i, 0)
-            nth_jet_DeepFlavour_CvsL = choose_jet(events["sel_jets"].btagDeepFlav_CvL, i, 0)
-            nth_jet_DeepFlavour_CvsB = choose_jet(events["sel_jets"].btagDeepFlav_CvB, i, 0)
+            nth_jet_DeepFlavour_CvsL = choose_jet(
+                events["sel_jets"].btagDeepFlav_CvL, i, 0
+            )
+            nth_jet_DeepFlavour_CvsB = choose_jet(
+                events["sel_jets"].btagDeepFlav_CvB, i, 0
+            )
             _sf.append(
                 evaluator.evaluate(
-                    'central',
+                    "central",
                     nth_jet_hFlav,
                     nth_jet_DeepFlavour_CvsL,
                     nth_jet_DeepFlavour_CvsB,
@@ -448,21 +497,24 @@ def cTagSF(
             sf = sf * nth
 
         variations = {}
-        for syst_name in ctag_correction_configs[era]['systs']:
+        for syst_name in ctag_correction_configs[year]["systs"]:
             # we will append the scale factors relative to all jets to be multiplied
             _sfup = []
             _sfdown = []
             variations[syst_name] = {}
             for i in range(max_n_jet):
-
                 # I select the nth jet column
                 nth_jet_hFlav = choose_jet(events["sel_jets"].hFlav, i, 0)
-                nth_jet_DeepFlavour_CvsL = choose_jet(events["sel_jets"].btagDeepFlav_CvL, i, 0)
-                nth_jet_DeepFlavour_CvsB = choose_jet(events["sel_jets"].btagDeepFlav_CvB, i, 0)
+                nth_jet_DeepFlavour_CvsL = choose_jet(
+                    events["sel_jets"].btagDeepFlav_CvL, i, 0
+                )
+                nth_jet_DeepFlavour_CvsB = choose_jet(
+                    events["sel_jets"].btagDeepFlav_CvB, i, 0
+                )
 
                 _sfup.append(
                     evaluator.evaluate(
-                        'up_' + syst_name,
+                        "up_" + syst_name,
                         nth_jet_hFlav,
                         nth_jet_DeepFlavour_CvsL,
                         nth_jet_DeepFlavour_CvsB,
@@ -471,7 +523,7 @@ def cTagSF(
 
                 _sfdown.append(
                     evaluator.evaluate(
-                        'down_' + syst_name,
+                        "down_" + syst_name,
                         nth_jet_hFlav,
                         nth_jet_DeepFlavour_CvsL,
                         nth_jet_DeepFlavour_CvsB,
@@ -501,8 +553,17 @@ def cTagSF(
 
         # coffea weights.add_multivariation() wants a list of arrays for the multiple up and down variations
         sfs_up = [variations[syst_name]["up"] / sf for syst_name in ctag_systematics]
-        sfs_down = [variations[syst_name]["down"] / sf for syst_name in ctag_systematics]
+        sfs_down = [
+            variations[syst_name]["down"] / sf for syst_name in ctag_systematics
+        ]
 
-        weights.add_multivariation(name="cTagSF", weight=dummy_sf, modifierNames=ctag_systematics, weightsUp=sfs_up, weightsDown=sfs_down, shift=False)
+        weights.add_multivariation(
+            name="cTagSF",
+            weight=dummy_sf,
+            modifierNames=ctag_systematics,
+            weightsUp=sfs_up,
+            weightsDown=sfs_down,
+            shift=False,
+        )
 
     return weights

@@ -150,6 +150,7 @@ def get_photonid_json(logger, target_dir):
     }
     fetch_file("PhotonID", logger, from_to_dict, type="copy")
 
+
 def get_scale_and_smearing(logger, target_dir):
     if target_dir is not None:
         to_prefix = target_dir
@@ -172,15 +173,37 @@ def get_goldenjson(logger, target_dir):
     # https://twiki.cern.ch/twiki/bin/view/CMS/PdmVRun3Analysis#Data
     # This is not really a correction JSON, so we only allow saving to a specific location
     # Commnenting out the code below, this was the previous method
-    #if target_dir is not None:
+    # if target_dir is not None:
     #    to_prefix = target_dir
-    #else:
+    # else:
     #    to_prefix = os.path.join(
     #        os.path.dirname(__file__), "../metaconditions/pileup"
     #    )
 
     prefix = "../higgs_dna/metaconditions/CAF/certification/"
+
     from_to_dict = {
+        "2016": {
+            "from": "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions16/13TeV/Legacy_2016/Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON.txt",
+            "to": os.path.join(
+                prefix,
+                "Collisions16/Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON.txt",
+            ),
+        },
+        "2017": {
+            "from": "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_GoldenJSON.txt",
+            "to": os.path.join(
+                prefix,
+                "Collisions17/Cert_294927-306462_13TeV_UL2017_Collisions17_GoldenJSON.txt",
+            ),
+        },
+        "2018": {
+            "from": "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON.txt",
+            "to": os.path.join(
+                prefix,
+                "Collisions18/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON.txt",
+            ),
+        },
         "2022": {
             "from": "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions22/Cert_Collisions2022_355100_362760_Golden.json",
             "to": os.path.join(

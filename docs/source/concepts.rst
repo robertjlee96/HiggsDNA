@@ -18,6 +18,7 @@ The main part that define an analysis are the following:
   the coffea processor you want to use to process you data, can be found in the modules located inside the subpackage ``higgs_dna.workflows``
 * ``metaconditions``:
   the name (without ``.json`` extension) of one of the JSON files inherited from FLASHgg and located inside ``higgs_dna.metaconditions``
+* ``year``: the year condition for each sample, let us use ``2016preVFP``, ``2016postVFP``, ``2017``, ``2018``, ``2022preEE``, ``2022postEE``, ``2023``
 * ``taggers``:
   the set of taggers you want to use, can be found in the modules located inside the subpackage ``higgs_dna/workflows/taggers``
 * ``systematics``: the set of systematics you want to use for each sample
@@ -40,6 +41,10 @@ where ``simple_analysis.json`` looks like this:
           "taggers": [
               "DummyTagger1"
           ],
+          "year":[
+            "SampleName1": ["2022preEE"],
+            "SampleName2": ["2017"]            
+          ]
           "systematics": {
               "SampleName1": [
                   "SystematicA", "SystematicB"
@@ -58,7 +63,7 @@ where ``simple_analysis.json`` looks like this:
               }
       }
 
-where the ``taggers`` list and the ``systematics`` or ``corrections`` dictionaries can be left empty if no taggers or systematics are applied.
+where the ``taggers`` list and the ``systematics`` or ``corrections`` dictionaries can be left empty if no taggers or systematics are applied. For most of the ``systematics``, a ``year`` condition is necessary.
 
 
 The next two flags that you will want to specify are ``dump`` and ``executor``: the former receives the path to a directory where the parquet output files will be stored, while the latter specifies the Coffea executor used to process the chunks of data. It can be one of the following:

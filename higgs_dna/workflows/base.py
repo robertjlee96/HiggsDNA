@@ -3,9 +3,10 @@ from higgs_dna.tools.diphoton_mva import calculate_diphoton_mva
 from higgs_dna.tools.xgb_loader import load_bdt
 from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_mva
 from higgs_dna.tools.SC_eta import add_photon_SC_eta
+from higgs_dna.tools.EELeak_region import veto_EEleak_flag
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.selections.lepton_selections import select_electrons, select_muons
-from higgs_dna.selections.jet_selections import select_jets
+from higgs_dna.selections.jet_selections import select_jets, jetvetomap
 from higgs_dna.selections.lumi_selections import select_lumis
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array
 from higgs_dna.utils.misc_utils import choose_jet
@@ -49,6 +50,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         trigger_group: str,
         analysis: str,
         skipCQR: bool,
+        skipJetVetoMap: bool,
         year: Optional[Dict[str, List[str]]],
     ) -> None:
         self.meta = metaconditions
@@ -59,6 +61,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.trigger_group = trigger_group
         self.analysis = analysis
         self.skipCQR = skipCQR
+        self.skipJetVetoMap = skipJetVetoMap
         self.year = year if year is not None else {}
 
         # muon selection cuts
@@ -69,7 +72,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
 
         # electron selection cuts
         self.electron_pt_threshold = 15
-        self.electron_max_eta = 2.4
+        self.electron_max_eta = 2.5
         self.el_iso_wp = "WP80"
 
         # jet selection cuts
@@ -209,6 +212,29 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         # data or monte carlo?
         self.data_kind = "mc" if hasattr(events, "GenPart") else "data"
 
+        # here we start recording possible coffea accumulators
+        # most likely histograms, could be counters, arrays, ...
+        histos_etc = {}
+        histos_etc[dataset_name] = {}
+        if self.data_kind == "mc":
+            histos_etc[dataset_name]["nTot"] = int(
+                awkward.num(events.genWeight, axis=0)
+            )
+            histos_etc[dataset_name]["nPos"] = int(awkward.sum(events.genWeight > 0))
+            histos_etc[dataset_name]["nNeg"] = int(awkward.sum(events.genWeight < 0))
+            histos_etc[dataset_name]["nEff"] = int(
+                histos_etc[dataset_name]["nPos"] - histos_etc[dataset_name]["nNeg"]
+            )
+            histos_etc[dataset_name]["genWeightSum"] = float(
+                awkward.sum(events.genWeight)
+            )
+        else:
+            histos_etc[dataset_name]["nTot"] = int(len(events))
+            histos_etc[dataset_name]["nPos"] = int(histos_etc[dataset_name]["nTot"])
+            histos_etc[dataset_name]["nNeg"] = int(0)
+            histos_etc[dataset_name]["nEff"] = int(histos_etc[dataset_name]["nTot"])
+            histos_etc[dataset_name]["genWeightSum"] = float(len(events))
+
         # lumi mask
         if self.data_kind == "data":
             try:
@@ -218,7 +244,11 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 logger.info(
                     f"[ lumimask ] Skip now! Unable to find year info of {dataset_name}"
                 )
-
+        # apply jetvetomap
+        if not self.skipJetVetoMap:
+            events = jetvetomap(
+                events, logger, dataset_name, year=self.year[dataset_name][0]
+            )
         # metadata array to append to higgsdna output
         metadata = {}
 
@@ -234,9 +264,12 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         # we need ScEta for corrections and systematics, which is not present in NanoAODv11 but can be calculated using PV
         events.Photon = add_photon_SC_eta(events.Photon, events.PV)
 
-        # here we start recording possible coffea accumulators
-        # most likely histograms, could be counters, arrays, ...
-        histos_etc = {}
+        # add veto EE leak branch for photons, could also be used for electrons
+        if (
+            self.year[dataset_name][0] == "2022EE"
+            or self.year[dataset_name][0] == "2022postEE"
+        ):
+            events.Photon = veto_EEleak_flag(self, events.Photon)
 
         # read which systematics and corrections to process
         try:
@@ -280,7 +313,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         kind=systematic_dct["args"]["kind"],
                         what=systematic_dct["args"]["what"],
                         varying_function=functools.partial(
-                            systematic_dct["args"]["varying_function"], events=events, year=self.year[dataset_name][0]
+                            systematic_dct["args"]["varying_function"],
+                            events=events,
+                            year=self.year[dataset_name][0],
                         )
                         # name=systematic_name, **systematic_dct["args"]
                     )
@@ -396,7 +431,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             "charge": awkward.zeros_like(
                                 Jets.pt
                             ),  # added this because jet charge is not a property of photons in nanoAOD v11. We just need the charge to build jet collection.
-                            "hFlav": Jets.hadronFlavour if self.data_kind == "mc" else awkward.zeros_like(Jets.pt),
+                            "hFlav": Jets.hadronFlavour
+                            if self.data_kind == "mc"
+                            else awkward.zeros_like(Jets.pt),
                             "btagDeepFlav_B": Jets.btagDeepFlavB,
                             "btagDeepFlav_CvB": Jets.btagDeepFlavCvB,
                             "btagDeepFlav_CvL": Jets.btagDeepFlavCvL,
@@ -526,6 +563,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     diphotons["fixedGridRhoAll"] = events.Rho.fixedGridRhoAll
                     # annotate diphotons with dZ information (difference between z position of GenVtx and PV) as required by flashggfinalfits
                     if self.data_kind == "mc":
+                        diphotons["genWeight"] = events.genWeight
                         diphotons["dZ"] = events.GenVtx.z - events.PV.z
                     # Fill zeros for data because there is no GenVtx for data, obviously
                     else:
@@ -534,7 +572,24 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     ### Add mass resolution uncertainty
                     # Note that pt*cosh(eta) is equal to the energy of a four vector
                     # Note that you need to call it slightly different than in the output of HiggsDNA as pho_lead -> lead is only done in dumping utils
-                    diphotons["sigma_m_over_m"] = 0.5 * numpy.sqrt((diphotons["pho_lead"].energyErr / (diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))**2 + (diphotons["pho_sublead"].energyErr / (diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))**2)
+                    diphotons["sigma_m_over_m"] = 0.5 * numpy.sqrt(
+                        (
+                            diphotons["pho_lead"].energyErr
+                            / (
+                                diphotons["pho_lead"].pt
+                                * numpy.cosh(diphotons["pho_lead"].eta)
+                            )
+                        )
+                        ** 2
+                        + (
+                            diphotons["pho_sublead"].energyErr
+                            / (
+                                diphotons["pho_sublead"].pt
+                                * numpy.cosh(diphotons["pho_sublead"].eta)
+                            )
+                        )
+                        ** 2
+                    )
 
                     # drop events without a preselected diphoton candidate
                     # drop events without a tag, if there are tags
@@ -572,7 +627,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                     ],
                                     weights=event_weights,
                                     dataset_name=dataset_name,
-                                    year=self.year[dataset_name][0]
+                                    year=self.year[dataset_name][0],
                                 )
 
                         # systematic variations of event weights go to nominal output dataframe:
@@ -624,9 +679,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                                 selection_mask
                                             ],
                                             weights=event_weights,
-                                            logger=logger,
-                                            dataset=dataset_name,
-                                            systematic=systematic_name,
+                                            dataset_name=dataset_name,
                                             year=self.year[dataset_name][0],
                                         )
 
@@ -661,7 +714,13 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         akarr = diphoton_ak_array(self, diphotons)
 
                         # Remove fixedGridRhoAll from photons to avoid having event-level info per photon
-                        akarr = akarr[[field for field in akarr.fields if "lead_fixedGridRhoAll" not in field]]
+                        akarr = akarr[
+                            [
+                                field
+                                for field in akarr.fields
+                                if "lead_fixedGridRhoAll" not in field
+                            ]
+                        ]
 
                         fname = (
                             events.behavior[

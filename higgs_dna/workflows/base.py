@@ -52,6 +52,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         skipCQR: bool,
         skipJetVetoMap: bool,
         year: Optional[Dict[str, List[str]]],
+        output_format: str,
     ) -> None:
         self.meta = metaconditions
         self.systematics = systematics if systematics is not None else {}
@@ -63,7 +64,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.skipCQR = skipCQR
         self.skipJetVetoMap = skipJetVetoMap
         self.year = year if year is not None else {}
-
+        self.output_format = output_format
         # muon selection cuts
         self.muon_pt_threshold = 10
         self.muon_max_eta = 2.4
@@ -726,7 +727,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             events.behavior[
                                 "__events_factory__"
                             ]._partition_key.replace("/", "_")
-                            + ".parquet"
+                            + ".%s"%self.output_format
                         )
                         subdirs = []
                         if "dataset" in events.metadata:
@@ -734,7 +735,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         subdirs.append(do_variation)
                         # dump_pandas(self, df, fname, self.output_location, subdirs)
                         dump_ak_array(
-                            self, akarr, fname, self.output_location, metadata, subdirs
+                            self, akarr, fname, self.output_location, metadata, subdirs,
                         )
 
         return histos_etc

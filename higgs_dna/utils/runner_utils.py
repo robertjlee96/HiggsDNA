@@ -203,6 +203,15 @@ def get_main_parser():
         action="store_true",
         help="Print debug information with a logger",
     )
+    parser.add_argument(
+        "--output_format",
+        choices=[
+            "root",
+            "parquet",
+        ],
+	default="parquet",
+        help="Output format (default: %(default)s)."
+    )
 
     return parser
 

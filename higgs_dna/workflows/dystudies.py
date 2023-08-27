@@ -78,8 +78,8 @@ class TagAndProbeProcessor(HggBaseProcessor):
             trigger_group=".*SingleEle.*",
             analysis="tagAndProbe",
             skipCQR=skipCQR,
-            year=year if year is not None else {},
             skipJetVetoMap = skipJetVetoMap,
+            year=year if year is not None else {},
             output_format=output_format,
         )
         self.trigger_group = ".*SingleEle.*"

@@ -727,7 +727,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             events.behavior[
                                 "__events_factory__"
                             ]._partition_key.replace("/", "_")
-                            + ".%s"%self.output_format
+                            + ".%s" % self.output_format
                         )
                         subdirs = []
                         if "dataset" in events.metadata:

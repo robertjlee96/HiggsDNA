@@ -261,7 +261,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
                     events.behavior["__events_factory__"]._partition_key.replace(
                         "/", "_"
                     )
-                    + ".%s"%self.output_format
+                    + ".%s" % self.output_format
                 )
 
                 subdirs = []

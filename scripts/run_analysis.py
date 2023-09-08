@@ -89,7 +89,7 @@ def run_executor(_args, executor, sample_dict, processor_instance):
     )
 
     # save event number to json
-    if _args.save != None:
+    if _args.save is not None:
         save(output, _args.save)
 
 

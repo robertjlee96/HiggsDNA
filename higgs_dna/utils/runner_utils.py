@@ -209,7 +209,7 @@ def get_main_parser():
             "root",
             "parquet",
         ],
-	default="parquet",
+        default="parquet",
         help="Output format (default: %(default)s)."
     )
 

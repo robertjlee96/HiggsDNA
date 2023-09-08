@@ -8,6 +8,7 @@ import shutil
 import pyarrow.parquet as pq
 import uproot
 
+
 def diphoton_list_to_pandas(self, diphotons: awkward.Array) -> pandas.DataFrame:
     """
     Convert diphoton array to pandas dataframe.
@@ -68,11 +69,11 @@ def dump_pandas(
     )
 
     if self.output_format == "parquet":
-      pddf.to_parquet(local_file)
+        pddf.to_parquet(local_file)
     else:
-      uproot_file = uproot.recreate(local_file)
-      uproot_file["Event"] = pddf
-      uproot_file.close()
+        uproot_file = uproot.recreate(local_file)
+        uproot_file["Event"] = pddf
+        uproot_file.close()
 
     if xrootd:
         copyproc = XRootD.client.CopyProcess()
@@ -154,18 +155,18 @@ def dump_ak_array(
         else os.path.join(location, os.path.join(merged_subdirs, fname))
     )
     if self.output_format == "parquet":
-      pa_table = awkward.to_arrow_table(akarr)
-      # If metadata is not None then write to pyarrow table
-      if metadata:
-          merged_metadata = {**metadata, **(pa_table.schema.metadata or {})}
-          pa_table = pa_table.replace_schema_metadata(merged_metadata)
+        pa_table = awkward.to_arrow_table(akarr)
+        # If metadata is not None then write to pyarrow table
+        if metadata:
+            merged_metadata = {**metadata, **(pa_table.schema.metadata or {})}
+            pa_table = pa_table.replace_schema_metadata(merged_metadata)
 
-      # Write pyarrow table to parquet file
-      pq.write_table(pa_table, local_file)
+        # Write pyarrow table to parquet file
+        pq.write_table(pa_table, local_file)
     else:
-      uproot_file = uproot.recreate(local_file)
-      uproot_file["Event"] = akarr
-      uproot_file.close()
+        uproot_file = uproot.recreate(local_file)
+        uproot_file["Event"] = akarr
+        uproot_file.close()
 
     if xrootd:
         copyproc = XRootD.client.CopyProcess()

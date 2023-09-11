@@ -4,6 +4,7 @@ from higgs_dna.systematics import object_corrections as available_object_correct
 from higgs_dna.systematics import weight_systematics as available_weight_systematics
 from higgs_dna.systematics import weight_corrections as available_weight_corrections
 from higgs_dna.selections.photon_selections import photon_preselection
+from higgs_dna.selections.lumi_selections import select_lumis
 from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
 from higgs_dna.tools.SC_eta import add_photon_SC_eta
 from typing import Any, Dict, List, Optional
@@ -90,6 +91,15 @@ class TagAndProbeProcessor(HggBaseProcessor):
         # data or mc?
         self.data_kind = "mc" if "GenPart" in ak.fields(events) else "data"
 
+        # lumi mask
+        if self.data_kind == "data":
+            try:
+                lumimask = select_lumis(self.year[dataset_name][0], events, logger)
+                events = events[lumimask]
+            except:
+                logger.info(
+                    f"[ lumimask ] Skip now! Unable to find year info of {dataset_name}"
+                )
         # apply filters and triggers
         events = self.apply_filters_and_triggers(events)
 

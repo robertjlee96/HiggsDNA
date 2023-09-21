@@ -11,6 +11,8 @@ from higgs_dna.selections.lumi_selections import select_lumis
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array
 from higgs_dna.utils.misc_utils import choose_jet
 
+from higgs_dna.tools.mass_decorrelator import decorrelate_mass_resolution
+
 # from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
 from higgs_dna.metaconditions import photon_id_mva_weights
 from higgs_dna.metaconditions import diphoton as diphoton_mva_dir
@@ -52,6 +54,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         skipCQR: bool,
         skipJetVetoMap: bool,
         year: Optional[Dict[str, List[str]]],
+        doDeco: bool,
     ) -> None:
         self.meta = metaconditions
         self.systematics = systematics if systematics is not None else {}
@@ -63,6 +66,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.skipCQR = skipCQR
         self.skipJetVetoMap = skipJetVetoMap
         self.year = year if year is not None else {}
+        self.doDeco = doDeco
 
         # muon selection cuts
         self.muon_pt_threshold = 10
@@ -126,6 +130,11 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             self.taggers.sort(key=lambda x: x.priority)
 
         self.prefixes = {"pho_lead": "lead", "pho_sublead": "sublead"}
+
+        if not self.doDeco:
+            logger.info("Skipping Mass resolution decorrelation as required")
+        else:
+            logger.info("Performing Mass resolution decorrelation as required")
 
         # build the chained quantile regressions
         if not self.skipCQR:
@@ -708,6 +717,10 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             diphotons["event"]
                         )
                         diphotons["weight"] = awkward.ones_like(diphotons["event"])
+
+                    # Decorrelating the mass resolution - Still need to supress the decorrelator noises
+                    if self.doDeco:
+                        diphotons["sigma_m_over_m_decorr"] = decorrelate_mass_resolution(diphotons)
 
                     if self.output_location is not None:
                         # df = diphoton_list_to_pandas(self, diphotons)

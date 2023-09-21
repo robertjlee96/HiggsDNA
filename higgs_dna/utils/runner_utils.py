@@ -203,7 +203,12 @@ def get_main_parser():
         action="store_true",
         help="Print debug information with a logger",
     )
-
+    parser.add_argument(
+        "--doDeco",
+        default=True,
+        action="store_true",
+        help="Perform the mass resolution decorrelation",
+    )
     return parser
 
 

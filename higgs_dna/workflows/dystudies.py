@@ -29,6 +29,7 @@ class DYStudiesProcessor(HggBaseProcessor):
         skipCQR: bool = False,
         skipJetVetoMap: bool = False,
         year: Dict[str, List[str]] = None,
+        doDeco: bool = False,
     ) -> None:
         super().__init__(
             metaconditions,
@@ -42,6 +43,7 @@ class DYStudiesProcessor(HggBaseProcessor):
             skipCQR=skipCQR,
             skipJetVetoMap=skipJetVetoMap,
             year=year,
+            doDeco=doDeco
         )
         self.trigger_group = ".*DoubleEG.*"
         self.analysis = "mainAnalysis"

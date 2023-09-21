@@ -211,6 +211,7 @@ if __name__ == "__main__":
                 args.skipCQR,
                 args.skipJetVetoMap,
                 year,
+                args.doDeco,
             )  # additional args can go here to configure a processor
     else:
         raise NotImplementedError

@@ -15,6 +15,29 @@ build:
   script:
     - pip install -e .[dev]
 
+build_docker:
+  stage: build docker
+  variables:
+    TMP: tmpimg
+    TO: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+    TOL: $CI_REGISTRY_IMAGE:latest
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_REF_NAME == "master"'
+  tags:
+    - docker-privileged-xl
+  image: docker:19.03.1
+  services:
+    - docker:19.03.1-dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_BUILD_TOKEN $CI_REGISTRY
+  script:
+    - docker build -f docker/Dockerfile_lxplus -t $TMP .
+    - docker run -v $(pwd):/root/pyinstall/HiggsDNA --name $CI_PROJECT_NAME $TMP /bin/bash HiggsDNA/docker/install.sh
+    - docker commit $CI_PROJECT_NAME $TO
+    - docker tag $TO $TOL
+    - docker push $TO
+    - docker push $TOL
+
 static_analysis:
   stage: static analysis
   before_script:

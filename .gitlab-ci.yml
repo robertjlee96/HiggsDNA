@@ -1,14 +1,26 @@
-variables:
-  EOS_PATH: "/eos/user/h/higgsdna/www"
-  CI_OUTPUT_DIR: "public"
-
 image: "python:3.9"
 
 stages:
   - build
   - build docker
+  - tag docker
   - static analysis
   - test
+
+include:
+  - project: 'cms-analysis/general/container-image-ci-templates'
+    file:
+      - 'kaniko-image.gitlab-ci.yml'
+      - 'skopeo.gitlab-ci.yml'
+
+variables:
+    CONTEXT_DIR: ""
+    DOCKER_FILE_NAME: "Dockerfile"
+    GIT_SUBMODULE_STRATEGY: recursive
+    PUSH_IMAGE: "true"
+    ACCELERATED_IMAGE: "true"
+    BUILD_ARGS: ""
+    SCAN_IMAGE: "false"
 
 build:
   stage: build
@@ -17,26 +29,23 @@ build:
 
 build_docker:
   stage: build docker
-  variables:
-    TMP: tmpimg
-    TO: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
-    TOL: $CI_REGISTRY_IMAGE:latest
+  extends: .build_kaniko
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_REF_NAME == "master"'
-  tags:
-    - docker-privileged-xl
-  image: docker:19.03.1
-  services:
-    - docker:19.03.1-dind
-  before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_BUILD_TOKEN $CI_REGISTRY
-  script:
-    - docker build -f docker/Dockerfile_lxplus -t $TMP .
-    - docker run -v $(pwd):/root/pyinstall/HiggsDNA --name $CI_PROJECT_NAME $TMP /bin/bash HiggsDNA/docker/install.sh
-    - docker commit $CI_PROJECT_NAME $TO
-    - docker tag $TO $TOL
-    - docker push $TO
-    - docker push $TOL
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE == "merge"'
+  variables:
+    BUILD_ARGS: "FROM_IMAGE=gitlab-registry.cern.ch/batch-team/dask-lxplus/lxdask-cc7:latest CLUSTER=lxplus"
+    REGISTRY_IMAGE_PATH: ${CI_REGISTRY_IMAGE}:lxplus-${CI_COMMIT_SHORT_SHA}
+
+build_docker_latest:
+  stage: tag docker
+  extends: .tag_skopeo
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE == "merge"'
+  variables:
+    IMAGE_ORIGIN_TAG: ${CI_REGISTRY_IMAGE}:lxplus-${CI_COMMIT_SHORT_SHA}
+    # keep only latest for now as we have only the lxplus one
+    # change in the future in case we need more
+    IMAGE_DESTINATION_TAG: ${CI_REGISTRY_IMAGE}:latest
 
 static_analysis:
   stage: static analysis

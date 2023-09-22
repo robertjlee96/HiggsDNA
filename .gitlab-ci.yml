@@ -22,12 +22,6 @@ variables:
     BUILD_ARGS: ""
     SCAN_IMAGE: "false"
 
-.build_docker_template:
-  extends: .build_kaniko
-  only:
-    - pushes
-    - merge_requests
-
 build:
   stage: build
   script:
@@ -35,17 +29,23 @@ build:
 
 build_docker:
   stage: build docker
-  extends: .build_docker_template
+  extends: .build_kaniko
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE == "merge"'
   variables:
     BUILD_ARGS: "FROM_IMAGE=gitlab-registry.cern.ch/batch-team/dask-lxplus/lxdask-cc7:latest CLUSTER=lxplus"
     REGISTRY_IMAGE_PATH: ${CI_REGISTRY_IMAGE}:lxplus-${CI_COMMIT_SHORT_SHA}
 
 build_docker_latest:
-  stage: build docker
+  stage: tag docker
   extends: .tag_skopeo
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE == "merge"'
   variables:
     IMAGE_ORIGIN_TAG: ${CI_REGISTRY_IMAGE}:lxplus-${CI_COMMIT_SHORT_SHA}
-    IMAGE_DESTINATION_TAG: ${CI_REGISTRY_IMAGE}:lxplus-cc7-latest
+    # keep only latest for now as we have only the lxplus one
+    # change in the future in case we need more
+    IMAGE_DESTINATION_TAG: ${CI_REGISTRY_IMAGE}:latest
 
 static_analysis:
   stage: static analysis

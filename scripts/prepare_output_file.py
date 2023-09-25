@@ -132,8 +132,12 @@ SCRIPT_DIR = os.path.dirname(
 
 process_dict = {
     "GluGluHtoGG_postEE_M125_2022": "ggh",
-    "VBFHtoGG_postEE_M125_2022": "vbf",
+    "VBFtoGG_postEE_M125_2022": "vbf",
+    "VHtoGG_postEE_M125_2022": "vh",
     "ttHtoGG_postEE_M125_2022": "tth",
+    "GJetPt20to40": "gjet20to40",
+    "GJetPt40toInf": "gjet40toinf",
+    "Diphoton": "diphoton",
 }
 
 var_dict = {
@@ -145,93 +149,28 @@ var_dict = {
 # This can be improved by passing the configuration via json loading
 if opt.cats:
     cat_dict = {
-        "EBEB_highR9highR9": {
+        "best_resolution": {
             "cat_filter": [
-                ("lead_isScEtaEB", "==", True),
-                ("lead_r9", ">=", 0.85),
-                ("sublead_isScEtaEB", "==", True),
-                ("sublead_r9", ">=", 0.85),
+                ("sigma_m_over_m_decorr", "<", 0.005),
+                ("lead_mvaID", ">", 0.43),
+                ("sublead_mvaID", ">", 0.43),
             ]
         },
-        "EBEB_highR9lowR9": {
+        "medium_resolution": {
             "cat_filter": [
-                ("lead_isScEtaEB", "==", True),
-                ("lead_r9", ">=", 0.85),
-                ("sublead_isScEtaEB", "==", True),
-                ("sublead_r9", "<", 0.85),
-                ("sublead_r9", ">=", 0.5),
+                ("sigma_m_over_m_decorr", ">", 0.005),
+                ("sigma_m_over_m_decorr", "<", 0.008),
+                ("lead_mvaID", ">", 0.43),
+                ("sublead_mvaID", ">", 0.43),
             ]
         },
-        "EBEB_lowR9highR9": {
+        "worst_resolution": {
             "cat_filter": [
-                ("lead_isScEtaEB", "==", True),
-                ("lead_r9", "<", 0.85),
-                ("lead_r9", ">=", 0.5),
-                ("sublead_isScEtaEB", "==", True),
-                ("sublead_r9", ">=", 0.85),
+                ("sigma_m_over_m_decorr", ">", 0.008),
+                ("lead_mvaID", ">", 0.43),
+                ("sublead_mvaID", ">", 0.43),
             ]
         },
-
-        "EBEE_highR9highR9": {
-            "cat_filter": [
-                ("lead_isScEtaEB", "==", True),
-                ("lead_r9", ">=", 0.85),
-                ("sublead_isScEtaEE", "==", True),
-                ("sublead_r9", ">=", 0.9),
-            ]
-        },
-        "EBEE_highR9lowR9": {
-            "cat_filter": [
-                ("lead_isScEtaEB", "==", True),
-                ("lead_r9", ">=", 0.85),
-                ("sublead_isScEtaEE", "==", True),
-                ("sublead_r9", "<", 0.9),
-                ("sublead_r9", ">=", 0.8),
-            ]
-        },
-        "EBEE_lowR9highR9": {
-            "cat_filter": [
-                ("lead_isScEtaEB", "==", True),
-                ("lead_r9", "<", 0.85),
-                ("lead_r9", ">=", 0.5),
-                ("sublead_isScEtaEE", "==", True),
-                ("sublead_r9", ">=", 0.9),
-            ]
-        },
-
-        "EEEB_highR9highR9": {
-            "cat_filter": [
-                ("lead_isScEtaEE", "==", True),
-                ("lead_r9", ">=", 0.9),
-                ("sublead_isScEtaEB", "==", True),
-                ("sublead_r9", ">=", 0.85),
-            ]
-        },
-        "EEEB_highR9lowR9": {
-            "cat_filter": [
-                ("lead_isScEtaEE", "==", True),
-                ("lead_r9", ">=", 0.9),
-                ("sublead_isScEtaEB", "==", True),
-                ("sublead_r9", "<", 0.85),
-                ("sublead_r9", ">=", 0.5),
-            ]
-        },
-        "EEEB_lowR9highR9": {
-            "cat_filter": [
-                ("lead_isScEtaEE", "==", True),
-                ("lead_r9", "<", 0.9),
-                ("lead_r9", ">=", 0.8),
-                ("sublead_isScEtaEB", "==", True),
-                ("sublead_r9", ">=", 0.85),
-            ]
-        },
-
-        "EEEE_incl": {
-            "cat_filter": [
-                ("lead_isScEtaEE", "==", True),
-                ("sublead_isScEtaEE", "==", True),
-            ]
-        }
     }
 else:
     cat_dict = {"UNTAGGED": {"cat_filter": [("pt", ">", -1.0)]}}
@@ -258,7 +197,8 @@ if opt.merge:
         for file in files:
             file = file.split("\n")[0]
             # MC dataset are supposed to have M125 in the name, this should be changed!
-            if "M125" in file:
+            # Next attempt: If data or Data is not in file
+            if "data" not in file.lower():
                 if os.path.exists(f"{IN_PATH}/merged/{file}"):
                     raise Exception(
                         f"The selected target path: {IN_PATH}/merged/{file} already exists"
@@ -299,7 +239,7 @@ if opt.merge:
         # we also skip this step if there is no Data
         for file in files:
             file = file.split("\n")[0]  # otherwise it contains an end of line and messes up the os.walk() call
-            if "Data" in file or "DoubleEG" in file:
+            if "data" in file.lower() or "DoubleEG" in file:
                 dirpath, dirnames, filenames = next(os.walk(f'{IN_PATH}/merged/Data_{file.split("_")[-1]}'))
                 if len(filenames) > 0:
                     os.system(
@@ -317,7 +257,7 @@ if opt.root:
         files = fl.readlines()
         for file in files:
             file = file.split("\n")[0]
-            if "M125" in file and file in process_dict:
+            if "data" not in file.lower() and file in process_dict:
                 if os.path.exists(f"{IN_PATH}/root/{file}"):
                     raise Exception(
                         f"The selected target path: {IN_PATH}/root/{file} already exists"
@@ -332,7 +272,7 @@ if opt.root:
                 os.system(
                     f"python3 convert_parquet_to_root.py {IN_PATH}/merged/{file}/merged.parquet {IN_PATH}/root/{file}/merged.root mc --process {process_dict[file]} {opt.args} --cats {cat_dict} --vars variation.json"
                 )
-            elif "M125" not in file:
+            elif "data" in file.lower():
                 if os.listdir(f'{IN_PATH}/merged/Data_{file.split("_")[-1]}/'):
                     logger.info(
                         f'Found merged data files in: {IN_PATH}/merged/Data_{file.split("_")[-1]}/'
@@ -379,7 +319,8 @@ if opt.ws:
             doSystematics = ""
         for dir in files:
             dir = dir.split("\n")[0]
-            if "M125" in dir and dir in process_dict:
+            # if MC
+            if "dat" not in dir.lower() and dir in process_dict:
                 if os.listdir(f"{IN_PATH}/root/{dir}/"):
                     filename = subprocess.check_output(
                         f"find {IN_PATH}/root/{dir} -name *.root -type f",
@@ -392,7 +333,7 @@ if opt.ws:
                     )
                 command = f"python trees2ws.py --inputConfig {opt.config} --productionMode {process_dict[dir]} --year 2017 {doSystematics} --inputTreeFile {filename}"
                 activate_final_fit(opt.final_fit, command)
-            elif "Data" in dir and not data_done:
+            elif "Data" in dir.lower() and not data_done:
                 if os.listdir(f"{IN_PATH}/root/Data/"):
                     filename = subprocess.check_output(
                         f"find {IN_PATH}/root/Data -name *.root -type f",

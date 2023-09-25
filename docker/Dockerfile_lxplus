@@ -1,4 +1,0 @@
-FROM gitlab-registry.cern.ch/batch-team/dask-lxplus/lxdask-cc7:latest
-
-RUN yum -y update \
-    && yum -y install git-lfs

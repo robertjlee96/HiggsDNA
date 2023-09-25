@@ -135,4 +135,6 @@ tests/log
 dask-report.html
 *.cc
 
-
+#sshfs on mac
+._*
+Diphoton_CDFs.pkl.gx

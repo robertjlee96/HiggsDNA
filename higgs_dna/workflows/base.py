@@ -748,7 +748,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         if "dataset" in events.metadata:
                             subdirs.append(events.metadata["dataset"])
                         subdirs.append(do_variation)
-                        if self.output_format == "root": dump_pandas(self, df, fname, self.output_location, subdirs)
+                        if self.output_format == "root":
+                            dump_pandas(self, df, fname, self.output_location, subdirs)
                         else:
                             dump_ak_array(
                                 self, akarr, fname, self.output_location, metadata, subdirs,

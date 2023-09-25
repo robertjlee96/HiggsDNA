@@ -205,7 +205,7 @@ def get_main_parser():
     )
     parser.add_argument(
         "--doDeco",
-        default=True,
+        default=False,
         action="store_true",
         help="Perform the mass resolution decorrelation",
     )

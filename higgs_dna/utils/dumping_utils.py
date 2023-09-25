@@ -8,6 +8,7 @@ import shutil
 import pyarrow.parquet as pq
 import uproot
 
+
 def diphoton_list_to_pandas(self, diphotons: awkward.Array) -> pandas.DataFrame:
     """
     Convert diphoton array to pandas dataframe.

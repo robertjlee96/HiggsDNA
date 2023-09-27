@@ -174,7 +174,7 @@ for n_cat in cats:
     print(f"\n INFO: starting calculation for {n_cat} categories.\n")
 
     if n_cat == 1:
-        path_plots_1_cat = "./Plots_1catRun2mvaID/"
+        path_plots_1_cat = "./Plots_1cat/"
         if not os.path.exists(path_plots_1_cat):
             os.makedirs(path_plots_1_cat)
         metrics = []
@@ -246,7 +246,7 @@ for n_cat in cats:
         t0 = time.time()
         metrics = []
         for i_res, resbound in enumerate(resboundaries):
-            print("Resolution bound new", i_res)
+            print("Resolution bound", i_res)
             _metrics = []
             params = []  # for later plotting
             for i, MVAbound in enumerate(MVAboundaries):
@@ -478,7 +478,7 @@ for n_cat in cats:
                         plot_category(hists_signal[_i], [hists_GJet[_i], hists_diphoton[_i]], x_steps, y_vals_sig[_i] * 2, y_vals_bkg[_i] * 2, params_list[_i * 2], ax=axes[_i], hist_unc_bkg=hists_bkg_unc[_i])
                     fig.suptitle("MVA ID bound: {:.3f}, resolution bounds: [{:.3f},{:.3f}], metric: {:.4f}".format(max_MVAbound, bound1, bound2, np.max(_metrics) / metric_1cat), fontsize=24)
                     fig.tight_layout()
-                    path = "./Plots_3catsRun2mvaID/bound1_{:.3f}/".format(bound1)
+                    path = "./Plots_3cats/bound1_{:.3f}/".format(bound1)
                     if not os.path.exists(path):
                         os.makedirs(path)
                     fig.savefig(path + "bound2_{}.pdf".format(j))

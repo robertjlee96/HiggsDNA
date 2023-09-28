@@ -92,13 +92,13 @@ def plot_category(hist_sig, hists_bkg, x_vals, y_vals_sig, y_vals_bkg, params_si
     hep.cms.label(data=True, ax=ax, loc=0, label="Simulation Work in Progress", com=13.6, lumi=20.7, fontsize=22)
 
 
-# values from XSDB
+# values from https://twiki.cern.ch/twiki/bin/view/LHCPhysics/LHCHWG136TeVxsec_extrap and XSDB
 dict_xSecs = {
     # in fb
-    "ggH": 39.91e3 * 0.00227,
-    "VBF": 4.359e3 * 0.00227,
-    "VH": 2.556e3 * 0.00227,
-    "ttH": 0.5687e3 * 0.00227,
+    "ggH": 52.23e3 * 0.00227,
+    "VBF": 4.078e3 * 0.00227,
+    "VH": 2.4009e3 * 0.00227,
+    "ttH": 0.5700e3 * 0.00227,
     "Diphoton": 89.14e3,
     "GJetPT20to40": 242.5e3,
     "GJetPT40": 919.1e3,

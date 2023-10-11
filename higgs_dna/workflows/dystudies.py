@@ -66,7 +66,8 @@ class TagAndProbeProcessor(HggBaseProcessor):
         taggers: Optional[List[Any]] = None,
         skipCQR: bool = False,
         skipJetVetoMap: bool = False,
-        year: Optional[Dict[str, List[str]]] = None
+        year: Optional[Dict[str, List[str]]] = None,
+        doDeco: bool = False,
     ) -> None:
         super().__init__(
             metaconditions,
@@ -80,6 +81,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
             skipCQR=skipCQR,
             skipJetVetoMap=False,
             year=year if year is not None else {},
+            doDeco=doDeco
         )
         self.trigger_group = ".*SingleEle.*"
         self.analysis = "tagAndProbe"

@@ -320,7 +320,7 @@ if opt.ws:
         for dir in files:
             dir = dir.split("\n")[0]
             # if MC
-            if "dat" not in dir.lower() and dir in process_dict:
+            if "data" not in dir.lower() and dir in process_dict:
                 if os.listdir(f"{IN_PATH}/root/{dir}/"):
                     filename = subprocess.check_output(
                         f"find {IN_PATH}/root/{dir} -name *.root -type f",

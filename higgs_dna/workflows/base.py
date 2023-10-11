@@ -458,9 +458,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             "phi": events.Electron.phi,
                             "mass": events.Electron.mass,
                             "charge": events.Electron.charge,
-                            "mvaIso_Fall17V2_WP90": events.Electron.mvaIso_Fall17V2_WP90,
-                            "mvaIso_Fall17V2_WP80": events.Electron.mvaIso_Fall17V2_WP80,
-                            "mvaIso_Fall17V2_WPL": events.Electron.mvaIso_Fall17V2_WPL,
+                            "mvaIso_WP90": events.Electron.mvaIso_WP90,
+                            "mvaIso_WP80": events.Electron.mvaIso_WP80,
                         }
                     )
                     electrons = awkward.with_name(electrons, "PtEtaPhiMCandidate")
@@ -574,6 +573,12 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     if self.data_kind == "mc":
                         diphotons["genWeight"] = events.genWeight
                         diphotons["dZ"] = events.GenVtx.z - events.PV.z
+                        # Necessary for differential xsec measurements in final fits ("truth" variables)
+                        diphotons["HTXS_Higgs_pt"] = events.HTXS.Higgs_pt
+                        diphotons["HTXS_Higgs_y"] = events.HTXS.Higgs_y
+                        diphotons["HTXS_njets30"] = events.HTXS.njets30  # Need to clarify if this variable is suitable, does it fulfill abs(eta_j) < 2.5? Probably not
+                        # Preparation for HTXS measurements later, start with stage 0 to disentangle VH into WH and ZH for final fits
+                        diphotons["HTXS_stage_0"] = events.HTXS.stage_0
                     # Fill zeros for data because there is no GenVtx for data, obviously
                     else:
                         diphotons["dZ"] = awkward.zeros_like(events.PV.z)

@@ -12,11 +12,12 @@ def select_electrons(
     eta_cut = abs(electrons.eta) < self.electron_max_eta
 
     if self.el_iso_wp == "WP90":
-        id_cut = electrons.mvaIso_Fall17V2_WP90
+        id_cut = electrons.mvaIso_WP90
     elif self.el_iso_wp == "WP80":
-        id_cut = electrons.mvaIso_Fall17V2_WP80
-    elif self.el_iso_wp == "WPL":
-        id_cut = electrons.mvaIso_Fall17V2_WPL
+        id_cut = electrons.mvaIso_WP80
+    # WPL is not supported anymore with the Run 3 electron ID, CMSSW 130X v12 nanoAODs only have WP80 and WP90 options
+    # elif self.el_iso_wp == "WPL":
+    #    id_cut = electrons.mvaIso_WPL
     else:
         id_cut = electrons.pt > 0.
 

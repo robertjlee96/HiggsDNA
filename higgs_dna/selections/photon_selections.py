@@ -35,6 +35,7 @@ def photon_preselection(
                 )
             )
             | (
+                # should almost never happen because of the requirement of (photons.isScEtaEB) earlier, thus might be slightly redundant
                 (photon_abs_eta > self.eta_rho_corr)
                 & (
                     photons.pfPhoIso03 - rho * self.high_eta_rho_corr

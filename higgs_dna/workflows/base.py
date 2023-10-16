@@ -13,7 +13,7 @@ from higgs_dna.utils.misc_utils import choose_jet
 
 from higgs_dna.tools.mass_decorrelator import decorrelate_mass_resolution
 
-from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
+# from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
 from higgs_dna.metaconditions import photon_id_mva_weights
 from higgs_dna.metaconditions import diphoton as diphoton_mva_dir
 from higgs_dna.systematics import object_systematics as available_object_systematics
@@ -55,7 +55,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         skipJetVetoMap: bool,
         year: Optional[Dict[str, List[str]]],
         doDeco: bool,
-        output_format: str,
     ) -> None:
         self.meta = metaconditions
         self.systematics = systematics if systematics is not None else {}
@@ -68,7 +67,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.skipJetVetoMap = skipJetVetoMap
         self.year = year if year is not None else {}
         self.doDeco = doDeco
-        self.output_format = output_format
+
         # muon selection cuts
         self.muon_pt_threshold = 10
         self.muon_max_eta = 2.4
@@ -459,9 +458,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             "phi": events.Electron.phi,
                             "mass": events.Electron.mass,
                             "charge": events.Electron.charge,
-                            "mvaIso_Fall17V2_WP90": events.Electron.mvaIso_Fall17V2_WP90,
-                            "mvaIso_Fall17V2_WP80": events.Electron.mvaIso_Fall17V2_WP80,
-                            "mvaIso_Fall17V2_WPL": events.Electron.mvaIso_Fall17V2_WPL,
+                            "mvaIso_WP90": events.Electron.mvaIso_WP90,
+                            "mvaIso_WP80": events.Electron.mvaIso_WP80,
                         }
                     )
                     electrons = awkward.with_name(electrons, "PtEtaPhiMCandidate")
@@ -575,6 +573,12 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     if self.data_kind == "mc":
                         diphotons["genWeight"] = events.genWeight
                         diphotons["dZ"] = events.GenVtx.z - events.PV.z
+                        # Necessary for differential xsec measurements in final fits ("truth" variables)
+                        diphotons["HTXS_Higgs_pt"] = events.HTXS.Higgs_pt
+                        diphotons["HTXS_Higgs_y"] = events.HTXS.Higgs_y
+                        diphotons["HTXS_njets30"] = events.HTXS.njets30  # Need to clarify if this variable is suitable, does it fulfill abs(eta_j) < 2.5? Probably not
+                        # Preparation for HTXS measurements later, start with stage 0 to disentangle VH into WH and ZH for final fits
+                        diphotons["HTXS_stage_0"] = events.HTXS.stage_0
                     # Fill zeros for data because there is no GenVtx for data, obviously
                     else:
                         diphotons["dZ"] = awkward.zeros_like(events.PV.z)
@@ -724,36 +728,32 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         diphotons["sigma_m_over_m_decorr"] = decorrelate_mass_resolution(diphotons)
 
                     if self.output_location is not None:
-                        if self.output_format == "root":
-                            df = diphoton_list_to_pandas(self, diphotons)
-                        else:
-                            akarr = diphoton_ak_array(self, diphotons)
+                        # df = diphoton_list_to_pandas(self, diphotons)
+                        akarr = diphoton_ak_array(self, diphotons)
 
-                            # Remove fixedGridRhoAll from photons to avoid having event-level info per photon
-                            akarr = akarr[
-                                [
-                                    field
-                                    for field in akarr.fields
-                                    if "lead_fixedGridRhoAll" not in field
-                                ]
+                        # Remove fixedGridRhoAll from photons to avoid having event-level info per photon
+                        akarr = akarr[
+                            [
+                                field
+                                for field in akarr.fields
+                                if "lead_fixedGridRhoAll" not in field
                             ]
+                        ]
 
                         fname = (
                             events.behavior[
                                 "__events_factory__"
                             ]._partition_key.replace("/", "_")
-                            + ".%s" % self.output_format
+                            + ".parquet"
                         )
                         subdirs = []
                         if "dataset" in events.metadata:
                             subdirs.append(events.metadata["dataset"])
                         subdirs.append(do_variation)
-                        if self.output_format == "root":
-                            dump_pandas(self, df, fname, self.output_location, subdirs)
-                        else:
-                            dump_ak_array(
-                                self, akarr, fname, self.output_location, metadata, subdirs,
-                            )
+                        # dump_pandas(self, df, fname, self.output_location, subdirs)
+                        dump_ak_array(
+                            self, akarr, fname, self.output_location, metadata, subdirs
+                        )
 
         return histos_etc
 

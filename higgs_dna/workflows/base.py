@@ -8,7 +8,7 @@ from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.selections.lepton_selections import select_electrons, select_muons
 from higgs_dna.selections.jet_selections import select_jets, jetvetomap
 from higgs_dna.selections.lumi_selections import select_lumis
-from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array
+from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array, diphoton_list_to_pandas, dump_pandas
 from higgs_dna.utils.misc_utils import choose_jet
 
 from higgs_dna.tools.mass_decorrelator import decorrelate_mass_resolution
@@ -80,7 +80,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.electron_pt_threshold = 15
         self.electron_max_eta = 2.5
         self.el_iso_wp = "WP80"
-
 
         # jet selection cuts
         self.jet_dipho_min_dr = 0.4
@@ -729,7 +728,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     # Decorrelating the mass resolution - Still need to supress the decorrelator noises
                     if self.doDeco:
                         diphotons["sigma_m_over_m_decorr"] = decorrelate_mass_resolution(diphotons)
-
 
                     if self.output_location is not None:
                         if self.output_format == "root":

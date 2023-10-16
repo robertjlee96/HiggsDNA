@@ -55,6 +55,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         skipJetVetoMap: bool,
         year: Optional[Dict[str, List[str]]],
         doDeco: bool,
+        output_format: str,
     ) -> None:
         self.meta = metaconditions
         self.systematics = systematics if systematics is not None else {}
@@ -67,6 +68,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.skipJetVetoMap = skipJetVetoMap
         self.year = year if year is not None else {}
         self.doDeco = doDeco
+        self.output_format = output_format
 
         # muon selection cuts
         self.muon_pt_threshold = 10
@@ -78,6 +80,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.electron_pt_threshold = 15
         self.electron_max_eta = 2.5
         self.el_iso_wp = "WP80"
+
 
         # jet selection cuts
         self.jet_dipho_min_dr = 0.4
@@ -727,33 +730,38 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     if self.doDeco:
                         diphotons["sigma_m_over_m_decorr"] = decorrelate_mass_resolution(diphotons)
 
-                    if self.output_location is not None:
-                        # df = diphoton_list_to_pandas(self, diphotons)
-                        akarr = diphoton_ak_array(self, diphotons)
 
-                        # Remove fixedGridRhoAll from photons to avoid having event-level info per photon
-                        akarr = akarr[
-                            [
-                                field
-                                for field in akarr.fields
-                                if "lead_fixedGridRhoAll" not in field
+                    if self.output_location is not None:
+                        if self.output_format == "root":
+                            df = diphoton_list_to_pandas(self, diphotons)
+                        else:
+                            akarr = diphoton_ak_array(self, diphotons)
+
+                            # Remove fixedGridRhoAll from photons to avoid having event-level info per photon
+                            akarr = akarr[
+                                [
+                                    field
+                                    for field in akarr.fields
+                                    if "lead_fixedGridRhoAll" not in field
+                                ]
                             ]
-                        ]
 
                         fname = (
                             events.behavior[
                                 "__events_factory__"
                             ]._partition_key.replace("/", "_")
-                            + ".parquet"
+                            + ".%s" % self.output_format
                         )
                         subdirs = []
                         if "dataset" in events.metadata:
                             subdirs.append(events.metadata["dataset"])
                         subdirs.append(do_variation)
-                        # dump_pandas(self, df, fname, self.output_location, subdirs)
-                        dump_ak_array(
-                            self, akarr, fname, self.output_location, metadata, subdirs
-                        )
+                        if self.output_format == "root":
+                            dump_pandas(self, df, fname, self.output_location, subdirs)
+                        else:
+                            dump_ak_array(
+                                self, akarr, fname, self.output_location, metadata, subdirs,
+                            )
 
         return histos_etc
 

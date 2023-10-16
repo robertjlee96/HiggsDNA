@@ -69,11 +69,8 @@ class TagAndProbeProcessor(HggBaseProcessor):
         skipCQR: bool = False,
         skipJetVetoMap: bool = False,
         year: Optional[Dict[str, List[str]]] = None,
-<<<<<<< HEAD
         output_format: str = "parquet"
-=======
         doDeco: bool = False,
->>>>>>> FETCH_HEAD
     ) -> None:
         super().__init__(
             metaconditions,

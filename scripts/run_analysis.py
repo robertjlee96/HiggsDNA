@@ -89,7 +89,7 @@ def run_executor(_args, executor, sample_dict, processor_instance):
     )
 
     # save event number to json
-    if _args.save != None:
+    if _args.save is not None:
         save(output, _args.save)
 
 
@@ -212,6 +212,7 @@ if __name__ == "__main__":
                 args.skipJetVetoMap,
                 year,
                 args.doDeco,
+                args.output_format,
             )  # additional args can go here to configure a processor
     else:
         raise NotImplementedError

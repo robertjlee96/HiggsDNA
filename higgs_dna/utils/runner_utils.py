@@ -209,6 +209,15 @@ def get_main_parser():
         action="store_true",
         help="Perform the mass resolution decorrelation",
     )
+    parser.add_argument(
+        "--output_format",
+        choices=[
+            "root",
+            "parquet",
+        ],
+        default="parquet",
+        help="Output format (default: %(default)s)."
+    )
     return parser
 
 

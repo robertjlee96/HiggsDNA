@@ -30,6 +30,7 @@ class DYStudiesProcessor(HggBaseProcessor):
         skipJetVetoMap: bool = False,
         year: Dict[str, List[str]] = None,
         doDeco: bool = False,
+        output_format: str = "parquet"
     ) -> None:
         super().__init__(
             metaconditions,
@@ -43,7 +44,8 @@ class DYStudiesProcessor(HggBaseProcessor):
             skipCQR=skipCQR,
             skipJetVetoMap=skipJetVetoMap,
             year=year,
-            doDeco=doDeco
+            doDeco=doDeco,
+            output_format=output_format
         )
         self.trigger_group = ".*DoubleEG.*"
         self.analysis = "mainAnalysis"
@@ -68,6 +70,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
         skipJetVetoMap: bool = False,
         year: Optional[Dict[str, List[str]]] = None,
         doDeco: bool = False,
+        output_format: str = "parquet"
     ) -> None:
         super().__init__(
             metaconditions,
@@ -81,7 +84,8 @@ class TagAndProbeProcessor(HggBaseProcessor):
             skipCQR=skipCQR,
             skipJetVetoMap=False,
             year=year if year is not None else {},
-            doDeco=doDeco
+            doDeco=doDeco,
+            output_format=output_format
         )
         self.trigger_group = ".*SingleEle.*"
         self.analysis = "tagAndProbe"
@@ -271,7 +275,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
                     events.behavior["__events_factory__"]._partition_key.replace(
                         "/", "_"
                     )
-                    + ".parquet"
+                    + ".%s" % self.output_format
                 )
                 subdirs = []
                 if "dataset" in events.metadata:

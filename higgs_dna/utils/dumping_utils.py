@@ -6,6 +6,7 @@ import os
 import pathlib
 import shutil
 import pyarrow.parquet as pq
+import uproot
 
 
 def diphoton_list_to_pandas(self, diphotons: awkward.Array) -> pandas.DataFrame:
@@ -66,7 +67,12 @@ def dump_pandas(
         if xrootd
         else os.path.join(location, os.path.join(merged_subdirs, fname))
     )
-    pddf.to_parquet(local_file)
+    if self.output_format == "parquet":
+        pddf.to_parquet(local_file)
+    else:
+        uproot_file = uproot.recreate(local_file)
+        uproot_file["Event"] = pddf
+        uproot_file.close()
     if xrootd:
         copyproc = XRootD.client.CopyProcess()
         copyproc.add_job(local_file, destination)

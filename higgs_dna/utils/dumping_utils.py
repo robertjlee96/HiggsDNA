@@ -183,3 +183,22 @@ def dump_ak_array(
         shutil.copy(local_file, destination)
         assert os.path.isfile(destination)
     pathlib.Path(local_file).unlink()
+
+
+def dress_branches(
+    main_arr: awkward.Array, additional_arr: awkward.Array, prefix: str
+) -> awkward.Array:
+    """_summary_
+
+    Args:
+        main_arr (awkward.Array): main array
+        additional_arr (awkward.Array): add additional branches to the main array
+        prefix (str): prefix of the new branches
+
+    Returns:
+        awkward.Array: return new array
+    """
+    for field in awkward.fields(additional_arr):
+        if field != "__systematics__":
+            main_arr[f"{prefix}_{field}"] = additional_arr[field]
+    return main_arr

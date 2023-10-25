@@ -142,7 +142,10 @@ def Pileup(events, weights, year, is_correction=True, **kwargs):
         return weights
 
     else:
-        path_to_json = os.path.join(os.path.dirname(__file__), "../systematics/JSONs/pileup/pileup_{}.json.gz".format(year))
+        path_to_json = os.path.join(
+            os.path.dirname(__file__),
+            "../systematics/JSONs/pileup/pileup_{}.json.gz".format(year),
+        )
         if "16" in year:
             name = "Collisions16_UltraLegacy_goldenJSON"
         elif "17" in year:
@@ -564,6 +567,81 @@ def cTagSF(events, weights, is_correction=True, year="2017", **kwargs):
             weightsUp=sfs_up,
             weightsDown=sfs_down,
             shift=False,
+        )
+
+    return weights
+
+
+def Zpt(
+    events,
+    weights,
+    logger,
+    dataset_name,
+    is_correction=True,
+    year="2022postEE",
+    **kwargs,
+):
+    """
+    Z pt reweighting
+    """
+    systematic = "Z pt reweighting"
+
+    json_dict = {
+        "2016postVFP_UL": os.path.join(
+            os.path.dirname(__file__),
+            "./JSONs/my_Zpt_reweighting.json.gz",
+        ),
+        "2016preVFP_UL": os.path.join(
+            os.path.dirname(__file__),
+            "./JSONs/my_Zpt_reweighting.json.gz",
+        ),
+        "2017_UL": os.path.join(
+            os.path.dirname(__file__),
+            "./JSONs/my_Zpt_reweighting.json.gz",
+        ),
+        "2018_UL": os.path.join(
+            os.path.dirname(__file__),
+            "./JSONs/my_Zpt_reweighting.json.gz",
+        ),
+        "2022postEE": os.path.join(
+            os.path.dirname(__file__),
+            "./JSONs/my_Zpt_reweighting.json.gz",
+        ),
+        "2023": os.path.join(
+            os.path.dirname(__file__),
+            "./JSONs/my_Zpt_reweighting.json.gz",
+        ),
+    }
+    key_map = {
+        "2016postVFP_UL": "Zpt_reweight",
+        "2016preVFP_UL": "Zpt_reweight",
+        "2017_UL": "Zpt_reweight",
+        "2018_UL": "Zpt_reweight",
+        "2022postEE": "Zpt_reweight",
+        "2023": "Zpt_reweight",
+    }
+
+    # inputs
+    input_value = {
+        "Zpt": events.mmy_pt,
+    }
+    cset = correctionlib.CorrectionSet.from_file(json_dict[year])
+    # list(cset) # get keys in cset
+    sf = cset[key_map[year]]
+
+    logger.debug(f"{systematic}:{key_map[year]}, year: {year} ===> {dataset_name}")
+    if is_correction:
+        nom = sf.evaluate(input_value["Zpt"])
+        weights.add(name="ZptWeight", weight=nom)
+    else:
+        nom = sf.evaluate(input_value["Zpt"])
+        up = sf.evaluate(input_value["Zpt"])
+        down = sf.evaluate(input_value["Zpt"])
+        weights.add(
+            name="ZptWeight",
+            weight=ak.ones_like(nom),
+            weightUp=up / nom,
+            weightDown=down / nom,
         )
 
     return weights

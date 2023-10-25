@@ -1,4 +1,10 @@
-from .photon_systematics import photon_pt_scale_dummy, Scale, Smearing, FNUF, ShowerShape
+from .photon_systematics import (
+    photon_pt_scale_dummy,
+    Scale,
+    Smearing,
+    FNUF,
+    ShowerShape,
+)
 from .event_weight_systematics import (
     Pileup,
     SF_photon_ID,
@@ -7,6 +13,7 @@ from .event_weight_systematics import (
     AlphaS,
     PartonShower,
     cTagSF,
+    Zpt,
 )
 from .jet_systematics import JERC_jet
 from functools import partial
@@ -86,6 +93,7 @@ weight_systematics = {
     "PartonShower": partial(PartonShower),
     "LHEScale": None,
     "LHEPdf": None,
+    "Zpt": partial(Zpt),
 }
 
 # functions correcting nominal event weights to be placed here
@@ -96,6 +104,7 @@ weight_corrections = {
     "LooseMvaSF": partial(LooseMvaSF, is_correction=True),
     "cTagSF": partial(cTagSF, is_correction=True),
     "NNLOPS": partial(NNLOPS, is_correction=True),
+    "Zpt": partial(Zpt, is_correction=True),
 }
 
 

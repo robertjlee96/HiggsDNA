@@ -196,8 +196,7 @@ if opt.merge:
         files = fl.readlines()
         for file in files:
             file = file.split("\n")[0]
-            # MC dataset are supposed to have M125 in the name, this should be changed!
-            # Next attempt: If data or Data is not in file
+            # MC dataset are identified as everythingthat does not contain "data" or "Data" in the name.
             if "data" not in file.lower():
                 if os.path.exists(f"{IN_PATH}/merged/{file}"):
                     raise Exception(

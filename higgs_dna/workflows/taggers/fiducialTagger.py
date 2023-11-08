@@ -1,0 +1,83 @@
+import awkward as ak
+import numpy as np
+from coffea.analysis_tools import PackedSelection
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class fiducialTagger:
+    def __init__(self) -> None:
+        pass
+
+    @property
+    def name(self) -> str:
+        return "fiducialTagger"
+
+    # lower priority is better
+    # first decimal point is category within tag (in case for untagged)
+    @property
+    def priority(self) -> int:
+        return 20
+
+    def __call__(self, events: ak.Array, diphotons: ak.Array) -> ak.Array:
+        """GenIsolatedPhoton is used in this fiducial region definition
+
+        Args:
+            events (ak.Array): _description_
+
+        Returns:
+            ak.Array:
+                priority+0: out of fiducial
+                priority+1: in fiducial
+        """
+        selection = PackedSelection()
+
+        selection.add("n_iso_photon", ak.num(events.GenIsolatedPhoton, axis=1) > 1)
+        events = events.mask[selection.all("n_iso_photon")]
+        lead_pho = events.GenIsolatedPhoton[:, 0]
+        sublead_pho = events.GenIsolatedPhoton[:, 1]
+        diphoton = (lead_pho) + (sublead_pho)
+        selection.add("lead_photon_scaled_pt", lead_pho.pt / diphoton.mass > 0.35)
+        selection.add("sublead_photon_scaled_pt", sublead_pho.pt / diphoton.mass > 0.25)
+        selection.add(
+            "lead_photon_eta",
+            (np.abs(lead_pho.eta) < 1.4442)
+            | ((np.abs(lead_pho.eta) < 2.5) & (np.abs(lead_pho.eta) > 1.566)),
+        )
+        selection.add(
+            "sublead_photon_eta",
+            (np.abs(sublead_pho.eta) < 1.4442)
+            | ((np.abs(sublead_pho.eta) < 2.5) & (np.abs(sublead_pho.eta) > 1.566)),
+        )
+        selection.add("diphoton_mass", (diphoton.mass > 100) & (diphoton.mass < 180))
+
+        sel_fiducial = selection.all(
+            "n_iso_photon",
+            "lead_photon_scaled_pt",
+            "sublead_photon_scaled_pt",
+            "lead_photon_eta",
+            "sublead_photon_eta",
+            "diphoton_mass",
+        )
+        logger.debug(
+            f"""_summary_
+before: \t {len(events)}
+---
+n_iso_photon: \t {ak.sum(selection.all("n_iso_photon"))}
+lead_photon_scaled_pt: \t {ak.sum(selection.all("lead_photon_scaled_pt"))}
+sublead_photon_scaled_pt: \t {ak.sum(selection.all("sublead_photon_scaled_pt"))}
+lead_photon_eta: \t {ak.sum(selection.all("lead_photon_eta"))}
+sublead_photon_eta: \t {ak.sum(selection.all("sublead_photon_eta"))}
+diphoton_mass: \t {ak.sum(selection.all("diphoton_mass"))}
+---
+total in fiducial: \t {ak.sum(sel_fiducial)}
+-end-
+        """
+        )
+        # priority+1: in fiducial
+        # priority+0: out of fiducial
+        return (
+            self.priority + sel_fiducial * 1,
+            {},
+        )

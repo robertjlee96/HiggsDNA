@@ -150,10 +150,7 @@ for process in dict_paths_bkg.keys():
     events["process"] = process
     if "GJet" in process:
         print("INFO: applying overlap removal for sample", process)
-        events = events[
-            ((events.lead_genPartFlav != 1) & (events.sublead_genPartFlav == 1)) | ((events.lead_genPartFlav == 1) & (events.sublead_genPartFlav != 1))
-        ]
-        print("N events after OR:", len(events))
+        events = events[events.lead_genPartFlav + events.sublead_genPartFlav < 2]
     bkg_events.append(events)
 bkg_events = pd.concat(bkg_events,ignore_index=True)
 bkg_events["min_mvaID"] = np.min([bkg_events.lead_mvaID.values, bkg_events.sublead_mvaID.values], axis=0)

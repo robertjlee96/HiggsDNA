@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python>=3.6
+  - python>=3.6,<3.12
   - pyaml
   - sphinx<7 # see https://github.com/readthedocs/readthedocs.org/issues/10279
   - breathe

@@ -182,7 +182,7 @@ def get_mass_decorrelation_CDF(logger, target_dir):
 
     from_to_dict = {
         "2022FG": {
-            "from": "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/mass_decorrelation/CDFs/Diphoton_CDFs.pkl.gz",
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/mass_decorrelation/CDFs/Smeared_Diphoton_CDFs.pkl.gz",
             "to": f"{to_prefix}/",
         },
     }

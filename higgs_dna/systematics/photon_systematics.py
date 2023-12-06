@@ -85,15 +85,28 @@ def Smearing(pt, events, year="2022postEE", is_correction=True):
 
     if is_correction:
 
+        # In theory, the energy should be smeared and not the pT, see: https://mattermost.web.cern.ch/cmseg/channels/egm-ss/6mmucnn8rjdgt8x9k5zaxbzqyh
+        # However, there is a linear proportionality between pT and E: E = pT * cosh(eta)
+        # Because of that, applying the correction to pT and E is equivalent (since eta does not change)
+        # Energy is provided as a LorentzVector mixin, so we choose to correct pT
+        # Also holds true for the scale part
         rho = evaluator.evaluate("rho", eta, r9)
         smearing = rng.normal(loc=1., scale=rho)
         pt_corr = _pt * smearing
-
         corrected_photons = deepcopy(events.Photon)
         pt_corr = ak.unflatten(pt_corr, counts)
-        corrected_photons["pt"] = pt_corr
+        rho_corr = ak.unflatten(rho, counts)
 
-        events.Photon = corrected_photons
+        # If it is data, dont perform the pt smearing, only save the std of the gaussian for each event!
+        try:
+            events.GenIsolatedPhoton  # this operation is here because if there is no "events.GenIsolatedPhoton" field on data, an error will be thrown and we go to the except - so we dont smear the data pt spectrum
+            corrected_photons["pt"] = pt_corr
+        except:
+            pass
+
+        corrected_photons["rho_smear"] = rho_corr
+
+        events.Photon = corrected_photons  # why does this work? Why do we not need events['Photon'] to assign?
 
         return events
 

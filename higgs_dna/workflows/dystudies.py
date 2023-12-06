@@ -12,6 +12,8 @@ import awkward as ak
 import logging
 import functools
 import warnings
+import numpy
+import sys
 from coffea.analysis_tools import Weights
 
 logger = logging.getLogger(__name__)
@@ -30,6 +32,7 @@ class DYStudiesProcessor(HggBaseProcessor):
         skipJetVetoMap: bool = False,
         year: Dict[str, List[str]] = None,
         doDeco: bool = False,
+        Smear_sigma_m: bool = False,
         output_format: str = "parquet"
     ) -> None:
         super().__init__(
@@ -45,6 +48,7 @@ class DYStudiesProcessor(HggBaseProcessor):
             skipJetVetoMap=skipJetVetoMap,
             year=year,
             doDeco=doDeco,
+            Smear_sigma_m=Smear_sigma_m,
             output_format=output_format
         )
         self.trigger_group = ".*DoubleEG.*"
@@ -70,6 +74,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
         skipJetVetoMap: bool = False,
         year: Optional[Dict[str, List[str]]] = None,
         doDeco: bool = False,
+        Smear_sigma_m: bool = False,
         output_format: str = "parquet"
     ) -> None:
         super().__init__(
@@ -85,6 +90,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
             skipJetVetoMap=False,
             year=year if year is not None else {},
             doDeco=doDeco,
+            Smear_sigma_m=Smear_sigma_m,
             output_format=output_format
         )
         self.trigger_group = ".*SingleEle.*"
@@ -124,8 +130,24 @@ class TagAndProbeProcessor(HggBaseProcessor):
         except KeyError:
             systematic_names = []
 
-        # object corrections:
+        # If --Smear_sigma_m == True and no Smearing correction in .json for MC throws an error, since the pt scpectrum need to be smeared in order to properly calculate the smeared sigma_m_m
+        if self.data_kind == "mc" and self.Smear_sigma_m and 'Smearing' not in correction_names:
+            warnings.warn("Smearing should be specified in the corrections field in .json in order to smear the mass!")
+            sys.exit(0)
+
+        # Since now we are applying Smearing term to the sigma_m_over_m i added this portion of code
+        # specially for the estimation of smearing terms for the data events [data pt/energy] are not smeared!
+        if self.data_kind == "data" and self.Smear_sigma_m:
+            correction_name = 'Smearing'
+
+            logger.info(
+                f"\nApplying correction {correction_name} to dataset {dataset_name}\n"
+            )
+            varying_function = available_object_corrections[correction_name]
+            events = varying_function(events=events)
+
         for correction_name in correction_names:
+
             if correction_name in available_object_corrections.keys():
                 logger.info(
                     f"\nApplying correction {correction_name} to dataset {dataset_name}\n"
@@ -178,13 +200,11 @@ class TagAndProbeProcessor(HggBaseProcessor):
                     systematic
                 ][variation]
 
-        if self.data_kind == "mc":
-            event_weights = Weights(size=len(events))
-            # _weight will correspond to "nominal" weight, what else has to be included here? (lumi? xSec? MC sum of weights?)
-            event_weights._weight = events["genWeight"]
-
         for variation, photons in photons_dct.items():
             logger.debug(f"Variation: {variation}")
+
+            if variation == "nominal":
+                do_variation = "nominal"
 
             if self.chained_quantile is not None:
                 photons = self.chained_quantile.apply(photons, events)
@@ -201,7 +221,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
             if self.data_kind == "mc":
                 # TODO: add weight systs and corrections! (if needed)
                 # need to annotate the photons already here with a weight since later, each photon can be tag and probe and this changes the length of the array
-                photons["weight"] = event_weights.weight()
+                photons["weight"] = events["genWeight"]
                 # keep only photons matched to gen e+ or e-
                 photons = photons[photons.genPartFlav == 11]
 
@@ -252,16 +272,104 @@ class TagAndProbeProcessor(HggBaseProcessor):
 
             # apply selections
             tnp_candidates = tnp_candidates[tag_mask & probe_mask]
+
             # candidates need to be flattened since we have each photon as a tag and probe, otherwise it can't be exported to numpy
             tnp_candidates = ak.flatten(tnp_candidates)
+
+            # performing the weight corrections after the preselctions
+            if self.data_kind == "mc":
+
+                # events only accept flat masks, so I had to some operations with the tag and probe masks to make them flat
+                flat_mask_tag = numpy.concatenate([row for row in tag_mask])
+                flat_mask_probe = numpy.concatenate([row for row in probe_mask])
+                mask_tag_and_probe = numpy.logical_and(flat_mask_probe, flat_mask_tag)
+
+                event_weights = Weights(size=len(events[mask_tag_and_probe]))
+
+                # corrections to event weights:
+                for correction_name in correction_names:
+                    if correction_name in available_weight_corrections:
+                        logger.info(
+                            f"Adding correction {correction_name} to weight collection of dataset {dataset_name}"
+                        )
+                        varying_function = available_weight_corrections[
+                            correction_name
+                        ]
+                        event_weights = varying_function(
+                            events=events[mask_tag_and_probe],
+                            photons=events.Photon[mask_tag_and_probe],
+                            weights=event_weights,
+                            dataset_name=dataset_name,
+                            year=self.year[dataset_name][0],
+                        )
+
+            # Calculating sigma_m_overm_m
+            tnp_candidates["sigma_m_over_m"] = 0.5 * numpy.sqrt(
+                (
+                    tnp_candidates["tag"].energyErr
+                    / (
+                        tnp_candidates["tag"].pt
+                        * numpy.cosh(tnp_candidates["tag"].eta)
+                    )
+                )
+                ** 2
+                + (
+                    tnp_candidates["probe"].energyErr
+                    / (
+                        tnp_candidates["probe"].pt
+                        * numpy.cosh(tnp_candidates["probe"].eta)
+                    )
+                )
+                ** 2
+            )
+
+            # adding the smearing of the mass resolution also for the tag and probe workflow - for both data and Simulation!
+            # Just a reminder, the pt/energy of teh data is not smearing, but the smearing term is added to the data sigma_m_over_m
+            if (self.Smear_sigma_m):
+                # Adding the smeared energyErr error to the ntuples!
+                tnp_candidates["tag","energyErr_Smeared"] = numpy.sqrt((tnp_candidates["tag"].energyErr)**2 + (tnp_candidates["tag"].rho_smear * ((tnp_candidates["tag"].pt * numpy.cosh(tnp_candidates["tag"].eta)))) ** 2)
+                tnp_candidates["probe","energyErr_Smeared"] = numpy.sqrt((tnp_candidates["probe"].energyErr) ** 2 + (tnp_candidates["probe"].rho_smear * ((tnp_candidates["probe"].pt * numpy.cosh(tnp_candidates["probe"].eta)))) ** 2)
+
+                tnp_candidates["sigma_m_over_m_Smeared"] = 0.5 * numpy.sqrt(
+                    (
+                        tnp_candidates["tag"].energyErr_Smeared / (tnp_candidates["tag"].pt * numpy.cosh(tnp_candidates["tag"].eta))
+                    )
+                    ** 2
+                    + (
+                        tnp_candidates["probe"].energyErr_Smeared / (tnp_candidates["probe"].pt * numpy.cosh(tnp_candidates["probe"].eta))
+                    )
+                    ** 2
+                )
+
+            # Adding the tagandprobe pair mass. Based on the expression provided here for a massless pair of particles -> (https://en.wikipedia.org/wiki/Invariant_mass)
+            tnp_candidates["mass"] = numpy.sqrt(2 * tnp_candidates["tag"].pt * tnp_candidates["probe"].pt * (numpy.cosh(tnp_candidates["tag"].eta - tnp_candidates["probe"].eta) - numpy.cos(tnp_candidates["tag"].phi - tnp_candidates["probe"].phi)))
 
             if self.output_location is not None:
                 df = diphoton_list_to_pandas(self, tnp_candidates)
 
                 # since we annotated the photons with event variables, these exist now for tag and probe. This concerns weights as well as nPV and fixedGridRhoAll Remove:
                 if self.data_kind == "mc":
-                    df["weight"] = df["tag_weight"]
+
+                    # Store variations with respect to central weight
+                    if do_variation == "nominal":
+                        if len(event_weights.variations):
+                            logger.info(
+                                "Adding systematic weight variations to nominal output file."
+                            )
+                        for modifier in event_weights.variations:
+                            tnp_candidates["weight_" + modifier] = event_weights.weight(
+                                modifier=modifier
+                            )
+                    # storing the central weights
+                    df["weight_central"] = event_weights.weight()
+                    # generated weights * other weights (pile up, SF, etc ...)
+                    df["weight"] = df["tag_weight"] * event_weights.weight()
+
+                    # dropping the nominal and varitation weights
                     df.drop(["tag_weight", "probe_weight"], axis=1, inplace=True)
+                    for modifier in event_weights.variations:
+                        df.drop(["tag_weight_" + modifier , "probe_weight_" + modifier], axis=1, inplace=True)
+
                 df["nPV"] = df["tag_nPV"]
                 df.drop(["tag_nPV", "probe_nPV"], axis=1, inplace=True)
                 df["fixedGridRhoAll"] = df["tag_fixedGridRhoAll"]

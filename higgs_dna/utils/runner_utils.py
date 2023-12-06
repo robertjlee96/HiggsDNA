@@ -210,6 +210,12 @@ def get_main_parser():
         help="Perform the mass resolution decorrelation",
     )
     parser.add_argument(
+        "--Smear_sigma_m",
+        default=False,
+        action="store_true",
+        help="Perform the mass resolution Smearing",
+    )
+    parser.add_argument(
         "--output_format",
         choices=[
             "root",

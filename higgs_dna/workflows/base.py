@@ -28,6 +28,7 @@ import warnings
 from typing import Any, Dict, List, Optional
 import awkward
 import numpy
+import sys
 import vector
 from coffea import processor
 from coffea.analysis_tools import Weights
@@ -55,6 +56,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         skipJetVetoMap: bool,
         year: Optional[Dict[str, List[str]]],
         doDeco: bool,
+        Smear_sigma_m: bool,
         output_format: str,
     ) -> None:
         self.meta = metaconditions
@@ -68,6 +70,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.skipJetVetoMap = skipJetVetoMap
         self.year = year if year is not None else {}
         self.doDeco = doDeco
+        self.Smear_sigma_m = Smear_sigma_m
         self.output_format = output_format
 
         # muon selection cuts
@@ -292,7 +295,22 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         except KeyError:
             systematic_names = []
 
-        # object corrections:
+        # If --Smear_sigma_m == True and no Smearing correction in .json for MC throws an error, since the pt scpectrum need to be smeared in order to properly calculate the smeared sigma_m_m
+        if self.data_kind == "mc" and self.Smear_sigma_m and 'Smearing' not in correction_names:
+            warnings.warn("Smearing should be specified in the corrections field in .json in order to smear the mass!")
+            sys.exit(0)
+
+        # Since now we are applying Smearing term to the sigma_m_over_m i added this portion of code
+        # specially for the estimation of smearing terms for the data events [data pt/energy] are not smeared!
+        if self.data_kind == "data" and self.Smear_sigma_m:
+            correction_name = 'Smearing'
+
+            logger.info(
+                f"\nApplying correction {correction_name} to dataset {dataset_name}\n"
+            )
+            varying_function = available_object_corrections[correction_name]
+            events = varying_function(events=events)
+
         for correction_name in correction_names:
             if correction_name in available_object_corrections.keys():
                 logger.info(
@@ -585,28 +603,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     else:
                         diphotons["dZ"] = awkward.zeros_like(events.PV.z)
 
-                    ### Add mass resolution uncertainty
-                    # Note that pt*cosh(eta) is equal to the energy of a four vector
-                    # Note that you need to call it slightly different than in the output of HiggsDNA as pho_lead -> lead is only done in dumping utils
-                    diphotons["sigma_m_over_m"] = 0.5 * numpy.sqrt(
-                        (
-                            diphotons["pho_lead"].energyErr
-                            / (
-                                diphotons["pho_lead"].pt
-                                * numpy.cosh(diphotons["pho_lead"].eta)
-                            )
-                        )
-                        ** 2
-                        + (
-                            diphotons["pho_sublead"].energyErr
-                            / (
-                                diphotons["pho_sublead"].pt
-                                * numpy.cosh(diphotons["pho_sublead"].eta)
-                            )
-                        )
-                        ** 2
-                    )
-
                     # drop events without a preselected diphoton candidate
                     # drop events without a tag, if there are tags
                     if len(self.taggers):
@@ -725,9 +721,65 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         )
                         diphotons["weight"] = awkward.ones_like(diphotons["event"])
 
+                    ### Add mass resolution uncertainty
+                    # Note that pt*cosh(eta) is equal to the energy of a four vector
+                    # Note that you need to call it slightly different than in the output of HiggsDNA as pho_lead -> lead is only done in dumping utils
+                    diphotons["sigma_m_over_m"] = 0.5 * numpy.sqrt(
+                        (
+                            diphotons["pho_lead"].energyErr
+                            / (
+                                diphotons["pho_lead"].pt
+                                * numpy.cosh(diphotons["pho_lead"].eta)
+                            )
+                        )
+                        ** 2
+                        + (
+                            diphotons["pho_sublead"].energyErr
+                            / (
+                                diphotons["pho_sublead"].pt
+                                * numpy.cosh(diphotons["pho_sublead"].eta)
+                            )
+                        )
+                        ** 2
+                    )
+
+                    # This is the mass SigmaM/M value including the smearing term from the Scale and smearing
+                    # The implementation follows the flashGG implementation -> https://github.com/cms-analysis/flashgg/blob/4edea8897e2a4b0518dca76ba6c9909c20c40ae7/DataFormats/src/Photon.cc#L293
+                    # adittional flashGG link when the smearing of the SigmaE/E smearing is called -> https://github.com/cms-analysis/flashgg/blob/4edea8897e2a4b0518dca76ba6c9909c20c40ae7/Systematics/plugins/PhotonSigEoverESmearingEGMTool.cc#L83C40-L83C45
+                    # Just a reminder, the pt/energy of teh data is not smearing, but the smearing term is added to the data sigma_m_over_m
+                    if (self.Smear_sigma_m):
+
+                        # Adding the smeared BDT error to the ntuples!
+                        diphotons["pho_lead","energyErr_Smeared"] = numpy.sqrt((diphotons["pho_lead"].energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
+                        diphotons["pho_sublead","energyErr_Smeared"] = numpy.sqrt((diphotons["pho_sublead"].energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
+
+                        diphotons["sigma_m_over_m_Smeared"] = 0.5 * numpy.sqrt(
+                            (
+                                numpy.sqrt((diphotons["pho_lead"].energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
+                                / (
+                                    diphotons["pho_lead"].pt
+                                    * numpy.cosh(diphotons["pho_lead"].eta)
+                                )
+                            )
+                            ** 2
+                            + (
+                                numpy.sqrt((diphotons["pho_sublead"].energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
+                                / (
+                                    diphotons["pho_sublead"].pt
+                                    * numpy.cosh(diphotons["pho_sublead"].eta)
+                                )
+                            )
+                            ** 2
+                        )
+
                     # Decorrelating the mass resolution - Still need to supress the decorrelator noises
                     if self.doDeco:
-                        diphotons["sigma_m_over_m_decorr"] = decorrelate_mass_resolution(diphotons)
+                        # Instead of the nominal sigma_m_over_m, we will use the smeared version of it -> (https://indico.cern.ch/event/1319585/#169-update-on-the-run-3-mass-r)
+                        if (self.Smear_sigma_m):
+                            diphotons["sigma_m_over_m_decorr"] = decorrelate_mass_resolution(diphotons)
+                        else:
+                            warnings.warn("Smeamering need to be applied in order to decorrelate the (Smeared) mass resolution. -- Exiting!")
+                            sys.exit(0)
 
                     if self.output_location is not None:
                         if self.output_format == "root":

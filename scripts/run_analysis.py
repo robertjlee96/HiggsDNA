@@ -212,6 +212,7 @@ if __name__ == "__main__":
                 args.skipJetVetoMap,
                 year,
                 args.doDeco,
+                args.Smear_sigma_m,
                 args.output_format,
             )  # additional args can go here to configure a processor
     else:

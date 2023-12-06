@@ -46,6 +46,7 @@ class ZmmyProcessor(HggBaseProcessor):
         skipJetVetoMap: bool = False,
         year: Dict[str, List[str]] = None,
         doDeco: bool = False,
+        Smear_sigma_m: bool = False,
         output_format: str = "parquet",
     ) -> None:
         super().__init__(
@@ -61,6 +62,7 @@ class ZmmyProcessor(HggBaseProcessor):
             skipJetVetoMap=skipJetVetoMap,
             year=year,
             doDeco=doDeco,
+            Smear_sigma_m=Smear_sigma_m,
             output_format=output_format,
         )
         self.analysis = "ZmmyAnalysis"

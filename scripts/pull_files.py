@@ -160,13 +160,17 @@ def get_scale_and_smearing(logger, target_dir):
         to_prefix = target_dir
     else:
         to_prefix = os.path.join(
-            os.path.dirname(__file__), "../higgs_dna/systematics/scaleAndSmearing"
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/scaleAndSmearing"
         )
 
     from_to_dict = {
-        "2022FG": {
-            "from": "/eos/cms/store/group/phys_egamma/akapoor/S+SJSON/Prompt2022FG/SS.json",
-            "to": f"{to_prefix}/2022FG/SS.json",
+        "2022preEE": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/prrout/Run3_Egamma_2022_Scale_smearing_correction/photon/Rereco2022BCD/SS.json",
+            "to": f"{to_prefix}/SS_Rereco2022BCD.json",
+        },
+        "2022postEE": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/prrout/Run3_Egamma_2022_Scale_smearing_correction/photon/RerecoE_PromptFG_2022/SS.json",
+            "to": f"{to_prefix}/SS_RerecoE_PromptFG_2022.json",
         },
     }
     fetch_file("Scale and Smearing", logger, from_to_dict, type="copy")
@@ -187,6 +191,7 @@ def get_mass_decorrelation_CDF(logger, target_dir):
         },
     }
     fetch_file("CDFs", logger, from_to_dict, type="copy")
+
 
 def get_goldenjson(logger, target_dir):
     # References:

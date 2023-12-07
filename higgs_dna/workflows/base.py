@@ -442,6 +442,11 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         awkward.argsort(diphotons.pt, ascending=False)
                     ]
 
+                    # Determine if event passes fiducial Hgg cuts at detector-level
+                    # Assume that hcalPFClusterIso concerns dR < 0.3
+                    fid_det_passed = (diphotons.pho_lead.pt / diphotons.mass > 1 / 3) & (diphotons.pho_sublead.pt / diphotons.mass > 1 / 4) & (diphotons.pho_lead.hcalPFClusterIso < 10) & (diphotons.pho_sublead.hcalPFClusterIso < 10) & (numpy.abs(diphotons.pho_lead.eta) < 2.5) & (numpy.abs(diphotons.pho_sublead.eta) < 2.5)
+                    diphotons = diphotons[fid_det_passed]
+
                     # baseline modifications to diphotons
                     if self.diphoton_mva is not None:
                         diphotons = self.add_diphoton_mva(diphotons, events)

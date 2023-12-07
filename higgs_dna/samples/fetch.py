@@ -28,7 +28,7 @@ def get_fetcher_args() -> argparse.Namespace:
         "-w",
         "--where",
         help="Where are you running your jobs? (default: %(default)s)",
-        default="Americas",
+        default="Eurasia",
         choices=["Americas", "Eurasia", "Yolo"],
     )
     parser.add_argument(

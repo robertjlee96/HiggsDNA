@@ -131,13 +131,13 @@ SCRIPT_DIR = os.path.dirname(
 )  # script directory
 
 process_dict = {
-    "GluGluHtoGG_postEE_M125_2022": "ggh",
-    "VBFtoGG_postEE_M125_2022": "vbf",
-    "VHtoGG_postEE_M125_2022": "vh",
-    "ttHtoGG_postEE_M125_2022": "tth",
-    "GJetPt20to40": "gjet20to40",
-    "GJetPt40toInf": "gjet40toinf",
-    "Diphoton": "diphoton",
+    "GluGluHtoGG_M-125_preEE": "ggh",
+    "GluGluHtoGG_M-125_postEE": "ggh",
+    "VBFHtoGG_M-125_preEE": "vbf",
+    "VBFHtoGG_M-125_postEE": "vbf",
+    "VHtoGG_M-125_preEE": "vh",
+    "ttHtoGG_M-125_preEE": "tth",
+    "ttHtoGG_M-125_postEE": "tth",
 }
 
 var_dict = {

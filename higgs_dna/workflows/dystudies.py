@@ -153,7 +153,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
                     f"\nApplying correction {correction_name} to dataset {dataset_name}\n"
                 )
                 varying_function = available_object_corrections[correction_name]
-                events = varying_function(events=events)
+                events = varying_function(events=events, year=self.year[dataset_name][0])
             elif correction_name in available_weight_corrections:
                 # event weight corrections will be applied after photon preselection / application of further taggers
                 continue

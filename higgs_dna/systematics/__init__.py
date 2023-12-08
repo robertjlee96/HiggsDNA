@@ -77,9 +77,9 @@ object_systematics = {
 object_corrections = {
     "Scale": partial(Scale, pt=None, is_correction=True),
     "Smearing": partial(Smearing, pt=None, is_correction=True),
-    "FNUF": partial(FNUF, pt=None, year="2017", is_correction=True),
-    "ShowerShape": partial(ShowerShape, pt=None, year="2017", is_correction=True),
-    "JES": partial(JERC_jet, pt=None, year="2022postEE", is_correction=True),
+    "FNUF": partial(FNUF, pt=None, is_correction=True),
+    "ShowerShape": partial(ShowerShape, pt=None, is_correction=True),
+    "JES": partial(JERC_jet, pt=None, is_correction=True),
 }
 
 # functions adding systematic variations to event weights to be placed here

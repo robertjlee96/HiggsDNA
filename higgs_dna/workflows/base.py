@@ -125,6 +125,21 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.eta_rho_corr = 1.5
         self.low_eta_rho_corr = 0.16544
         self.high_eta_rho_corr = 0.13212
+        # EA values for Run3 from Egamma
+        self.EA1_EB1 = 0.102056
+        self.EA2_EB1 = -0.000398112
+        self.EA1_EB2 = 0.0820317
+        self.EA2_EB2 = -0.000286224
+        self.EA1_EE1 = 0.0564915
+        self.EA2_EE1 = -0.000248591
+        self.EA1_EE2 = 0.0428606
+        self.EA2_EE2 = -0.000171541
+        self.EA1_EE3 = 0.0395282
+        self.EA2_EE3 = -0.000121398
+        self.EA1_EE4 = 0.0369761
+        self.EA2_EE4 = -8.10369e-05
+        self.EA1_EE5 = 0.0369417
+        self.EA2_EE5 = -2.76885e-05
         self.e_veto = 0.5
 
         logger.debug(f"Setting up processor with metaconditions: {self.meta}")

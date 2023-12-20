@@ -16,30 +16,24 @@ def photon_preselection(
     rho = events.Rho.fixedGridRhoAll * awkward.ones_like(photons.pt)
     photon_abs_eta = numpy.abs(photons.eta)
     # quadratic EA corrections in Run3 : https://indico.cern.ch/event/1204277/contributions/5064356/attachments/2538496/4369369/CutBasedPhotonID_20221031.pdf
-    rho_corr_EB = (
+    pass_phoIso_rho_corr_EB = (
         (((photon_abs_eta > 0.0) & (photon_abs_eta < 1.0))
-         & ((photons.pfPhoIso03 - (rho * self.EA1_EB1) - (rho * rho * self.EA2_EB1))
-            < self.max_pho_iso_EB_low_r9))
+         & (photons.pfPhoIso03 - (rho * self.EA1_EB1) - (rho * rho * self.EA2_EB1) < self.max_pho_iso_EB_low_r9))
         | (((photon_abs_eta > 1.0) & (photon_abs_eta < 1.4442))
-           & ((photons.pfPhoIso03 - (rho * self.EA1_EB2) - (rho * rho * self.EA2_EB2))
-              < self.max_pho_iso_EB_low_r9))
+           & (photons.pfPhoIso03 - (rho * self.EA1_EB2) - (rho * rho * self.EA2_EB2) < self.max_pho_iso_EB_low_r9))
     )
-    rho_corr_EE = (
+
+    pass_phoIso_rho_corr_EE = (
         (((photon_abs_eta > 1.566) & (photon_abs_eta < 2.0))
-         & ((photons.pfPhoIso03 - (rho * self.EA1_EE1) - (rho * rho * self.EA2_EE1))
-            < self.max_pho_iso_EB_low_r9))
+         & (photons.pfPhoIso03 - (rho * self.EA1_EE1) - (rho * rho * self.EA2_EE1) < self.max_pho_iso_EB_low_r9))
         | (((photon_abs_eta > 2.0) & (photon_abs_eta < 2.2))
-           & ((photons.pfPhoIso03 - (rho * self.EA1_EE2) - (rho * rho * self.EA2_EE2))
-              < self.max_pho_iso_EB_low_r9))
+           & (photons.pfPhoIso03 - (rho * self.EA1_EE2) - (rho * rho * self.EA2_EE2) < self.max_pho_iso_EB_low_r9))
         | (((photon_abs_eta > 2.2) & (photon_abs_eta < 2.3))
-           & ((photons.pfPhoIso03 - (rho * self.EA1_EE3) - (rho * rho * self.EA2_EE3))
-              < self.max_pho_iso_EB_low_r9))
+           & (photons.pfPhoIso03 - (rho * self.EA1_EE3) - (rho * rho * self.EA2_EE3) < self.max_pho_iso_EB_low_r9))
         | (((photon_abs_eta > 2.3) & (photon_abs_eta < 2.4))
-           & ((photons.pfPhoIso03 - (rho * self.EA1_EE4) - (rho * rho * self.EA2_EE4))
-              < self.max_pho_iso_EB_low_r9))
+           & (photons.pfPhoIso03 - (rho * self.EA1_EE4) - (rho * rho * self.EA2_EE4) < self.max_pho_iso_EB_low_r9))
         | (((photon_abs_eta > 2.4) & (photon_abs_eta < 2.5))
-           & ((photons.pfPhoIso03 - (rho * self.EA1_EE5) - (rho * rho * self.EA2_EE5))
-              < self.max_pho_iso_EB_low_r9))
+           & (photons.pfPhoIso03 - (rho * self.EA1_EE5) - (rho * rho * self.EA2_EE5) < self.max_pho_iso_EB_low_r9))
     )
     isEB_high_r9 = (photons.isScEtaEB) & (photons.r9 > self.min_full5x5_r9_EB_high_r9)
     isEE_high_r9 = (photons.isScEtaEE) & (photons.r9 > self.min_full5x5_r9_EE_high_r9)
@@ -52,7 +46,7 @@ def photon_preselection(
             < self.max_trkSumPtHollowConeDR03_EB_low_r9
         )
         & (photons.sieie < self.max_sieie_EB_low_r9)
-        & (rho_corr_EB)
+        & (pass_phoIso_rho_corr_EB)
     )
     isEE_low_r9 = (
         (photons.isScEtaEE)
@@ -63,7 +57,7 @@ def photon_preselection(
             < self.max_trkSumPtHollowConeDR03_EE_low_r9
         )
         & (photons.sieie < self.max_sieie_EE_low_r9)
-        & (rho_corr_EE)
+        & (pass_phoIso_rho_corr_EE)
     )
     # not apply electron veto for for TnP workflow
     e_veto = self.e_veto if apply_electron_veto else -1

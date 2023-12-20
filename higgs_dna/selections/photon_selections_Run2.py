@@ -4,7 +4,6 @@ import numpy
 
 # photon preselection Run2 -> take as input nAOD Photon collection and return the Photons that pass
 # cuts (pt, eta, sieie, mvaID, iso... etc)
-#
 def photon_preselection(
     self, photons: awkward.Array, events: awkward.Array, apply_electron_veto=True
 ) -> awkward.Array:

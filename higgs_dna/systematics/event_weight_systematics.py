@@ -89,53 +89,58 @@ def Pileup(events, weights, year, is_correction=True, **kwargs):
     """
     Function to apply either the pileup correction to MC to make it match the pileup profile of a certain year/period,
     or the respective uncertainties.
-    The parameter `year` needs to be specified to be one of ["2016preVFP", "2016postVFP", "2017", "2018"]
-    By now, only the Run-2 files are available from LUM POG, but for Run-3, it should work analogously once the files are provided.
-    The pileup JSONs first need to be pulled with `scripts/pull_files.py`!
+    The parameter `year` needs to be specified as one of ["2022preEE", "2022postEE"] for Run-3 or ["2016preVFP", "2016postVFP", "2017", "2018"] for Run-2.
+    By now, only the Run-2 files are available from LUM POG in the correctionlib format...
+    The pileup JSONs / ROOT histograms first need to be pulled with `scripts/pull_files.py`!
 
-    For now, to do a preliminary pileup reweighting for 2022 data, a privately produced pileup file is included.
+    For now the reweighting for 2022 is not yet split into pre / post EE and thus preliminary.
     """
 
+    # splitting into pre / post EE to be implemented here!
     if "22" in year:
         """
-        This block should be removed when the official Run-3 pileup JSONs are available.
+        This block should be removed when the Run-3 correctionlib JSONs are available...
         """
+        path_pileup = os.path.join(os.path.dirname(__file__), "JSONs/pileup/2022/")
 
-        print(
-            "\n Applying preliminary, privately produced 2022 pileup corrections. A corresponding uncertainty does not exist here.\n"
-        )
+        # get the MC pileup distribution by histogramming Pileup.nPU
+        pileup_MC = np.histogram(
+            ak.to_numpy(events.Pileup.nPU), bins=100, range=(0, 100)
+        )[0].astype("float64")
+        # avoid division by zero later
+        pileup_MC[pileup_MC == 0.0] = 1
+        pileup_MC /= pileup_MC.sum()
+
+        # data distributions from LUM hists
+        pileup_profile = uproot.open(path_pileup + "nominal.root")["pileup"]
+        pileup_profile = pileup_profile.to_numpy()[0]
+        pileup_profile /= pileup_profile.sum()
+
+        pileup_correction = pileup_profile / pileup_MC
+        # remove large MC reweighting factors to prevent artifacts
+        pileup_correction[pileup_correction > 10] = 10
+        sf_nom = pileup_correction[ak.to_numpy(events.Pileup.nPU)]
 
         if is_correction:
-            path_pileup = os.path.join(
-                os.path.dirname(__file__),
-                "../systematics/JSONs/pileup/2022Preliminary/MyDataPileupHistogram2022FG.root",
-            )
-            pileup_profile = uproot.open(path_pileup)["pileup"]
-            pileup_profile = pileup_profile.to_numpy()[0]
-            # normalise
-            pileup_profile /= pileup_profile.sum()
-
-            # here, we get the MC pileup distribution by histogramming
-            pileup_MC = np.histogram(
-                ak.to_numpy(events.Pileup.nPU), bins=100, range=(0, 100)
-            )[0].astype("float64")
-            # avoid division by zero later
-            pileup_MC[pileup_MC == 0.0] = 1
-            # normalise
-            pileup_MC /= pileup_MC.sum()
-
-            pileup_correction = pileup_profile / pileup_MC
-            # remove large MC reweighting factors to prevent artifacts
-            pileup_correction[pileup_correction > 10] = 10
-
-            sf = pileup_correction[ak.to_numpy(events.Pileup.nPU)]
+            sf = sf_nom
             sfup, sfdown = None, None
 
         else:
-            # this preliminary pileup does not come with an uncertainty!
             sf = np.ones(len(weights._weight))
-            sfup = np.ones(len(weights._weight))
-            sfdown = np.ones(len(weights._weight))
+
+            pileup_profile_up = uproot.open(path_pileup + "up.root")["pileup"]
+            pileup_profile_up = pileup_profile_up.to_numpy()[0]
+            pileup_profile_up /= pileup_profile_up.sum()
+            pileup_correction_up = pileup_profile_up / pileup_MC
+            pileup_correction_up[pileup_correction_up > 10] = 10
+            sfup = pileup_correction_up[ak.to_numpy(events.Pileup.nPU)] / sf_nom
+
+            pileup_profile_down = uproot.open(path_pileup + "down.root")["pileup"]
+            pileup_profile_down = pileup_profile_down.to_numpy()[0]
+            pileup_profile_down /= pileup_profile_down.sum()
+            pileup_correction_down = pileup_profile_down / pileup_MC
+            pileup_correction_down[pileup_correction_down > 10] = 10
+            sfdown = pileup_correction_down[ak.to_numpy(events.Pileup.nPU)] / sf_nom
 
         weights.add(name="Pileup", weight=sf, weightUp=sfup, weightDown=sfdown)
 

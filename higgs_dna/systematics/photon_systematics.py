@@ -29,10 +29,10 @@ def Scale(pt, events, year="2022postEE", is_correction=True):
 
     if year == "2022preEE":
         path_json = os.path.join(os.path.dirname(__file__), 'JSONs/scaleAndSmearing/SS_Rereco2022BCD.json')
-        evaluator = correctionlib.CorrectionSet.from_file(path_json)["Rereco2022BCD_ScaleJSON"]
+        evaluator = correctionlib.CorrectionSet.from_file(path_json)["2022Re-recoBCD_ScaleJSON"]
     elif year == "2022postEE":
         path_json = os.path.join(os.path.dirname(__file__), 'JSONs/scaleAndSmearing/SS_RerecoE_PromptFG_2022.json')
-        evaluator = correctionlib.CorrectionSet.from_file(path_json)["Prompt2022FG_ScaleJSON"]
+        evaluator = correctionlib.CorrectionSet.from_file(path_json)["2022Re-recoE+PromptFG_ScaleJSON"]
     else:
         print("\n WARNING: there are only scale corrections for the year strings \"2022preEE\" and \"2022postEE\"! \n Exiting. \n")
         exit()
@@ -81,10 +81,10 @@ def Smearing(pt, events, year="2022postEE", is_correction=True):
 
     if year == "2022preEE":
         path_json = os.path.join(os.path.dirname(__file__), 'JSONs/scaleAndSmearing/SS_Rereco2022BCD.json')
-        evaluator = correctionlib.CorrectionSet.from_file(path_json)["Rereco2022BCD_SmearingJSON"]
+        evaluator = correctionlib.CorrectionSet.from_file(path_json)["2022Re-recoBCD_SmearingJSON"]
     elif year == "2022postEE":
         path_json = os.path.join(os.path.dirname(__file__), 'JSONs/scaleAndSmearing/SS_RerecoE_PromptFG_2022.json')
-        evaluator = correctionlib.CorrectionSet.from_file(path_json)["Prompt2022FG_SmearingJSON"]
+        evaluator = correctionlib.CorrectionSet.from_file(path_json)["2022Re-recoE+PromptFG_SmearingJSON"]
     else:
         print("\n WARNING: there are only smearing corrections for the year strings \"2022preEE\" and \"2022postEE\"! \n Exiting. \n")
         exit()

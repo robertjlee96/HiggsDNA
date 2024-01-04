@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 import argparse
 import os
+import sys
 from higgs_dna.utils.logger_utils import setup_logger
 import urllib.request
 import pathlib
 import shutil
+import subprocess
 from distutils.dir_util import copy_tree
+
 
 parser = argparse.ArgumentParser(
     description="Simple utility script to retrieve the needed files for corections, luminostiy mask, systematics uncertainties ..."
@@ -53,6 +56,21 @@ parser.add_argument(
 args = parser.parse_args()
 
 # ---------------------- A few helping functions  ----------------------
+
+def unzip_gz_with_zcat(logger, input_file, output_file):
+    try:
+        # Check if zcat is available in the system
+        subprocess.check_call(["zcat", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # Run zcat command to unzip the gz file
+        with open(output_file, "wb") as output:
+            subprocess.check_call(["zcat", input_file], stdout=output)
+        logger.info(f"File '{input_file}' successfully unzipped to '{output_file}'.")
+        # Remove the gz file after extraction
+        os.remove(input_file)
+        logger.info(f"File '{input_file}' deleted.")
+    except subprocess.CalledProcessError as e:
+        logger.info(f"Error: {e}")
+        sys.exit(1)
 
 
 def fetch_file(target_name, logger, from_to_dict, type="url"):
@@ -156,6 +174,7 @@ def get_photonid_json(logger, target_dir):
 
 
 def get_scale_and_smearing(logger, target_dir):
+    # see https://twiki.cern.ch/twiki/bin/viewauth/CMS/EgammSFandSSRun3#Scale_And_Smearings_Correctionli
     if target_dir is not None:
         to_prefix = target_dir
     else:
@@ -165,15 +184,18 @@ def get_scale_and_smearing(logger, target_dir):
 
     from_to_dict = {
         "2022preEE": {
-            "from": "/eos/cms/store/group/phys_higgs/cmshgg/prrout/Run3_Egamma_2022_Scale_smearing_correction/photon/Rereco2022BCD/SS.json",
-            "to": f"{to_prefix}/SS_Rereco2022BCD.json",
+            "from": "/eos/cms/store/group/phys_egamma/akapoor/S+SJSON/2022Re-recoBCD/photonSS.json.gz",
+            "to": f"{to_prefix}/SS_Rereco2022BCD.json.gz",
         },
         "2022postEE": {
-            "from": "/eos/cms/store/group/phys_higgs/cmshgg/prrout/Run3_Egamma_2022_Scale_smearing_correction/photon/RerecoE_PromptFG_2022/SS.json",
-            "to": f"{to_prefix}/SS_RerecoE_PromptFG_2022.json",
+            "from": "/eos/cms/store/group/phys_egamma/akapoor/S+SJSON/2022Re-recoE+PromptFG/photonSS.json.gz",
+            "to": f"{to_prefix}/SS_RerecoE_PromptFG_2022.json.gz",
         },
     }
     fetch_file("Scale and Smearing", logger, from_to_dict, type="copy")
+    # Now, unpack the gz to have the raw JSONs
+    unzip_gz_with_zcat(logger, f"{to_prefix}/SS_Rereco2022BCD.json.gz", f"{to_prefix}/SS_Rereco2022BCD.json")
+    unzip_gz_with_zcat(logger, f"{to_prefix}/SS_RerecoE_PromptFG_2022.json.gz", f"{to_prefix}/SS_RerecoE_PromptFG_2022.json")
 
 
 def get_mass_decorrelation_CDF(logger, target_dir):
@@ -237,10 +259,10 @@ def get_goldenjson(logger, target_dir):
             ),
         },
         "2023": {
-            "from": "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions23/Cert_Collisions2023_366442_370092_Golden.json",
+            "from": "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions23/Cert_Collisions2023_366442_370790_Golden.json",
             "to": os.path.join(
                 prefix,
-                "Collisions23/Cert_Collisions2023_366442_370092_Golden.json",
+                "Collisions23/Cert_Collisions2023_366442_370790_Golden.json",
             ),
         },
     }

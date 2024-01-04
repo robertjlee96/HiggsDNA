@@ -136,6 +136,22 @@ def Smearing(pt, events, year="2022postEE", is_correction=True):
         return np.concatenate((corr_up_variation.reshape(-1,1), corr_down_variation.reshape(-1,1)), axis=1) * _pt[:, None]
 
 
+def energyErr_shift(energyErr, events, year="2022postEE", is_correction=True):
+    # See also https://indico.cern.ch/event/1131803/contributions/4758593/attachments/2398621/4111806/Hgg_Differentials_Approval_080322.pdf#page=47
+    if is_correction:
+        return events
+    else:
+        _energyErr = ak.flatten(events.Photon.energyErr)
+        uncertainty_up = np.ones(len(_energyErr)) * 1.05
+        uncertainty_dn = np.ones(len(_energyErr)) * 0.95
+        return (
+            np.concatenate(
+                (uncertainty_up.reshape(-1, 1), uncertainty_dn.reshape(-1, 1)), axis=1
+            )
+            * _energyErr[:, None]
+        )
+
+
 # Not nice but working: if the functions are called in the base processor by Photon.add_systematic(... "what"="pt"...), the pt is passed to the function as first argument.
 # I need the full events here, so I pass in addition the events. Seems to only work if it is explicitly a function of pt, but I might be missing something. Open for better solutions.
 def FNUF(pt, events, year="2017", is_correction=True):

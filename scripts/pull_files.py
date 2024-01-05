@@ -20,7 +20,7 @@ parser.add_argument(
     dest="target",
     help="Choose the target to download (default: %(default)s)",
     default="GoldenJson",
-    choices=["GoldenJSON", "cTag", "PhotonID", "PU", "PU_run2", "SS", "JetMET","CDFs"],
+    choices=["GoldenJSON", "cTag", "PhotonID", "PU_run2", "SS", "JetMET","CDFs"],
 )
 
 parser.add_argument(
@@ -50,13 +50,13 @@ parser.add_argument(
     "--log_dir",
     type=str,
     default="./json-log/",
-    help="Log file summarising the json will end up here, default: ./json-log/",
+    help="Log file summarising the json will end up here, default: ./json-log/"
 )
 
 args = parser.parse_args()
 
-# ---------------------- A few helping functions  ----------------------
 
+# ---------------------- A few helping functions  ----------------------
 def unzip_gz_with_zcat(logger, input_file, output_file):
     try:
         # Check if zcat is available in the system
@@ -321,37 +321,6 @@ def get_jetmet_json(logger, target_dir):
     fetch_file("JetMET", logger, from_to_dict, type="copy")
 
 
-def get_pileup(logger, target_dir):
-    # Base URL for Run-3 pileup root histograms
-    base_path = "/eos/user/c/cmsdqm/www/CAF/certification/Collisions22/PileUp/"
-
-    if target_dir is not None:
-        to_prefix = target_dir
-    else:
-        to_prefix = os.path.join(
-            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/pileup/2022"
-        )
-
-    # note that these files need to be replaced once the splitting into 2022 pre / post EE is implemented.
-    # Ideally, the files will be available in correctionlib format
-    from_to_dict = {
-        "2022_nominal": {
-            "from": f"{base_path}/pileupHistogram-Cert_Collisions2022_355100_362760_GoldenJson-13p6tev-2022-69200ub.root",
-            "to": f"{to_prefix}/nominal.root",
-        },
-        "2022_up": {
-            "from": f"{base_path}/pileupHistogram-Cert_Collisions2022_355100_362760_GoldenJson-13p6tev-2022-72400ub.root",
-            "to": f"{to_prefix}/up.root",
-        },
-        "2022_down": {
-            "from": f"{base_path}/pileupHistogram-Cert_Collisions2022_355100_362760_GoldenJson-13p6tev-2022-66000ub.root",
-            "to": f"{to_prefix}/down.root",
-        },
-    }
-
-    fetch_file("Pileup_Run2", logger, from_to_dict, type="copy")
-
-
 def get_pileup_Run2(logger, target_dir):
     # Base URL for pileup JSONs
     base_path = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/LUM"
@@ -405,8 +374,6 @@ if __name__ == "__main__":
         get_jetmet_json(logger, args.target_dir)
     elif args.target == "GoldenJSON":
         get_goldenjson(logger, args.target_dir)
-    elif args.target == "PU":
-        get_pileup(logger, args.target_dir)
     elif args.target == "PU_run2":
         get_pileup_Run2(logger, args.target_dir)
     elif args.target == "SS":

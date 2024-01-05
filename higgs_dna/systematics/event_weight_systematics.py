@@ -91,17 +91,15 @@ def Pileup(events, weights, year, is_correction=True, **kwargs):
     or the respective uncertainties.
     The parameter `year` needs to be specified as one of ["2022preEE", "2022postEE"] for Run-3 or ["2016preVFP", "2016postVFP", "2017", "2018"] for Run-2.
     By now, only the Run-2 files are available from LUM POG in the correctionlib format...
-    The pileup JSONs / ROOT histograms first need to be pulled with `scripts/pull_files.py`!
-
-    For now the reweighting for 2022 is not yet split into pre / post EE and thus preliminary.
+    The pileup histos for Run-3 were produced by Junquan, the JSONs for Run-2 first need to be pulled with `scripts/pull_files.py`!
     """
 
-    # splitting into pre / post EE to be implemented here!
+    # This block should be removed when Run-3 correctionlib JSONs are available...
     if "22" in year:
-        """
-        This block should be removed when the Run-3 correctionlib JSONs are available...
-        """
-        path_pileup = os.path.join(os.path.dirname(__file__), "JSONs/pileup/2022/")
+        if year == "2022preEE":
+            path_pileup = os.path.join(os.path.dirname(__file__), "JSONs/pileup/2022/preEE/")
+        elif year == "2022postEE":
+            path_pileup = os.path.join(os.path.dirname(__file__), "JSONs/pileup/2022/postEE/")
 
         # get the MC pileup distribution by histogramming Pileup.nPU
         pileup_MC = np.histogram(

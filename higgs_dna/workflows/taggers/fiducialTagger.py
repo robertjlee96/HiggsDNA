@@ -41,8 +41,8 @@ class fiducialTagger:
             lead_pho = events.GenIsolatedPhoton[:, 0]
             sublead_pho = events.GenIsolatedPhoton[:, 1]
             diphoton = (lead_pho) + (sublead_pho)
-            selection.add("lead_photon_scaled_pt", lead_pho.pt / diphoton.mass > 0.35)
-            selection.add("sublead_photon_scaled_pt", sublead_pho.pt / diphoton.mass > 0.25)
+            selection.add("lead_photon_scaled_pt", lead_pho.pt / diphoton.mass > 1 / 3)
+            selection.add("sublead_photon_scaled_pt", sublead_pho.pt / diphoton.mass > 1 / 4)
             selection.add(
                 "lead_photon_eta",
                 (np.abs(lead_pho.eta) < 1.4442)

@@ -427,7 +427,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         photons = self.add_photonid_mva(photons, events)
 
                     # photon preselection
-                    photons = photon_preselection(self, photons, events)
+                    photons = photon_preselection(self, photons, events, year=self.year[dataset_name][0])
                     # sort photons in each event descending in pt
                     # make descending-pt combinations of photons
                     photons = photons[awkward.argsort(photons.pt, ascending=False)]

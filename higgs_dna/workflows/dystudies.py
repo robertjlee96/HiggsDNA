@@ -215,7 +215,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
 
             # photon preselection
             photons = photon_preselection(
-                self, photons, events, apply_electron_veto=False
+                self, photons, events, apply_electron_veto=False, year=self.year[dataset_name][0]
             )
 
             if self.data_kind == "mc":

@@ -158,7 +158,7 @@ def FNUF(pt, events, year="2017", is_correction=True):
     """
     ---This is an implementation of the FNUF uncertainty copied from flashgg,
     --- Preliminary JSON (run2 I don't know if this needs to be changed) file created with correctionlib starting from flashgg: https://github.com/cms-analysis/flashgg/blob/2677dfea2f0f40980993cade55144636656a8a4f/Systematics/python/flashggDiPhotonSystematics2017_Legacy_cfi.py
-    Applies the photon pt and energy scale corrections and corresponding uncertainties (only on the pt because it is what is used in selection).
+    Applies the photon pt and energy scale corrections and corresponding uncertainties.
     To be checked by experts
     """
 
@@ -168,6 +168,12 @@ def FNUF(pt, events, year="2017", is_correction=True):
     r9 = ak.flatten(events.Photon.r9)
     _energy = ak.flatten(events.Photon.energy)
     _pt = ak.flatten(events.Photon.pt)
+
+    # era/year defined as parameter of the function, only 2017 is implemented up to now
+    avail_years = ["2017"]
+    if year not in avail_years:
+        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        exit()
 
     jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/FNUF.json")
     evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["FNUF"]
@@ -188,8 +194,7 @@ def FNUF(pt, events, year="2017", is_correction=True):
 
     else:
         correction = evaluator.evaluate("nominal", eta, r9)
-        # When creating the JSON I already included added the variation to the returned value,
-        # the ratio is there because was there in the example function not 100% sure it's needed
+        # When creating the JSON I already included added the variation to the returned value
         uncertainty_up = evaluator.evaluate("up", eta, r9) / correction
         uncertainty_dn = evaluator.evaluate("down", eta, r9) / correction
         # coffea does the unflattenning step itself and sets this value as pt of the up/down variations
@@ -218,6 +223,12 @@ def ShowerShape(pt, events, year="2017", is_correction=True):
     _energy = ak.flatten(events.Photon.energy)
     _pt = ak.flatten(events.Photon.pt)
 
+    # era/year defined as parameter of the function, only 2017 is implemented up to now
+    avail_years = ["2017"]
+    if year not in avail_years:
+        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        exit()
+
     jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/ShowerShape.json")
     evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["ShowerShape"]
 
@@ -237,8 +248,59 @@ def ShowerShape(pt, events, year="2017", is_correction=True):
 
     else:
         correction = evaluator.evaluate("nominal", eta, r9)
-        # When creating the JSON I already included added the variation to the returned value,
-        # the ratio is there because was there in the example function not 100% sure it's needed
+        # When creating the JSON I already included added the variation to the returned value
+        uncertainty_up = evaluator.evaluate("up", eta, r9) / correction
+        uncertainty_dn = evaluator.evaluate("down", eta, r9) / correction
+        # coffea does the unflattenning step itself and sets this value as pt of the up/down variations
+        return (
+            np.concatenate(
+                (uncertainty_up.reshape(-1, 1), uncertainty_dn.reshape(-1, 1)), axis=1
+            )
+            * _pt[:, None]
+        )
+
+
+def Material(pt, events, year="2017", is_correction=True):
+    """
+    ---This is an implementation of the Material uncertainty copied from flashgg,
+    --- JSON file for run2 created with correctionlib starting from flashgg: https://github.com/cms-analysis/flashgg/blob/2677dfea2f0f40980993cade55144636656a8a4f/Systematics/python/flashggDiPhotonSystematics2017_Legacy_cfi.py
+    Applies the photon pt and energy scale corrections and corresponding uncertainties.
+    To be checked by experts
+    """
+
+    # for later unflattening:
+    counts = ak.num(events.Photon.pt)
+    eta = ak.flatten(abs(events.Photon.ScEta))
+    r9 = ak.flatten(events.Photon.r9)
+    _energy = ak.flatten(events.Photon.energy)
+    _pt = ak.flatten(events.Photon.pt)
+
+    # era/year defined as parameter of the function, only 2017 is implemented up to now
+    avail_years = ["2017"]
+    if year not in avail_years:
+        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        exit()
+
+    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/Material.json")
+    evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["Material"]
+
+    if is_correction:
+        correction = evaluator.evaluate("nominal", eta, r9)
+        corr_energy = _energy * correction
+        corr_pt = _pt * correction
+
+        corrected_photons = deepcopy(events.Photon)
+        corr_energy = ak.unflatten(corr_energy, counts)
+        corr_pt = ak.unflatten(corr_pt, counts)
+        corrected_photons["energy"] = corr_energy
+        corrected_photons["pt"] = corr_pt
+        events.Photon = corrected_photons
+
+        return events
+
+    else:
+        correction = evaluator.evaluate("nominal", eta, r9)
+        # When creating the JSON I already included added the variation to the returned value
         uncertainty_up = evaluator.evaluate("up", eta, r9) / correction
         uncertainty_dn = evaluator.evaluate("down", eta, r9) / correction
         # coffea does the unflattenning step itself and sets this value as pt of the up/down variations

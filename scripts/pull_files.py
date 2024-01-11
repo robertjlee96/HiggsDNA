@@ -20,7 +20,7 @@ parser.add_argument(
     dest="target",
     help="Choose the target to download (default: %(default)s)",
     default="GoldenJson",
-    choices=["GoldenJSON", "cTag", "PhotonID", "PU_run2", "SS", "JetMET","CDFs"],
+    choices=["GoldenJSON", "cTag", "PhotonID", "PU_run2", "SS", "JetMET","CDFs", "JEC", "JER", "Material", "TriggerSF", "PreselSF", "eVetoSF"],
 )
 
 parser.add_argument(
@@ -125,6 +125,121 @@ def fetch_file(target_name, logger, from_to_dict, type="url"):
                     target_name, ikey, from_to_dict[ikey]["from"]
                 )
             )
+
+
+def get_jec_files(logger, target_dir):
+    if target_dir is not None:
+        to_prefix = target_dir
+    else:
+        to_prefix = os.path.join(
+            os.path.dirname(__file__), "../higgs_dna/systematics/data/"
+        )
+
+    from_to_dict = {
+        "2017": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JECDatabase/textFiles/Summer19UL17_V5_MC",
+            "to": f"{to_prefix}/Summer19UL17_MC/JEC/",
+        },
+        "2022postEE": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JECDatabase/textFiles/Winter22Run3_V2_MC",
+            "to": f"{to_prefix}/Winter22Run3_MC/JEC/",
+        },
+    }
+    fetch_file("JEC", logger, from_to_dict, type="copy")
+    os.system(f"rename .txt .junc.txt {to_prefix}/*/JEC/*/*Uncertainty*.txt")
+
+
+def get_jer_files(logger, target_dir):
+    if target_dir is not None:
+        to_prefix = target_dir
+    else:
+        to_prefix = os.path.join(
+            os.path.dirname(__file__), "../higgs_dna/systematics/data/"
+        )
+
+    from_to_dict = {
+        "2017": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JRDatabase/textFiles/Summer19UL17_JRV2_MC",
+            "to": f"{to_prefix}/Summer19UL17_MC/JER/",
+        },
+        "2022postEE": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JRDatabase/textFiles/JR_Winter22Run3_V1_MC",
+            "to": f"{to_prefix}/Winter22Run3_MC/JER/",
+        },
+    }
+    fetch_file("JER", logger, from_to_dict, type="copy")
+    os.system(f"rename PtResolution_AK4PFchs.txt PtResolution_AK4PFchs.jr.txt {to_prefix}/*/JER/*/*PtResolution_AK4PFchs.txt")
+    os.system(f"rename PtResolution_AK4PFPuppi.txt PtResolution_AK4PFPuppi.jr.txt {to_prefix}/*/JER/*/*PtResolution_AK4PFPuppi.txt")
+    os.system(f"rename SF_AK4PFchs.txt SF_AK4PFchs.jersf.txt {to_prefix}/*/JER/*/*SF_AK4PFchs.txt")
+    os.system(f"rename SF_AK4PFPuppi.txt SF_AK4PFPuppi.jersf.txt {to_prefix}/*/JER/*/*SF_AK4PFPuppi.txt")
+
+
+def get_material_json(logger, target_dir):
+    if target_dir is not None:
+        to_prefix = target_dir
+    else:
+        to_prefix = os.path.join(
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/"
+        )
+
+    from_to_dict = {
+        "2017": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/Material.json",
+            "to": f"{to_prefix}",
+        }
+    }
+    fetch_file("Material", logger, from_to_dict, type="copy")
+
+
+def get_trigger_json(logger, target_dir):
+    if target_dir is not None:
+        to_prefix = target_dir
+    else:
+        to_prefix = os.path.join(
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/"
+        )
+
+    from_to_dict = {
+        "2017": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/TriggerSF*.json",
+            "to": f"{to_prefix}",
+        }
+    }
+    fetch_file("TriggerSF", logger, from_to_dict, type="copy")
+
+
+def get_presel_json(logger, target_dir):
+    if target_dir is not None:
+        to_prefix = target_dir
+    else:
+        to_prefix = os.path.join(
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/"
+        )
+
+    from_to_dict = {
+        "2017": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/PreselSF.json",
+            "to": f"{to_prefix}",
+        }
+    }
+    fetch_file("PreselSF", logger, from_to_dict, type="copy")
+
+
+def get_eveto_json(logger, target_dir):
+    if target_dir is not None:
+        to_prefix = target_dir
+    else:
+        to_prefix = os.path.join(
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/"
+        )
+
+    from_to_dict = {
+        "2017": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/eVetoSF.json",
+            "to": f"{to_prefix}",
+        }
+    }
+    fetch_file("eVetoSF", logger, from_to_dict, type="copy")
 
 
 def get_ctag_json(logger, target_dir):
@@ -386,6 +501,18 @@ if __name__ == "__main__":
         get_photonid_json(logger, args.target_dir)
     elif args.target == "JetMET":
         get_jetmet_json(logger, args.target_dir)
+    elif args.target == "JEC":
+        get_jec_files(logger, args.target_dir)
+    elif args.target == "JER":
+        get_jer_files(logger, args.target_dir)
+    elif args.target == "Material":
+        get_material_json(logger, args.target_dir)
+    elif args.target == "TriggerSF":
+        get_trigger_json(logger, args.target_dir)
+    elif args.target == "PreselSF":
+        get_presel_json(logger, args.target_dir)
+    elif args.target == "eVetoSF":
+        get_eveto_json(logger, args.target_dir)
     else:
         logger.info("Unknown target, exit now!")
         exit(0)

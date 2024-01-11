@@ -31,6 +31,8 @@ def SF_photon_ID(
     )
     evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["UL-Photon-ID-SF"]
 
+    logger.debug(f"Photon fields SF_photon_id: {photons['pho_lead'].fields}")
+
     if is_correction:
         # only calculate correction to nominal weight
         sf_lead = evaluator.evaluate(
@@ -145,10 +147,7 @@ def Pileup(events, weights, year, is_correction=True, **kwargs):
         return weights
 
     else:
-        path_to_json = os.path.join(
-            os.path.dirname(__file__),
-            "../systematics/JSONs/pileup/pileup_{}.json.gz".format(year),
-        )
+        path_to_json = os.path.join(os.path.dirname(__file__), "../systematics/JSONs/pileup/pileup_{}.json.gz".format(year))
         if "16" in year:
             name = "Collisions16_UltraLegacy_goldenJSON"
         elif "17" in year:
@@ -174,14 +173,19 @@ def Pileup(events, weights, year, is_correction=True, **kwargs):
     return weights
 
 
-def LooseMvaSF(photons, weights, year="2017", WP="Loose", is_correction=True, **kwargs):
+def LooseMvaSF(photons, weights, year="2017", is_correction=True, **kwargs):
     """
     LooseMvaSF: correction to the event weight on a per photon level, impacting one of the high importance input variable of the DiphotonBDT, binned in eta and r9.
     for original implementation look at: https://github.com/cms-analysis/flashgg/blob/2677dfea2f0f40980993cade55144636656a8a4f/Systematics/python/flashggDiPhotonSystematics2017_Legacy_cfi.py
     And for presentation on the study: https://indico.cern.ch/event/963617/contributions/4103623/attachments/2141570/3608645/Zee_Validation_UL2017_Update_09112020_Prasant.pdf
     """
 
-    # have to think about how to specify era/year, using 2017 test-wise here, defined as parameter of the function
+    # era/year defined as parameter of the function, only 2017 is implemented up to now
+    avail_years = ["2017"]
+    if year not in avail_years:
+        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        exit()
+
     jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/LooseMvaSF.json")
     evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["LooseMvaSF"]
 
@@ -225,6 +229,190 @@ def LooseMvaSF(photons, weights, year="2017", WP="Loose", is_correction=True, **
         sfdown = sfdown_lead * sfdown_sublead / _sf
 
     weights.add(name="LooseMvaSF", weight=sf, weightUp=sfup, weightDown=sfdown)
+
+    return weights
+
+
+def ElectronVetoSF(photons, weights, year="2017", is_correction=True, **kwargs):
+    """
+    ElectronVetoSF: correction to the event weight on a per photon level, Conversion safe veto efficiency with event counting method: To check if the FSR photons are passing the e-veto or not.
+    binned in abs(SCeta) and r9.
+    for original implementation look at: https://github.com/cms-analysis/flashgg/blob/2677dfea2f0f40980993cade55144636656a8a4f/Systematics/python/flashggDiPhotonSystematics2017_Legacy_cfi.py
+    And for presentation on the study: https://indico.cern.ch/event/961164/contributions/4089584/attachments/2135019/3596299/Zmmg_UL2017%20With%20CorrMC_Hgg%20(02.11.2020).pdf
+    """
+
+    # era/year defined as parameter of the function, only 2017 is implemented up to now
+    avail_years = ["2017"]
+    if year not in avail_years:
+        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        exit()
+
+    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/eVetoSF.json")
+    evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["ElectronVetoSF"]
+
+    if is_correction:
+        # only calculate correction to nominal weight
+        sf_lead = evaluator.evaluate(
+            "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+        )
+        sf_sublead = evaluator.evaluate(
+            "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+        )
+        sf = sf_lead * sf_sublead
+
+        sfup, sfdown = None, None
+
+    else:
+        # only calculate systs
+        sf = np.ones(len(weights._weight))
+        sf_lead = evaluator.evaluate(
+            "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+        )
+        sf_sublead = evaluator.evaluate(
+            "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+        )
+        _sf = sf_lead * sf_sublead
+
+        sfup_lead = evaluator.evaluate(
+            "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+        )
+        sfup_sublead = evaluator.evaluate(
+            "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+        )
+        sfup = sfup_lead * sfup_sublead / _sf
+
+        sfdown_lead = evaluator.evaluate(
+            "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+        )
+        sfdown_sublead = evaluator.evaluate(
+            "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+        )
+        sfdown = sfdown_lead * sfdown_sublead / _sf
+
+    weights.add(name="ElectronVetoSF", weight=sf, weightUp=sfup, weightDown=sfdown)
+
+    return weights
+
+
+def PreselSF(photons, weights, year="2017", is_correction=True, **kwargs):
+    """
+    Preselection SF: correction to the event weight on a per photon level for UL2017. Dt:17/11/2020
+    Binned in abs(SCeta) and r9.
+    For original implementation look at: https://github.com/cms-analysis/flashgg/blob/2677dfea2f0f40980993cade55144636656a8a4f/Systematics/python/flashggDiPhotonSystematics2017_Legacy_cfi.py
+    Link to the Presentation: https://indico.cern.ch/event/963617/contributions/4103623/attachments/2141570/3608645/Zee_Validation_UL2017_Update_09112020_Prasant.pdf
+    """
+
+    # era/year defined as parameter of the function, only 2017 is implemented up to now
+    avail_years = ["2017"]
+    if year not in avail_years:
+        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        exit()
+
+    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/PreselSF.json")
+    evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["PreselSF"]
+
+    if is_correction:
+        # only calculate correction to nominal weight
+        sf_lead = evaluator.evaluate(
+            "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+        )
+        sf_sublead = evaluator.evaluate(
+            "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+        )
+        sf = sf_lead * sf_sublead
+
+        sfup, sfdown = None, None
+
+    else:
+        # only calculate systs
+        sf = np.ones(len(weights._weight))
+        sf_lead = evaluator.evaluate(
+            "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+        )
+        sf_sublead = evaluator.evaluate(
+            "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+        )
+        _sf = sf_lead * sf_sublead
+
+        sfup_lead = evaluator.evaluate(
+            "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+        )
+        sfup_sublead = evaluator.evaluate(
+            "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+        )
+        sfup = sfup_lead * sfup_sublead / _sf
+
+        sfdown_lead = evaluator.evaluate(
+            "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+        )
+        sfdown_sublead = evaluator.evaluate(
+            "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+        )
+        sfdown = sfdown_lead * sfdown_sublead / _sf
+
+    weights.add(name="PreselSF", weight=sf, weightUp=sfup, weightDown=sfdown)
+
+    return weights
+
+
+def TriggerSF(photons, weights, year="2017", is_correction=True, **kwargs):
+    """
+    Trigger SF: for full 2017 legacy  B-F dataset. Trigger scale factors for use without HLT applied in MC
+    Binned in abs(SCeta), r9 and pt.
+    For original implementation look at: https://github.com/cms-analysis/flashgg/blob/2677dfea2f0f40980993cade55144636656a8a4f/Systematics/python/flashggDiPhotonSystematics2017_Legacy_cfi.py
+    """
+
+    # era/year defined as parameter of the function, only 2017 is implemented up to now
+    avail_years = ["2017"]
+    if year not in avail_years:
+        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        exit()
+
+    jsonpog_file_lead = os.path.join(os.path.dirname(__file__), "JSONs/TriggerSF_lead.json")
+    jsonpog_file_sublead = os.path.join(os.path.dirname(__file__), "JSONs/TriggerSF_sublead.json")
+    evaluator_lead = correctionlib.CorrectionSet.from_file(jsonpog_file_lead)["TriggerSF"]
+    evaluator_sublead = correctionlib.CorrectionSet.from_file(jsonpog_file_sublead)["TriggerSF"]
+
+    if is_correction:
+        # only calculate correction to nominal weight
+        sf_lead = evaluator_lead.evaluate(
+            "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
+        )
+        sf_sublead = evaluator_sublead.evaluate(
+            "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
+        )
+        sf = sf_lead * sf_sublead
+
+        sfup, sfdown = None, None
+
+    else:
+        # only calculate systs
+        sf = np.ones(len(weights._weight))
+        sf_lead = evaluator_lead.evaluate(
+            "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
+        )
+        sf_sublead = evaluator_sublead.evaluate(
+            "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
+        )
+        _sf = sf_lead * sf_sublead
+
+        sfup_lead = evaluator_lead.evaluate(
+            "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
+        )
+        sfup_sublead = evaluator_sublead.evaluate(
+            "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
+        )
+        sfup = sfup_lead * sfup_sublead / _sf
+
+        sfdown_lead = evaluator_lead.evaluate(
+            "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
+        )
+        sfdown_sublead = evaluator_sublead.evaluate(
+            "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
+        )
+        sfdown = sfdown_lead * sfdown_sublead / _sf
+
+    weights.add(name="TriggerSF", weight=sf, weightUp=sfup, weightDown=sfdown)
 
     return weights
 
@@ -350,6 +538,13 @@ def cTagSF(events, weights, is_correction=True, year="2017", **kwargs):
     to do this in columnar style the only thing I could think of was to pad the jet collection to the max(n_jets) keep track of the "fake jets" introduced
     by this procedure and fill these position wit 1s before actually setting the weights in the collection. If someone has better ideas I'm open for suggestions
     """
+
+    # era/year defined as parameter of the function, only Run2 is implemented up to now
+    avail_years = ["2016preVFP", "2016postVFP", "2017", "2018"]
+    if year not in avail_years:
+        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        exit()
+
     ctag_systematics = [
         "Extrap",
         "Interp",

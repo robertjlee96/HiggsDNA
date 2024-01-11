@@ -5,11 +5,15 @@ from .photon_systematics import (
     energyErr_shift,
     FNUF,
     ShowerShape,
+    Material
 )
 from .event_weight_systematics import (
     Pileup,
     SF_photon_ID,
     LooseMvaSF,
+    ElectronVetoSF,
+    PreselSF,
+    TriggerSF,
     NNLOPS,
     AlphaS,
     PartonShower,
@@ -69,14 +73,20 @@ object_systematics = {
             "varying_function": partial(ShowerShape, year="2017", is_correction=False),
         },
     },
+    "Material": {
+        "object": "Photon",
+        "args": {
+            "kind": "UpDownSystematic",
+            "what": "pt",
+            "varying_function": partial(Material, year="2017", is_correction=False),
+        },
+    },
     "JES": {
         "object": "Jet",
         "args": {
             "kind": "UpDownSystematic",
             "what": "pt",
-            "varying_function": partial(
-                JERC_jet, year="2022postEE", is_correction=False
-            ),
+            "varying_function": partial(JERC_jet, year="2022postEE", skip_JER=False, skip_JEC=False, is_correction=False),
         },
     },
 }
@@ -89,7 +99,8 @@ object_corrections = {
     "energyErr_shift": partial(energyErr_shift, energyErr=None, is_correction=True),
     "FNUF": partial(FNUF, pt=None, is_correction=True),
     "ShowerShape": partial(ShowerShape, pt=None, is_correction=True),
-    "JES": partial(JERC_jet, pt=None, is_correction=True),
+    "Material": partial(Material, pt=None, is_correction=True),
+    "JES": partial(JERC_jet, pt=None, year="2022postEE", skip_JER=False, skip_JEC=False, is_correction=True),
 }
 
 # functions adding systematic variations to event weights to be placed here
@@ -98,6 +109,9 @@ weight_systematics = {
     "Pileup": partial(Pileup, is_correction=False),
     "SF_photon_ID": partial(SF_photon_ID, is_correction=False),
     "LooseMvaSF": partial(LooseMvaSF, is_correction=False),
+    "ElectronVetoSF": partial(ElectronVetoSF, is_correction=False),
+    "PreselSF": partial(PreselSF, is_correction=False),
+    "TriggerSF": partial(TriggerSF, is_correction=False),
     "cTagSF": partial(cTagSF, is_correction=False),
     "AlphaS": partial(AlphaS),
     "PartonShower": partial(PartonShower),
@@ -112,6 +126,9 @@ weight_corrections = {
     "Pileup": partial(Pileup, is_correction=True),
     "SF_photon_ID": partial(SF_photon_ID, is_correction=True),
     "LooseMvaSF": partial(LooseMvaSF, is_correction=True),
+    "ElectronVetoSF": partial(ElectronVetoSF, is_correction=True),
+    "PreselSF": partial(PreselSF, is_correction=True),
+    "TriggerSF": partial(TriggerSF, is_correction=True),
     "cTagSF": partial(cTagSF, is_correction=True),
     "NNLOPS": partial(NNLOPS, is_correction=True),
     "Zpt": partial(Zpt, is_correction=True),

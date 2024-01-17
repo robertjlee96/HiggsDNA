@@ -63,3 +63,84 @@ def calculate_photonid_mva(
     mvaID = -1 + 2 * mvaID
 
     return mvaID
+
+
+def load_photonid_mva_run3(fname: str) -> Optional[xgboost.Booster]:
+
+    """ Reads and returns both the EB and EE Xgboost run3 mvaID models """
+
+    photonid_mva_EB = xgboost.Booster()
+    photonid_mva_EB.load_model(fname + 'Egamma_Run3_photonIDMVA_EB.json')
+
+    photonid_mva_EE = xgboost.Booster()
+    photonid_mva_EE.load_model(fname + 'Egamma_Run3_photonIDMVA_EE.json')
+
+    return photonid_mva_EB, photonid_mva_EE
+
+
+def calculate_photonid_mva_run3(
+    mva: Tuple[Optional[xgboost.Booster], List[str]],
+    photon: awkward.Array, rho,
+) -> awkward.Array:
+
+    """Recompute PhotonIDMVA on-the-fly. This step is necessary considering that the inputs have to be corrected
+    with the QRC process. Following is the list of features (barrel has 12, endcap two more):
+    EB:
+        events.Photon.energyRaw
+        events.Photon.r9
+        events.Photon.sieie
+        events.Photon.etaWidth
+        events.Photon.phiWidth
+        events.Photon.sieip
+        events.Photon.s4
+        events.photon.hoe
+        probe_ecalPFClusterIso
+        probe_trkSumPtHollowConeDR03
+        probe_trkSumPtSolidConeDR04
+        probe_pfChargedIso
+        probe_pfChargedIsoWorstVtx
+        events.Photon.ScEta
+        events.fixedGridRhoAll
+
+    EE: +
+        events.Photon.energyRaw
+        events.Photon.r9
+        events.Photon.sieie
+        events.Photon.etaWidth
+        events.Photon.phiWidth
+        events.Photon.sieip
+        events.Photon.s4
+        events.photon.hoe
+        probe_ecalPFClusterIso
+        probe_hcalPFClusterIso
+        probe_trkSumPtHollowConeDR03
+        probe_trkSumPtSolidConeDR04
+        probe_pfChargedIso
+        probe_pfChargedIsoWorstVtx
+        events.Photon.ScEta
+        events.fixedGridRhoAll
+        events.Photon.esEffSigmaRR
+        events.Photon.esEnergyOverRawE
+    """
+
+    photon["fixedGridRhoAll"] = numpy.nan_to_num(rho)
+    photon = numpy.nan_to_num(photon)
+
+    photonid_mva, var_order = mva
+
+    if photonid_mva is None:
+        return awkward.ones_like(photon.pt)
+
+    bdt_inputs = {}
+    bdt_inputs = numpy.column_stack(
+        [awkward.to_numpy(photon[name]) for name in var_order]
+    )
+
+    tempmatrix = xgboost.DMatrix(bdt_inputs)
+
+    mvaID = photonid_mva.predict(tempmatrix)
+
+    # Only needed to compare to TMVA
+    mvaID = 1.0 - 2.0 / (1.0 + numpy.exp(2.0 * mvaID))
+
+    return mvaID

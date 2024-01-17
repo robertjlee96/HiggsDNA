@@ -2,6 +2,7 @@ from higgs_dna.tools.chained_quantile import ChainedQuantileRegression
 from higgs_dna.tools.diphoton_mva import calculate_diphoton_mva
 from higgs_dna.tools.xgb_loader import load_bdt
 from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_mva
+from higgs_dna.tools.photonid_mva import calculate_photonid_mva_run3, load_photonid_mva_run3
 from higgs_dna.tools.SC_eta import add_photon_SC_eta
 from higgs_dna.tools.EELeak_region import veto_EEleak_flag
 from higgs_dna.selections.photon_selections import photon_preselection
@@ -10,6 +11,7 @@ from higgs_dna.selections.jet_selections import select_jets, jetvetomap
 from higgs_dna.selections.lumi_selections import select_lumis
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array, diphoton_list_to_pandas, dump_pandas
 from higgs_dna.utils.misc_utils import choose_jet
+from higgs_dna.tools.flow_corrections import calculate_flow_corrections
 
 from higgs_dna.tools.mass_decorrelator import decorrelate_mass_resolution
 
@@ -57,6 +59,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         year: Optional[Dict[str, List[str]]],
         doDeco: bool,
         Smear_sigma_m: bool,
+        doFlow_corrections: bool,
         output_format: str,
     ) -> None:
         self.meta = metaconditions
@@ -71,6 +74,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.year = year if year is not None else {}
         self.doDeco = doDeco
         self.Smear_sigma_m = Smear_sigma_m
+        self.doFlow_corrections = doFlow_corrections
         self.output_format = output_format
 
         # muon selection cuts
@@ -425,6 +429,21 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     # recompute photonid_mva on the fly
                     if self.photonid_mva_EB and self.photonid_mva_EE:
                         photons = self.add_photonid_mva(photons, events)
+
+                    # Computing the normalizinf flow correction
+                    if self.data_kind == "mc" and self.doFlow_corrections:
+
+                        # Applyting the Flow corrections to all photons before pre-selection
+                        counts = awkward.num(photons)
+                        corrected_inputs,var_list = calculate_flow_corrections(photons, events, self.meta["flashggPhotons"]["flow_inputs"], self.meta["flashggPhotons"]["Isolation_transform_order"], year=self.year[dataset_name][0])
+
+                        # adding the corrected values to the tnp_candidates
+                        for i in range(len(var_list)):
+                            photons["corr_" + str(var_list[i])] = awkward.unflatten(corrected_inputs[:,i] , counts)
+
+                        # Now adding the corrected mvaID to the photon entries
+                        photons["mvaID_run3"] = awkward.unflatten(self.add_photonid_mva_run3(photons, events), counts)
+                        photons["corr_mvaID_run3"] = awkward.unflatten(self.add_corr_photonid_mva_run3(photons, events), counts)
 
                     # photon preselection
                     photons = photon_preselection(self, photons, events, year=self.year[dataset_name][0])
@@ -865,3 +884,51 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         photons["mvaID"] = mva
 
         return awkward.unflatten(photons, counts)
+
+    def add_photonid_mva_run3(
+        self, photons: awkward.Array, events: awkward.Array
+    ) -> awkward.Array:
+
+        preliminary_path = os.path.join(os.path.dirname(__file__), '../tools/flows/run3_mvaID_models/')
+        photonid_mva_EB, photonid_mva_EE = load_photonid_mva_run3(preliminary_path)
+
+        rho = events.Rho.fixedGridRhoAll * awkward.ones_like(photons.pt)
+        rho = awkward.flatten(rho)
+
+        photons = awkward.flatten(photons)
+
+        isEB = awkward.to_numpy(numpy.abs(photons.eta) < 1.5)
+        mva_EB = calculate_photonid_mva_run3(
+            [photonid_mva_EB, self.meta["flashggPhotons"]["inputs_EB"]], photons , rho
+        )
+        mva_EE = calculate_photonid_mva_run3(
+            [photonid_mva_EE, self.meta["flashggPhotons"]["inputs_EE"]], photons, rho
+        )
+        mva = awkward.where(isEB, mva_EB, mva_EE)
+        photons["mvaID_run3"] = mva
+
+        return mva
+
+    def add_corr_photonid_mva_run3(
+        self, photons: awkward.Array, events: awkward.Array
+    ) -> awkward.Array:
+
+        preliminary_path = os.path.join(os.path.dirname(__file__), '../tools/flows/run3_mvaID_models/')
+        photonid_mva_EB, photonid_mva_EE = load_photonid_mva_run3(preliminary_path)
+
+        rho = events.Rho.fixedGridRhoAll * awkward.ones_like(photons.pt)
+        rho = awkward.flatten(rho)
+
+        photons = awkward.flatten(photons)
+
+        # Now calculating the corrected mvaID
+        isEB = awkward.to_numpy(numpy.abs(photons.eta) < 1.5)
+        corr_mva_EB = calculate_photonid_mva_run3(
+            [photonid_mva_EB, self.meta["flashggPhotons"]["inputs_EB_corr"]], photons, rho
+        )
+        corr_mva_EE = calculate_photonid_mva_run3(
+            [photonid_mva_EE, self.meta["flashggPhotons"]["inputs_EE_corr"]], photons, rho
+        )
+        corr_mva = awkward.where(isEB, corr_mva_EB, corr_mva_EE)
+
+        return corr_mva

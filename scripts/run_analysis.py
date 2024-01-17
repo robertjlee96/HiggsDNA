@@ -213,6 +213,7 @@ if __name__ == "__main__":
                 year,
                 args.doDeco,
                 args.Smear_sigma_m,
+                args.doFlow_corrections,
                 args.output_format,
             )  # additional args can go here to configure a processor
     else:

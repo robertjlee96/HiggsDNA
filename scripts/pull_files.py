@@ -20,7 +20,7 @@ parser.add_argument(
     dest="target",
     help="Choose the target to download (default: %(default)s)",
     default="GoldenJson",
-    choices=["GoldenJSON", "cTag", "PhotonID", "PU_run2", "SS", "JetMET","CDFs", "JEC", "JER", "Material", "TriggerSF", "PreselSF", "eVetoSF"],
+    choices=["GoldenJSON", "cTag", "PhotonID", "PU_run2", "SS", "JetMET","CDFs", "JEC", "JER", "Material", "TriggerSF", "PreselSF", "eVetoSF", "Flows"],
 )
 
 parser.add_argument(
@@ -330,6 +330,22 @@ def get_mass_decorrelation_CDF(logger, target_dir):
     fetch_file("CDFs", logger, from_to_dict, type="copy")
 
 
+def get_Flow_files(logger, target_dir):
+    if target_dir is not None:
+        to_prefix = target_dir
+    else:
+        to_prefix = os.path.join(
+            os.path.dirname(__file__), "../higgs_dna/tools/flows"
+        )
+
+    from_to_dict = {
+        "2022FG": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/flow_corrections/",
+            "to": f"{to_prefix}/",
+        },
+    }
+    fetch_file("Flows", logger, from_to_dict, type="copy")
+
 def get_goldenjson(logger, target_dir):
     # References:
     # https://twiki.cern.ch/twiki/bin/view/CMS/PdmVRun3Analysis#Data
@@ -483,6 +499,7 @@ if __name__ == "__main__":
         get_pileup_Run2(logger, args.target_dir)
         get_scale_and_smearing(logger, args.target_dir)
         get_mass_decorrelation_CDF(logger, args.target_dir)
+        get_Flow_files(logger, args.target_dir)
         get_ctag_json(logger, args.target_dir)
         get_photonid_json(logger, args.target_dir)
         get_pileup_Run2(logger, args.target_dir)
@@ -495,6 +512,8 @@ if __name__ == "__main__":
         get_scale_and_smearing(logger, args.target_dir)
     elif args.target == "CDFs":
         get_mass_decorrelation_CDF(logger, args.target_dir)
+    elif args.target == "Flows":
+        get_Flow_files(logger, args.target_dir)
     elif args.target == "cTag":
         get_ctag_json(logger, args.target_dir)
     elif args.target == "PhotonID":

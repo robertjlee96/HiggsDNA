@@ -7,6 +7,7 @@ from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.selections.lumi_selections import select_lumis
 from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
 from higgs_dna.tools.SC_eta import add_photon_SC_eta
+from higgs_dna.tools.flow_corrections import calculate_flow_corrections
 from typing import Any, Dict, List, Optional
 import awkward as ak
 import logging
@@ -33,6 +34,7 @@ class DYStudiesProcessor(HggBaseProcessor):
         year: Dict[str, List[str]] = None,
         doDeco: bool = False,
         Smear_sigma_m: bool = False,
+        doFlow_corrections: bool = False,
         output_format: str = "parquet"
     ) -> None:
         super().__init__(
@@ -49,6 +51,7 @@ class DYStudiesProcessor(HggBaseProcessor):
             year=year,
             doDeco=doDeco,
             Smear_sigma_m=Smear_sigma_m,
+            doFlow_corrections=doFlow_corrections,
             output_format=output_format
         )
         self.trigger_group = ".*DoubleEG.*"
@@ -75,6 +78,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
         year: Optional[Dict[str, List[str]]] = None,
         doDeco: bool = False,
         Smear_sigma_m: bool = False,
+        doFlow_corrections: bool = False,
         output_format: str = "parquet"
     ) -> None:
         super().__init__(
@@ -91,6 +95,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
             year=year if year is not None else {},
             doDeco=doDeco,
             Smear_sigma_m=Smear_sigma_m,
+            doFlow_corrections=doFlow_corrections,
             output_format=output_format
         )
         self.trigger_group = ".*SingleEle.*"
@@ -213,6 +218,22 @@ class TagAndProbeProcessor(HggBaseProcessor):
             if self.photonid_mva_EB and self.photonid_mva_EE:
                 photons = self.add_photonid_mva(photons, events)
 
+            # Performing per photon corrections using normalizing flows
+            # The corrections are made before pre-selection so it enable us to recalculate pre-selection SFs
+            if self.data_kind == "mc" and self.doFlow_corrections:
+
+                # Applyting the Flow corrections to all photons before pre-selection
+                counts = ak.num(photons)
+                corrected_inputs,var_list = calculate_flow_corrections(photons, events, self.meta["flashggPhotons"]["flow_inputs"], self.meta["flashggPhotons"]["Isolation_transform_order"], year=self.year[dataset_name][0])
+
+                # adding the corrected values to the tnp_candidates
+                for i in range(len(var_list)):
+                    photons["corr_" + str(var_list[i])] = ak.unflatten(corrected_inputs[:,i] , counts)
+
+                # Now adding the corrected mvaID to the photon entries
+                photons["mvaID_run3"] = ak.unflatten(self.add_photonid_mva_run3(photons, events), counts)
+                photons["corr_mvaID_run3"] = ak.unflatten(self.add_corr_photonid_mva_run3(photons, events), counts)
+
             # photon preselection
             photons = photon_preselection(
                 self, photons, events, apply_electron_veto=False, year=self.year[dataset_name][0]
@@ -276,13 +297,13 @@ class TagAndProbeProcessor(HggBaseProcessor):
             # candidates need to be flattened since we have each photon as a tag and probe, otherwise it can't be exported to numpy
             tnp_candidates = ak.flatten(tnp_candidates)
 
+            # events only accept flat masks, so I had to some operations with the tag and probe masks to make them flat
+            flat_mask_tag = numpy.concatenate([row for row in tag_mask])
+            flat_mask_probe = numpy.concatenate([row for row in probe_mask])
+            mask_tag_and_probe = numpy.logical_and(flat_mask_probe, flat_mask_tag)
+
             # performing the weight corrections after the preselctions
             if self.data_kind == "mc":
-
-                # events only accept flat masks, so I had to some operations with the tag and probe masks to make them flat
-                flat_mask_tag = numpy.concatenate([row for row in tag_mask])
-                flat_mask_probe = numpy.concatenate([row for row in probe_mask])
-                mask_tag_and_probe = numpy.logical_and(flat_mask_probe, flat_mask_tag)
 
                 event_weights = Weights(size=len(events[mask_tag_and_probe]))
 
@@ -295,6 +316,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
                         varying_function = available_weight_corrections[
                             correction_name
                         ]
+
                         event_weights = varying_function(
                             events=events[mask_tag_and_probe],
                             photons=events.Photon[mask_tag_and_probe],
@@ -323,6 +345,29 @@ class TagAndProbeProcessor(HggBaseProcessor):
                 ** 2
             )
 
+            # Only perform the sigma_m correction if it is a MC event and if flow corrections were specified!
+            if self.data_kind == "mc" and self.doFlow_corrections:
+
+                # We can now also calculate the corrected sigma_m_over_m
+                tnp_candidates["sigma_m_over_m_corr"] = 0.5 * numpy.sqrt(
+                    (
+                        tnp_candidates["tag"].corr_energyErr
+                        / (
+                            tnp_candidates["tag"].pt
+                            * numpy.cosh(tnp_candidates["tag"].eta)
+                        )
+                    )
+                    ** 2
+                    + (
+                        tnp_candidates["probe"].corr_energyErr
+                        / (
+                            tnp_candidates["probe"].pt
+                            * numpy.cosh(tnp_candidates["probe"].eta)
+                        )
+                    )
+                    ** 2
+                )
+
             # adding the smearing of the mass resolution also for the tag and probe workflow - for both data and Simulation!
             # Just a reminder, the pt/energy of teh data is not smearing, but the smearing term is added to the data sigma_m_over_m
             if (self.Smear_sigma_m):
@@ -340,6 +385,24 @@ class TagAndProbeProcessor(HggBaseProcessor):
                     )
                     ** 2
                 )
+
+                # We can also calculate the smeared sigma_m_over_m for the corrected flow samples
+                if (self.doFlow_corrections and self.data_kind == "mc"):
+
+                    # Adding the smeared energyErr error to the ntuples!
+                    tnp_candidates["tag","corr_energyErr_Smeared"] = numpy.sqrt((tnp_candidates["tag"].corr_energyErr) ** 2 + (tnp_candidates["tag"].rho_smear * ((tnp_candidates["tag"].pt * numpy.cosh(tnp_candidates["tag"].eta)))) ** 2)
+                    tnp_candidates["probe","corr_energyErr_Smeared"] = numpy.sqrt((tnp_candidates["probe"].corr_energyErr) ** 2 + (tnp_candidates["probe"].rho_smear * ((tnp_candidates["probe"].pt * numpy.cosh(tnp_candidates["probe"].eta)))) ** 2)
+
+                    tnp_candidates["sigma_m_over_m_Smeared_corrected"] = 0.5 * numpy.sqrt(
+                        (
+                            tnp_candidates["tag"].corr_energyErr_Smeared / (tnp_candidates["tag"].pt * numpy.cosh(tnp_candidates["tag"].eta))
+                        )
+                        ** 2
+                        + (
+                            tnp_candidates["probe"].corr_energyErr_Smeared / (tnp_candidates["probe"].pt * numpy.cosh(tnp_candidates["probe"].eta))
+                        )
+                        ** 2
+                    )
 
             # Adding the tagandprobe pair mass. Based on the expression provided here for a massless pair of particles -> (https://en.wikipedia.org/wiki/Invariant_mass)
             tnp_candidates["mass"] = numpy.sqrt(2 * tnp_candidates["tag"].pt * tnp_candidates["probe"].pt * (numpy.cosh(tnp_candidates["tag"].eta - tnp_candidates["probe"].eta) - numpy.cos(tnp_candidates["tag"].phi - tnp_candidates["probe"].phi)))

@@ -216,6 +216,12 @@ def get_main_parser():
         help="Perform the mass resolution Smearing",
     )
     parser.add_argument(
+        "--doFlow_corrections",
+        default=False,
+        action="store_true",
+        help="Perform the mvaID and energyErr corrections with normalizing flows",
+    )
+    parser.add_argument(
         "--output_format",
         choices=[
             "root",

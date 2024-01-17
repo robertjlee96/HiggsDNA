@@ -15,6 +15,7 @@ from higgs_dna.utils.dumping_utils import (
 from higgs_dna.systematics import object_corrections as available_object_corrections
 from higgs_dna.systematics import weight_systematics as available_weight_systematics
 from higgs_dna.systematics import weight_corrections as available_weight_corrections
+from higgs_dna.tools.flow_corrections import calculate_flow_corrections
 
 from typing import Any, Dict, List, Optional
 import awkward as ak
@@ -47,6 +48,7 @@ class ZmmyProcessor(HggBaseProcessor):
         year: Dict[str, List[str]] = None,
         doDeco: bool = False,
         Smear_sigma_m: bool = False,
+        doFlow_corrections: bool = False,
         output_format: str = "parquet",
     ) -> None:
         super().__init__(
@@ -63,6 +65,7 @@ class ZmmyProcessor(HggBaseProcessor):
             year=year,
             doDeco=doDeco,
             Smear_sigma_m=Smear_sigma_m,
+            doFlow_corrections=doFlow_corrections,
             output_format=output_format,
         )
         self.analysis = "ZmmyAnalysis"
@@ -202,6 +205,23 @@ class ZmmyProcessor(HggBaseProcessor):
         eve_sel.add("n_dimuon", n_good_dimuon > 0)
         # select photons
         photons = events.Photon
+
+        # Performing per photon corrections using normalizing flows
+        # The corrections are made before pre-selection so it enable us to recalculate pre-selection SFs
+        if self.data_kind == "mc" and self.doFlow_corrections:
+
+            # Applyting the Flow corrections to all photons before pre-selection
+            counts = ak.num(photons)
+            corrected_inputs,var_list = calculate_flow_corrections(photons, events, self.meta["flashggPhotons"]["flow_inputs"], self.meta["flashggPhotons"]["Isolation_transform_order"], year=self.year[dataset][0])
+
+            # adding the corrected values to the tnp_candidates
+            for i in range(len(var_list)):
+                photons["corr_" + str(var_list[i])] = ak.unflatten(corrected_inputs[:,i] , counts)
+
+            # Now adding the corrected mvaID to the photon entries
+            photons["mvaID_run3"] = ak.unflatten(self.add_photonid_mva_run3(photons, events), counts)
+            photons["corr_mvaID_run3"] = ak.unflatten(self.add_corr_photonid_mva_run3(photons, events), counts)
+
         good_photons = photons[select_photons_zmmy(self, photons)]
         n_good_photon = ak.sum(ak.ones_like(good_photons.pt) > 0, axis=1)
         eve_sel.add("n_photon", n_good_photon > 0)
@@ -292,6 +312,8 @@ class ZmmyProcessor(HggBaseProcessor):
                         year=self.year[dataset][0],
                     )
 
+            ntuple["weight_central"] = event_weights.weight()
+
             # systematic variations of event weights go to nominal output dataframe:
             for systematic_name in systematic_names:
                 if systematic_name in available_weight_systematics:
@@ -334,7 +356,6 @@ class ZmmyProcessor(HggBaseProcessor):
                             year=self.year[dataset][0],
                         )
 
-                ntuple["weight_central"] = event_weights.weight()
                 # Store variations with respect to central weight
                 if len(event_weights.variations):
                     logger.info(

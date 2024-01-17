@@ -53,7 +53,6 @@ class fiducialTagger:
                 (np.abs(sublead_pho.eta) < 1.4442)
                 | ((np.abs(sublead_pho.eta) < 2.5) & (np.abs(sublead_pho.eta) > 1.566)),
             )
-            selection.add("diphoton_mass", (diphoton.mass > 100) & (diphoton.mass < 180))
 
             sel_fiducial = selection.all(
                 "n_iso_photon",
@@ -61,7 +60,6 @@ class fiducialTagger:
                 "sublead_photon_scaled_pt",
                 "lead_photon_eta",
                 "sublead_photon_eta",
-                "diphoton_mass",
             )
             logger.debug(
                 f"""_summary_
@@ -72,7 +70,6 @@ class fiducialTagger:
                 sublead_photon_scaled_pt: \t {ak.sum(selection.all("sublead_photon_scaled_pt"))}
                 lead_photon_eta: \t {ak.sum(selection.all("lead_photon_eta"))}
                 sublead_photon_eta: \t {ak.sum(selection.all("sublead_photon_eta"))}
-                diphoton_mass: \t {ak.sum(selection.all("diphoton_mass"))}
                 ---
                 total in fiducial: \t {ak.sum(sel_fiducial)}
                 -end-

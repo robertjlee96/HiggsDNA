@@ -2,7 +2,7 @@ from .photon_systematics import (
     photon_pt_scale_dummy,
     Scale,
     Smearing,
-    energyErr_shift,
+    energyErrShift,
     FNUF,
     ShowerShape,
     Material
@@ -49,12 +49,12 @@ object_systematics = {
             "varying_function": partial(Smearing, is_correction=False),
         },
     },
-    "energyErr_shift": {
+    "energyErrShift": {
         "object": "Photon",
         "args": {
             "kind": "UpDownSystematic",
             "what": "energyErr",
-            "varying_function": partial(energyErr_shift, is_correction=False),
+            "varying_function": partial(energyErrShift, is_correction=False),
         },
     },
     "FNUF": {
@@ -96,7 +96,7 @@ object_systematics = {
 object_corrections = {
     "Scale": partial(Scale, pt=None, is_correction=True),
     "Smearing": partial(Smearing, pt=None, is_correction=True),
-    "energyErr_shift": partial(energyErr_shift, energyErr=None, is_correction=True),
+    "energyErrShift": partial(energyErrShift, energyErr=None, is_correction=True),
     "FNUF": partial(FNUF, pt=None, is_correction=True),
     "ShowerShape": partial(ShowerShape, pt=None, is_correction=True),
     "Material": partial(Material, pt=None, is_correction=True),

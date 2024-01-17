@@ -152,7 +152,7 @@ else:
 
         eve = ak.from_parquet(var_path)
 
-        logger.info("Successfully read from parquet file wit awkward.")
+        logger.info("Successfully read from parquet file with awkward.")
 
         dict = {}
         for i in eve.fields:
@@ -193,6 +193,20 @@ if type == "mc":
                         cat,
                     ]
                 )
+        for cat in cat_dict:
+            for field in df_dict["NOMINAL"][cat]:
+                if "weight_" in field:
+                    syst_ = field.split("weight_")[1]
+                    if ("Up" not in field) and ("Down" not in field): continue
+                    logger.info("found weight-based syst: %s for category: %s" % (syst_, cat))
+                    labels[cat].append(
+                        [
+                            "DiphotonTree/" + process + f"_125_13TeV_{cat}_" + syst_,
+                            field,
+                            syst_,
+                            cat,
+                        ]
+                    )
     else:
         for cat in cat_dict:
             syst_ = ""
@@ -210,7 +224,6 @@ else:
         labels[cat] = []
         labels[cat].append([f"DiphotonTree/Data_13TeV_{cat}", cat])
         names[cat] = f"DiphotonTree/Data_13TeV_{cat}"
-        # name = "DiphotonTree/Data_13TeV_WStest"
 
 # Now we want to write the dictionary to a root file, since object systematics don't come from
 # the nominal file we have to separate again the treatment of them from the object ones
@@ -221,10 +234,10 @@ with uproot.recreate(outfiles[process]) as file:
     # For MC: {inputTreeDir}/{production-mode}_{mass}_{sqrts}_{category}_{syst}
     # For data: {inputTreeDir}/Data_{sqrts}_{category}
     for cat in cat_dict:
-        logger.debug("writing category:", cat)
+        logger.debug(f"writing category: {cat}")
 
         if args.do_syst:
-            # check that the category actually contains something, otherwise the slattening step will make the script crash,
+            # check that the category actually contains something, otherwise the flattening step will make the script crash,
             # an improvement (not sure if needed) may be to also write an empty TTree to not confuse FinalFit
             if len(df_dict["NOMINAL"][cat]["weight"]):
                 for branch in df_dict["NOMINAL"][cat]:
@@ -238,9 +251,10 @@ with uproot.recreate(outfiles[process]) as file:
                     # Skip "NOMINAL" as information included in nominal tree
                     if syst_ == "NOMINAL":
                         continue
-                    logger.debug(syst_name, weight, syst_, c)
+                    logger.debug(f"{syst_name}, {weight}, {syst_}, {c}")
                     # If the name is not in the variation dictionary it is assumed to be a weight systematic
                     if syst_ not in variation_dict:
+                        logger.debug(f"found weight syst {syst_}")
                         red_dict = {
                             new_key: df_dict["NOMINAL"][cat][key]
                             for key, new_key in (

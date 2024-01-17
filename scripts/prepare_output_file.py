@@ -103,7 +103,7 @@ parser.add_option(
     dest="args",
     type="string",
     default="",
-    help="additional options for root converter: --do_syst, --notag",
+    help="additional options for root converter: --notag",
 )
 parser.add_option(
     "--verbose",
@@ -140,6 +140,9 @@ process_dict = {
     "ttHtoGG_M-125_postEE": "tth",
 }
 
+# the key of the var_dict entries is also used as a key for the related root tree branch
+# to be consistent with FinalFit naming scheme you shoud use SystNameUp and SystNameDown, 
+# e.g. "FNUFUp": "FNUF_up", "FNUFDown": "FNUF_down" 
 var_dict = {
     "NOMINAL": "nominal",
 }
@@ -250,6 +253,13 @@ if opt.merge:
 
 if opt.root:
     logger.info("Starting root step")
+    if opt.syst:
+        logger.info("you've selected the run with systematics")
+        args = "--do_syst"
+    else:
+        logger.info("you've selected the run without systematics")
+        args = ""
+
     # Note, in my version of HiggsDNA I run the analysis splitting data per Era in different datasets
     # the treatment of data here is tested just with that structure
     with open(f"{EXEC_PATH}/dirlist.txt") as fl:
@@ -269,7 +279,7 @@ if opt.root:
                 MKDIRP(f"{IN_PATH}/root/{file}")
                 os.chdir(SCRIPT_DIR)
                 os.system(
-                    f"python3 convert_parquet_to_root.py {IN_PATH}/merged/{file}/merged.parquet {IN_PATH}/root/{file}/merged.root mc --process {process_dict[file]} {opt.args} --cats {cat_dict} --vars variation.json"
+                    f"python3 convert_parquet_to_root.py {IN_PATH}/merged/{file}/merged.parquet {IN_PATH}/root/{file}/merged.root mc --process {process_dict[file]} {args} --cats {cat_dict} --vars variation.json"
                 )
             elif "data" in file.lower():
                 if os.listdir(f'{IN_PATH}/merged/Data_{file.split("_")[-1]}/'):

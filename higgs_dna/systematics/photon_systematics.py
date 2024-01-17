@@ -136,7 +136,7 @@ def Smearing(pt, events, year="2022postEE", is_correction=True):
         return np.concatenate((corr_up_variation.reshape(-1,1), corr_down_variation.reshape(-1,1)), axis=1) * _pt[:, None]
 
 
-def energyErr_shift(energyErr, events, year="2022postEE", is_correction=True):
+def energyErrShift(energyErr, events, year="2022postEE", is_correction=True):
     # See also https://indico.cern.ch/event/1131803/contributions/4758593/attachments/2398621/4111806/Hgg_Differentials_Approval_080322.pdf#page=47
     if is_correction:
         return events

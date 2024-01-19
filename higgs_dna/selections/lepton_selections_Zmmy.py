@@ -2,6 +2,9 @@
 import awkward as ak
 from coffea.analysis_tools import PackedSelection
 import numpy as np
+import vector
+
+vector.register_awkward()
 
 
 def select_muons_zmmy(self, muons_jagged: ak.highlevel.Array) -> ak.highlevel.Array:
@@ -61,8 +64,31 @@ def get_zmmy(
     # selection.add("n_mmy", ak.num(mmy) > 0)
     # mmy = mmy.mask(selection.all("n_mmy"))
     # fsr selections
-    dR_muon1_photon = mmy.dimuon.lead.delta_r(mmy.photon)
-    dR_muon2_photon = mmy.dimuon.sublead.delta_r(mmy.photon)
+    # use photon SC eta to calculate dr
+    vec_muon1 = ak.Array(
+        {
+            "rho": mmy.dimuon.lead.pt,
+            "phi": mmy.dimuon.lead.phi,
+            "eta": mmy.dimuon.lead.eta,
+        },
+        with_name="Vector3D",
+    )
+    vec_muon2 = ak.Array(
+        {
+            "rho": mmy.dimuon.sublead.pt,
+            "phi": mmy.dimuon.sublead.phi,
+            "eta": mmy.dimuon.sublead.eta,
+        },
+        with_name="Vector3D",
+    )
+    vec_photon = ak.Array(
+        {"rho": mmy.photon.pt, "phi": mmy.photon.phi, "eta": mmy.photon.ScEta},
+        with_name="Vector3D",
+    )
+    dR_muon1_photon = vec_muon1.deltaR(vec_photon)
+    dR_muon2_photon = vec_muon2.deltaR(vec_photon)
+    # dR_muon1_photon = mmy.dimuon.lead.delta_r(mmy.photon)
+    # dR_muon2_photon = mmy.dimuon.sublead.delta_r(mmy.photon)
     sel_obj.add(
         "deltaR",
         ak.where(dR_muon1_photon < dR_muon2_photon, dR_muon1_photon, dR_muon2_photon)

@@ -294,18 +294,23 @@ class TagAndProbeProcessor(HggBaseProcessor):
             # apply selections
             tnp_candidates = tnp_candidates[tag_mask & probe_mask]
 
+            # Since the Weights object accepts only flat masks, the tag and probe mask is flattened
+            flat_tag_and_probe_mask = ak.any(tag_mask & probe_mask, axis=1)
+
+            """
+            This n_event_tnp_cand array is created to keep track of how many tag and probe candidates we have at each event
+            Since the pileup rw is calculated at a event level, we will have only one weight for event
+            But since we are saving ak.flatten(tnp_candidates) , we need the n_event_tnp_cand to unroll the weights to each tnp candidate at the event
+            """
+            n_event_tnp_cand = [numpy.ones(n_tnp_candidates) for n_tnp_candidates in ak.num(tnp_candidates[flat_tag_and_probe_mask])]
+
             # candidates need to be flattened since we have each photon as a tag and probe, otherwise it can't be exported to numpy
             tnp_candidates = ak.flatten(tnp_candidates)
-
-            # events only accept flat masks, so I had to some operations with the tag and probe masks to make them flat
-            flat_mask_tag = numpy.concatenate([row for row in tag_mask])
-            flat_mask_probe = numpy.concatenate([row for row in probe_mask])
-            mask_tag_and_probe = numpy.logical_and(flat_mask_probe, flat_mask_tag)
 
             # performing the weight corrections after the preselctions
             if self.data_kind == "mc":
 
-                event_weights = Weights(size=len(events[mask_tag_and_probe]))
+                event_weights = Weights(size=len(events[flat_tag_and_probe_mask]))
 
                 # corrections to event weights:
                 for correction_name in correction_names:
@@ -318,8 +323,8 @@ class TagAndProbeProcessor(HggBaseProcessor):
                         ]
 
                         event_weights = varying_function(
-                            events=events[mask_tag_and_probe],
-                            photons=events.Photon[mask_tag_and_probe],
+                            events=events[flat_tag_and_probe_mask],
+                            photons=events.Photon[flat_tag_and_probe_mask],
                             weights=event_weights,
                             dataset_name=dataset_name,
                             year=self.year[dataset_name][0],
@@ -420,13 +425,16 @@ class TagAndProbeProcessor(HggBaseProcessor):
                                 "Adding systematic weight variations to nominal output file."
                             )
                         for modifier in event_weights.variations:
-                            tnp_candidates["weight_" + modifier] = event_weights.weight(
+                            tnp_candidates["weight_" + modifier] = numpy.hstack(event_weights.weight(
                                 modifier=modifier
-                            )
+                            ) * n_event_tnp_cand)
+                            df["weight_" + modifier] = df["tag_weight_" + modifier]
+
                     # storing the central weights
-                    df["weight_central"] = event_weights.weight()
+                    df["weight_central"] = numpy.hstack(event_weights.weight() * n_event_tnp_cand)
                     # generated weights * other weights (pile up, SF, etc ...)
-                    df["weight"] = df["tag_weight"] * event_weights.weight()
+                    df["weight"] = df["tag_weight"] * numpy.hstack(event_weights.weight() * n_event_tnp_cand)
+                    df["weight_no_pu"] = df["tag_weight"]
 
                     # dropping the nominal and varitation weights
                     df.drop(["tag_weight", "probe_weight"], axis=1, inplace=True)

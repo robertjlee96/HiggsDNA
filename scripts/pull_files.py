@@ -20,7 +20,9 @@ parser.add_argument(
     dest="target",
     help="Choose the target to download (default: %(default)s)",
     default="GoldenJson",
-    choices=["GoldenJSON", "cTag", "PhotonID", "PU_run2", "SS", "JetMET","CDFs", "JEC", "JER", "Material", "TriggerSF", "PreselSF", "eVetoSF", "Flows"],
+
+    choices=["GoldenJSON", "cTag", "PhotonID", "PU_run2", "SS", "JetMET","CDFs", "JEC", "JER", "Material", "TriggerSF", "PreselSF", "eVetoSF","Flows"],
+
 )
 
 parser.add_argument(

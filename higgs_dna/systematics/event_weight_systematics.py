@@ -11,6 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# this should be changed such that it applies the ID SF for the early Run-3 analysis categorisation!
 def SF_photon_ID(
     photons, weights, year="2017", WP="Loose", is_correction=True, **kwargs
 ):
@@ -178,55 +179,129 @@ def LooseMvaSF(photons, weights, year="2017", is_correction=True, **kwargs):
     LooseMvaSF: correction to the event weight on a per photon level, impacting one of the high importance input variable of the DiphotonBDT, binned in eta and r9.
     for original implementation look at: https://github.com/cms-analysis/flashgg/blob/2677dfea2f0f40980993cade55144636656a8a4f/Systematics/python/flashggDiPhotonSystematics2017_Legacy_cfi.py
     And for presentation on the study: https://indico.cern.ch/event/963617/contributions/4103623/attachments/2141570/3608645/Zee_Validation_UL2017_Update_09112020_Prasant.pdf
+
+    2022: up to this point, it applies the 2017 SF with the new formula for combining the SF for the diphoton candidate.
     """
 
     # era/year defined as parameter of the function, only 2017 is implemented up to now
-    avail_years = ["2017"]
+    avail_years = ["2017", "2022preEE", "2022postEE"]
     if year not in avail_years:
         print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
         exit()
 
-    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/LooseMvaSF.json")
-    evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["LooseMvaSF"]
+    # make this read the 2022 files when available!
+    # 2017 file should be renamed with the year in its name...
+    json_file = os.path.join(os.path.dirname(__file__), "JSONs/LooseMvaSF.json")
+    evaluator = correctionlib.CorrectionSet.from_file(json_file)["LooseMvaSF"]
+    if year == "2017":
+        if is_correction:
+            # only calculate correction to nominal weight
+            sf_lead = evaluator.evaluate(
+                "nominal", photons["pho_lead"].ScEta, photons["pho_lead"].r9
+            )
+            sf_sublead = evaluator.evaluate(
+                "nominal", photons["pho_sublead"].ScEta, photons["pho_sublead"].r9
+            )
+            sf = sf_lead * sf_sublead
 
-    if is_correction:
-        # only calculate correction to nominal weight
-        sf_lead = evaluator.evaluate(
-            "nominal", photons["pho_lead"].ScEta, photons["pho_lead"].r9
-        )
-        sf_sublead = evaluator.evaluate(
-            "nominal", photons["pho_sublead"].ScEta, photons["pho_sublead"].r9
-        )
-        sf = sf_lead * sf_sublead
+            sfup, sfdown = None, None
 
-        sfup, sfdown = None, None
+        else:
+            # only calculate systs
+            sf = np.ones(len(weights._weight))
+            sf_lead = evaluator.evaluate(
+                "nominal", photons["pho_lead"].ScEta, photons["pho_lead"].r9
+            )
+            sf_sublead = evaluator.evaluate(
+                "nominal", photons["pho_sublead"].ScEta, photons["pho_sublead"].r9
+            )
+            _sf = sf_lead * sf_sublead
 
-    else:
-        # only calculate systs
-        sf = np.ones(len(weights._weight))
-        sf_lead = evaluator.evaluate(
-            "nominal", photons["pho_lead"].ScEta, photons["pho_lead"].r9
-        )
-        sf_sublead = evaluator.evaluate(
-            "nominal", photons["pho_sublead"].ScEta, photons["pho_sublead"].r9
-        )
-        _sf = sf_lead * sf_sublead
+            sfup_lead = evaluator.evaluate(
+                "up", photons["pho_lead"].ScEta, photons["pho_lead"].r9
+            )
+            sfup_sublead = evaluator.evaluate(
+                "up", photons["pho_sublead"].ScEta, photons["pho_sublead"].r9
+            )
+            sfup = sfup_lead * sfup_sublead / _sf
 
-        sfup_lead = evaluator.evaluate(
-            "up", photons["pho_lead"].ScEta, photons["pho_lead"].r9
-        )
-        sfup_sublead = evaluator.evaluate(
-            "up", photons["pho_sublead"].ScEta, photons["pho_sublead"].r9
-        )
-        sfup = sfup_lead * sfup_sublead / _sf
+            sfdown_lead = evaluator.evaluate(
+                "down", photons["pho_lead"].ScEta, photons["pho_lead"].r9
+            )
+            sfdown_sublead = evaluator.evaluate(
+                "down", photons["pho_sublead"].ScEta, photons["pho_sublead"].r9
+            )
+            sfdown = sfdown_lead * sfdown_sublead / _sf
 
-        sfdown_lead = evaluator.evaluate(
-            "down", photons["pho_lead"].ScEta, photons["pho_lead"].r9
-        )
-        sfdown_sublead = evaluator.evaluate(
-            "down", photons["pho_sublead"].ScEta, photons["pho_sublead"].r9
-        )
-        sfdown = sfdown_lead * sfdown_sublead / _sf
+    elif "2022" in year:
+
+        if is_correction:
+            # only calculate correction to nominal weight
+            # ToDo: include pT!!!
+            sf_lead_p_lead = evaluator.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_lead"].pt
+            )
+            sf_lead_p_sublead = evaluator.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_sublead"].pt
+            )
+            sf_sublead_p_lead = evaluator.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_lead"].pt
+            )
+            sf_sublead_p_sublead = evaluator.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_sublead"].pt
+            )
+            sf = sf_lead_p_lead * sf_sublead_p_sublead + sf_lead_p_sublead * sf_sublead_p_lead - sf_lead_p_lead * sf_lead_p_sublead
+
+            sfup, sfdown = None, None
+
+        else:
+            # only calculate systs
+            sf = np.ones(len(weights._weight))
+
+            # get nominal SF to divide it out
+            sf_lead_p_lead = evaluator.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_lead"].pt
+            )
+            sf_lead_p_sublead = evaluator.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_sublead"].pt
+            )
+            sf_sublead_p_lead = evaluator.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_lead"].pt
+            )
+            sf_sublead_p_sublead = evaluator.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_sublead"].pt
+            )
+            _sf = sf_lead_p_lead * sf_sublead_p_sublead + sf_lead_p_sublead * sf_sublead_p_lead - sf_lead_p_lead * sf_lead_p_sublead
+
+            # up SF
+            sfup_lead_p_lead = evaluator.evaluate(
+                "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_lead"].pt
+            )
+            sfup_lead_p_sublead = evaluator.evaluate(
+                "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_sublead"].pt
+            )
+            sfup_sublead_p_lead = evaluator.evaluate(
+                "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_lead"].pt
+            )
+            sfup_sublead_p_sublead = evaluator.evaluate(
+                "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_sublead"].pt
+            )
+            sfup = (sfup_lead_p_lead * sfup_sublead_p_sublead + sfup_lead_p_sublead * sfup_sublead_p_lead - sfup_lead_p_lead * sfup_lead_p_sublead) / _sf
+
+            # down SF
+            sfdown_lead_p_lead = evaluator.evaluate(
+                "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_lead"].pt
+            )
+            sfdown_lead_p_sublead = evaluator.evaluate(
+                "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_sublead"].pt
+            )
+            sfdown_sublead_p_lead = evaluator.evaluate(
+                "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_lead"].pt
+            )
+            sfdown_sublead_p_sublead = evaluator.evaluate(
+                "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_sublead"].pt
+            )
+            sfdown = (sfdown_lead_p_lead * sfdown_sublead_p_sublead + sfdown_lead_p_sublead * sfdown_sublead_p_lead - sfdown_lead_p_lead * sfdown_lead_p_sublead) / _sf
 
     weights.add(name="LooseMvaSF", weight=sf, weightUp=sfup, weightDown=sfdown)
 
@@ -242,52 +317,94 @@ def ElectronVetoSF(photons, weights, year="2017", is_correction=True, **kwargs):
     """
 
     # era/year defined as parameter of the function, only 2017 is implemented up to now
-    avail_years = ["2017"]
+    avail_years = ["2017", "2022preEE", "2022postEE"]
     if year not in avail_years:
         print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
         exit()
 
-    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/eVetoSF.json")
-    evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["ElectronVetoSF"]
+    if year == "2017":
+        # 2017 file should be renamed with the year in its name...
+        json_file = os.path.join(os.path.dirname(__file__), "JSONs/eVetoSF.json")
+        evaluator = correctionlib.CorrectionSet.from_file(json_file)["ElectronVetoSF"]
+        if is_correction:
+            # only calculate correction to nominal weight
+            sf_lead = evaluator.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+            )
+            sf_sublead = evaluator.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+            )
+            sf = sf_lead * sf_sublead
 
-    if is_correction:
-        # only calculate correction to nominal weight
-        sf_lead = evaluator.evaluate(
-            "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
-        )
-        sf_sublead = evaluator.evaluate(
-            "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
-        )
-        sf = sf_lead * sf_sublead
+            sfup, sfdown = None, None
 
-        sfup, sfdown = None, None
+        else:
+            # only calculate systs
+            sf = np.ones(len(weights._weight))
+            sf_lead = evaluator.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+            )
+            sf_sublead = evaluator.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+            )
+            _sf = sf_lead * sf_sublead
 
-    else:
-        # only calculate systs
-        sf = np.ones(len(weights._weight))
-        sf_lead = evaluator.evaluate(
-            "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
-        )
-        sf_sublead = evaluator.evaluate(
-            "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
-        )
-        _sf = sf_lead * sf_sublead
+            sfup_lead = evaluator.evaluate(
+                "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+            )
+            sfup_sublead = evaluator.evaluate(
+                "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+            )
+            sfup = sfup_lead * sfup_sublead / _sf
 
-        sfup_lead = evaluator.evaluate(
-            "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
-        )
-        sfup_sublead = evaluator.evaluate(
-            "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
-        )
-        sfup = sfup_lead * sfup_sublead / _sf
+            sfdown_lead = evaluator.evaluate(
+                "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+            )
+            sfdown_sublead = evaluator.evaluate(
+                "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+            )
+            sfdown = sfdown_lead * sfdown_sublead / _sf
 
-        sfdown_lead = evaluator.evaluate(
-            "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
-        )
-        sfdown_sublead = evaluator.evaluate(
-            "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
-        )
-        sfdown = sfdown_lead * sfdown_sublead / _sf
+    elif "2022" in year:
+        # presentation of SF: https://indico.cern.ch/event/1360961/#173-run-3-electron-veto-sfs
+        if year == "2022preEE":
+            json_file = os.path.join(os.path.dirname(__file__), "JSONs/preEE_CSEV_SFcorrections.json")
+        if year == "2022postEE":
+            json_file = os.path.join(os.path.dirname(__file__), "JSONs/postEE_CSEV_SFcorrections.json")
+        evaluator = correctionlib.CorrectionSet.from_file(json_file)["CSEV_SFs"]
+
+        if is_correction:
+            # only calculate correction to nominal weight
+            sf_lead = evaluator.evaluate(
+                abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, "nominal"
+            )
+            sf_sublead = evaluator.evaluate(
+                abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, "nominal"
+            )
+            sf = sf_lead * sf_sublead
+
+            sfup, sfdown = None, None
+
+        else:
+            # only calculate systs
+            sf = np.ones(len(weights._weight))
+            sf_lead = evaluator.evaluate(
+                abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, "nominal"
+            )
+            sf_sublead = evaluator.evaluate(
+                abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, "nominal"
+            )
+            _sf = sf_lead * sf_sublead
+
+            unc_lead = evaluator.evaluate(
+                abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, "uncertainty"
+            )
+            unc_sublead = evaluator.evaluate(
+                abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, "uncertainty"
+            )
+
+            sfup = (sf_lead + unc_lead) * (sf_sublead + unc_sublead) / _sf
+            sfdown = (sf_lead - unc_lead) * (sf_sublead - unc_sublead) / _sf
 
     weights.add(name="ElectronVetoSF", weight=sf, weightUp=sfup, weightDown=sfdown)
 
@@ -303,52 +420,124 @@ def PreselSF(photons, weights, year="2017", is_correction=True, **kwargs):
     """
 
     # era/year defined as parameter of the function, only 2017 is implemented up to now
-    avail_years = ["2017"]
+    avail_years = ["2017", "2022preEE", "2022postEE"]
     if year not in avail_years:
         print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
         exit()
 
-    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/PreselSF.json")
-    evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["PreselSF"]
+    # make this read the 2022 files when available!
+    # 2017 file should be renamed with the year in its name...
+    json_file = os.path.join(os.path.dirname(__file__), "JSONs/PreselSF.json")
+    evaluator = correctionlib.CorrectionSet.from_file(json_file)["PreselSF"]
 
-    if is_correction:
-        # only calculate correction to nominal weight
-        sf_lead = evaluator.evaluate(
-            "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
-        )
-        sf_sublead = evaluator.evaluate(
-            "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
-        )
-        sf = sf_lead * sf_sublead
+    if year == "2017":
+        if is_correction:
+            # only calculate correction to nominal weight
+            sf_lead = evaluator.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+            )
+            sf_sublead = evaluator.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+            )
+            sf = sf_lead * sf_sublead
 
-        sfup, sfdown = None, None
+            sfup, sfdown = None, None
 
-    else:
-        # only calculate systs
-        sf = np.ones(len(weights._weight))
-        sf_lead = evaluator.evaluate(
-            "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
-        )
-        sf_sublead = evaluator.evaluate(
-            "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
-        )
-        _sf = sf_lead * sf_sublead
+        else:
+            # only calculate systs
+            sf = np.ones(len(weights._weight))
+            sf_lead = evaluator.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+            )
+            sf_sublead = evaluator.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+            )
+            _sf = sf_lead * sf_sublead
 
-        sfup_lead = evaluator.evaluate(
-            "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
-        )
-        sfup_sublead = evaluator.evaluate(
-            "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
-        )
-        sfup = sfup_lead * sfup_sublead / _sf
+            sfup_lead = evaluator.evaluate(
+                "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+            )
+            sfup_sublead = evaluator.evaluate(
+                "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+            )
+            sfup = sfup_lead * sfup_sublead / _sf
 
-        sfdown_lead = evaluator.evaluate(
-            "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
-        )
-        sfdown_sublead = evaluator.evaluate(
-            "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
-        )
-        sfdown = sfdown_lead * sfdown_sublead / _sf
+            sfdown_lead = evaluator.evaluate(
+                "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9
+            )
+            sfdown_sublead = evaluator.evaluate(
+                "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9
+            )
+            sfdown = sfdown_lead * sfdown_sublead / _sf
+
+    elif "2022" in year:
+        if is_correction:
+            # only calculate correction to nominal weight
+            # ToDo: include pT!!!
+            sf_lead_p_lead = evaluator.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_lead"].pt
+            )
+            sf_lead_p_sublead = evaluator.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_sublead"].pt
+            )
+            sf_sublead_p_lead = evaluator.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_lead"].pt
+            )
+            sf_sublead_p_sublead = evaluator.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_sublead"].pt
+            )
+            sf = sf_lead_p_lead * sf_sublead_p_sublead + sf_lead_p_sublead * sf_sublead_p_lead - sf_lead_p_lead * sf_lead_p_sublead
+
+            sfup, sfdown = None, None
+
+        else:
+            # only calculate systs
+            sf = np.ones(len(weights._weight))
+
+            # get nominal SF to divide it out
+            sf_lead_p_lead = evaluator.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_lead"].pt
+            )
+            sf_lead_p_sublead = evaluator.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_sublead"].pt
+            )
+            sf_sublead_p_lead = evaluator.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_lead"].pt
+            )
+            sf_sublead_p_sublead = evaluator.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_sublead"].pt
+            )
+            _sf = sf_lead_p_lead * sf_sublead_p_sublead + sf_lead_p_sublead * sf_sublead_p_lead - sf_lead_p_lead * sf_lead_p_sublead
+
+            # up SF
+            sfup_lead_p_lead = evaluator.evaluate(
+                "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_lead"].pt
+            )
+            sfup_lead_p_sublead = evaluator.evaluate(
+                "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_sublead"].pt
+            )
+            sfup_sublead_p_lead = evaluator.evaluate(
+                "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_lead"].pt
+            )
+            sfup_sublead_p_sublead = evaluator.evaluate(
+                "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_sublead"].pt
+            )
+            sfup = (sfup_lead_p_lead * sfup_sublead_p_sublead + sfup_lead_p_sublead * sfup_sublead_p_lead - sfup_lead_p_lead * sfup_lead_p_sublead) / _sf
+
+            # down SF
+            sfdown_lead_p_lead = evaluator.evaluate(
+                "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_lead"].pt
+            )
+            sfdown_lead_p_sublead = evaluator.evaluate(
+                "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9  # photons["pho_sublead"].pt
+            )
+            sfdown_sublead_p_lead = evaluator.evaluate(
+                "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_lead"].pt
+            )
+            sfdown_sublead_p_sublead = evaluator.evaluate(
+                "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9  # photons["pho_sublead"].pt
+            )
+            sfdown = (sfdown_lead_p_lead * sfdown_sublead_p_sublead + sfdown_lead_p_sublead * sfdown_sublead_p_lead - sfdown_lead_p_lead * sfdown_lead_p_sublead) / _sf
 
     weights.add(name="PreselSF", weight=sf, weightUp=sfup, weightDown=sfdown)
 
@@ -363,7 +552,7 @@ def TriggerSF(photons, weights, year="2017", is_correction=True, **kwargs):
     """
 
     # era/year defined as parameter of the function, only 2017 is implemented up to now
-    avail_years = ["2017"]
+    avail_years = ["2017", "2022preEE", "2022postEE"]
     if year not in avail_years:
         print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
         exit()
@@ -373,44 +562,115 @@ def TriggerSF(photons, weights, year="2017", is_correction=True, **kwargs):
     evaluator_lead = correctionlib.CorrectionSet.from_file(jsonpog_file_lead)["TriggerSF"]
     evaluator_sublead = correctionlib.CorrectionSet.from_file(jsonpog_file_sublead)["TriggerSF"]
 
-    if is_correction:
-        # only calculate correction to nominal weight
-        sf_lead = evaluator_lead.evaluate(
-            "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
-        )
-        sf_sublead = evaluator_sublead.evaluate(
-            "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
-        )
-        sf = sf_lead * sf_sublead
+    if year == "2017":
+        if is_correction:
+            # only calculate correction to nominal weight
+            sf_lead = evaluator_lead.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
+            )
+            sf_sublead = evaluator_sublead.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
+            )
+            sf = sf_lead * sf_sublead
 
-        sfup, sfdown = None, None
+            sfup, sfdown = None, None
 
-    else:
-        # only calculate systs
-        sf = np.ones(len(weights._weight))
-        sf_lead = evaluator_lead.evaluate(
-            "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
-        )
-        sf_sublead = evaluator_sublead.evaluate(
-            "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
-        )
-        _sf = sf_lead * sf_sublead
+        else:
+            # only calculate systs
+            sf = np.ones(len(weights._weight))
+            sf_lead = evaluator_lead.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
+            )
+            sf_sublead = evaluator_sublead.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
+            )
+            _sf = sf_lead * sf_sublead
 
-        sfup_lead = evaluator_lead.evaluate(
-            "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
-        )
-        sfup_sublead = evaluator_sublead.evaluate(
-            "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
-        )
-        sfup = sfup_lead * sfup_sublead / _sf
+            sfup_lead = evaluator_lead.evaluate(
+                "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
+            )
+            sfup_sublead = evaluator_sublead.evaluate(
+                "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
+            )
+            sfup = sfup_lead * sfup_sublead / _sf
 
-        sfdown_lead = evaluator_lead.evaluate(
-            "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
-        )
-        sfdown_sublead = evaluator_sublead.evaluate(
-            "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
-        )
-        sfdown = sfdown_lead * sfdown_sublead / _sf
+            sfdown_lead = evaluator_lead.evaluate(
+                "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
+            )
+            sfdown_sublead = evaluator_sublead.evaluate(
+                "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
+            )
+            sfdown = sfdown_lead * sfdown_sublead / _sf
+
+    elif "2022" in year:
+
+        if is_correction:
+            # only calculate correction to nominal weight
+            # ToDo: include pT!!!
+            sf_lead_p_lead = evaluator_lead.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
+            )
+            sf_lead_p_sublead = evaluator_lead.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_sublead"].pt
+            )
+            sf_sublead_p_lead = evaluator_sublead.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_lead"].pt
+            )
+            sf_sublead_p_sublead = evaluator_sublead.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
+            )
+            sf = sf_lead_p_lead * sf_sublead_p_sublead + sf_lead_p_sublead * sf_sublead_p_lead - sf_lead_p_lead * sf_lead_p_sublead
+
+            sfup, sfdown = None, None
+
+        else:
+            # only calculate systs
+            sf = np.ones(len(weights._weight))
+
+            # get nominal SF to divide it out
+            sf_lead_p_lead = evaluator_lead.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
+            )
+            sf_lead_p_sublead = evaluator_lead.evaluate(
+                "nominal", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_sublead"].pt
+            )
+            sf_sublead_p_lead = evaluator_sublead.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_lead"].pt
+            )
+            sf_sublead_p_sublead = evaluator_sublead.evaluate(
+                "nominal", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
+            )
+            _sf = sf_lead_p_lead * sf_sublead_p_sublead + sf_lead_p_sublead * sf_sublead_p_lead - sf_lead_p_lead * sf_lead_p_sublead
+
+            # up SF
+            sfup_lead_p_lead = evaluator_lead.evaluate(
+                "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
+            )
+            sfup_lead_p_sublead = evaluator_lead.evaluate(
+                "up", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_sublead"].pt
+            )
+            sfup_sublead_p_lead = evaluator_sublead.evaluate(
+                "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_lead"].pt
+            )
+            sfup_sublead_p_sublead = evaluator_sublead.evaluate(
+                "up", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
+            )
+            sfup = (sfup_lead_p_lead * sfup_sublead_p_sublead + sfup_lead_p_sublead * sfup_sublead_p_lead - sfup_lead_p_lead * sfup_lead_p_sublead) / _sf
+
+            # down SF
+            sfdown_lead_p_lead = evaluator_lead.evaluate(
+                "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_lead"].pt
+            )
+            sfdown_lead_p_sublead = evaluator_lead.evaluate(
+                "down", abs(photons["pho_lead"].ScEta), photons["pho_lead"].r9, photons["pho_sublead"].pt
+            )
+            sfdown_sublead_p_lead = evaluator_sublead.evaluate(
+                "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_lead"].pt
+            )
+            sfdown_sublead_p_sublead = evaluator_sublead.evaluate(
+                "down", abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt
+            )
+            sfdown = (sfdown_lead_p_lead * sfdown_sublead_p_sublead + sfdown_lead_p_sublead * sfdown_sublead_p_lead - sfdown_lead_p_lead * sfdown_lead_p_sublead) / _sf
 
     weights.add(name="TriggerSF", weight=sf, weightUp=sfup, weightDown=sfdown)
 

@@ -202,8 +202,12 @@ def get_trigger_json(logger, target_dir):
         )
 
     from_to_dict = {
-        "2017": {
-            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/TriggerSF*.json",
+        "2017_lead": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/TriggerSF_lead.json",
+            "to": f"{to_prefix}",
+        },
+        "2017_sublead": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/TriggerSF_sublead.json",
             "to": f"{to_prefix}",
         }
     }
@@ -238,6 +242,14 @@ def get_eveto_json(logger, target_dir):
     from_to_dict = {
         "2017": {
             "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/eVetoSF.json",
+            "to": f"{to_prefix}",
+        },
+        "2022preEE": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/fmausolf/HiggsDNA_JSONs/preEE_CSEV_SFcorrections.json",
+            "to": f"{to_prefix}",
+        },
+        "2022postEE": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/fmausolf/HiggsDNA_JSONs/postEE_CSEV_SFcorrections.json",
             "to": f"{to_prefix}",
         }
     }
@@ -347,6 +359,7 @@ def get_Flow_files(logger, target_dir):
         },
     }
     fetch_file("Flows", logger, from_to_dict, type="copy")
+
 
 def get_goldenjson(logger, target_dir):
     # References:

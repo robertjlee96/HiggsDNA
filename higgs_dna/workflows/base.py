@@ -57,6 +57,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         skipCQR: bool,
         skipJetVetoMap: bool,
         year: Optional[Dict[str, List[str]]],
+        fiducialCuts: str,
         doDeco: bool,
         Smear_sigma_m: bool,
         doFlow_corrections: bool,
@@ -72,6 +73,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.skipCQR = skipCQR
         self.skipJetVetoMap = skipJetVetoMap
         self.year = year if year is not None else {}
+        self.fiducialCuts = fiducialCuts
         self.doDeco = doDeco
         self.Smear_sigma_m = Smear_sigma_m
         self.doFlow_corrections = doFlow_corrections
@@ -477,7 +479,16 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     ]
 
                     # Determine if event passes fiducial Hgg cuts at detector-level
-                    fid_det_passed = (diphotons.pho_lead.pt / diphotons.mass > 1 / 3) & (diphotons.pho_sublead.pt / diphotons.mass > 1 / 4) & (diphotons.pho_lead.pfRelIso03_all_quadratic * diphotons.pho_lead.pt < 10) & ((diphotons.pho_sublead.pfRelIso03_all_quadratic * diphotons.pho_sublead.pt) < 10) & (numpy.abs(diphotons.pho_lead.eta) < 2.5) & (numpy.abs(diphotons.pho_sublead.eta) < 2.5)
+                    if self.fiducialCuts == 'classical':
+                        fid_det_passed = (diphotons.pho_lead.pt / diphotons.mass > 1 / 3) & (diphotons.pho_sublead.pt / diphotons.mass > 1 / 4) & (diphotons.pho_lead.pfRelIso03_all_quadratic * diphotons.pho_lead.pt < 10) & ((diphotons.pho_sublead.pfRelIso03_all_quadratic * diphotons.pho_sublead.pt) < 10) & (numpy.abs(diphotons.pho_lead.eta) < 2.5) & (numpy.abs(diphotons.pho_sublead.eta) < 2.5)
+                    elif self.fiducialCuts == 'geometric':
+                        fid_det_passed = (numpy.sqrt(diphotons.pho_lead.pt * diphotons.pho_sublead.pt) / diphotons.mass > 1 / 3) & (diphotons.pho_sublead.pt / diphotons.mass > 1 / 4) & (diphotons.pho_lead.pfRelIso03_all_quadratic * diphotons.pho_lead.pt < 10) & (diphotons.pho_sublead.pfRelIso03_all_quadratic * diphotons.pho_sublead.pt < 10) & (numpy.abs(diphotons.pho_lead.eta) < 2.5) & (numpy.abs(diphotons.pho_sublead.eta) < 2.5)
+                    elif self.fiducialCuts == 'none':
+                        fid_det_passed = diphotons.pho_lead.pt > -10  # This is a very dummy way but I do not know how to make a true array of outer shape of diphotons
+                    else:
+                        warnings.warn("You chose %s the fiducialCuts mode, but this is currently not supported. You should check your settings. For this run, no fiducial selection at detector level is applied." % self.fiducialCuts)
+                        fid_det_passed = diphotons.pho_lead.pt > -10
+
                     diphotons = diphotons[fid_det_passed]
 
                     # baseline modifications to diphotons
@@ -689,12 +700,12 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                     )
                                     if systematic_name == "LHEScale":
                                         if hasattr(events, "LHEScaleWeight"):
-                                            diphotons["nLHEScaleWeight"] = awkward.num(
+                                            diphotons["nweight_LHEScale"] = awkward.num(
                                                 events.LHEScaleWeight[selection_mask],
                                                 axis=1,
                                             )
                                             diphotons[
-                                                "LHEScaleWeight"
+                                                "weight_LHEScale"
                                             ] = events.LHEScaleWeight[selection_mask]
                                         else:
                                             logger.info(
@@ -703,7 +714,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                     elif systematic_name == "LHEPdf":
                                         if hasattr(events, "LHEPdfWeight"):
                                             # two AlphaS weights are removed
-                                            diphotons["nLHEPdfWeight"] = (
+                                            diphotons["nweight_LHEPdf"] = (
                                                 awkward.num(
                                                     events.LHEPdfWeight[selection_mask],
                                                     axis=1,
@@ -711,7 +722,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                                 - 2
                                             )
                                             diphotons[
-                                                "LHEPdfWeight"
+                                                "weight_LHEPdf"
                                             ] = events.LHEPdfWeight[selection_mask][
                                                 :, :-2
                                             ]
@@ -781,6 +792,27 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         ** 2
                     )
 
+                    if (self.data_kind == "mc" and self.doFlow_corrections):
+
+                        diphotons["sigma_m_over_m_corr"] = 0.5 * numpy.sqrt(
+                            (
+                                diphotons["pho_lead"].corr_energyErr
+                                / (
+                                    diphotons["pho_lead"].pt
+                                    * numpy.cosh(diphotons["pho_lead"].eta)
+                                )
+                            )
+                            ** 2
+                            + (
+                                diphotons["pho_sublead"].corr_energyErr
+                                / (
+                                    diphotons["pho_sublead"].pt
+                                    * numpy.cosh(diphotons["pho_sublead"].eta)
+                                )
+                            )
+                            ** 2
+                        )
+
                     # This is the mass SigmaM/M value including the smearing term from the Scale and smearing
                     # The implementation follows the flashGG implementation -> https://github.com/cms-analysis/flashgg/blob/4edea8897e2a4b0518dca76ba6c9909c20c40ae7/DataFormats/src/Photon.cc#L293
                     # adittional flashGG link when the smearing of the SigmaE/E smearing is called -> https://github.com/cms-analysis/flashgg/blob/4edea8897e2a4b0518dca76ba6c9909c20c40ae7/Systematics/plugins/PhotonSigEoverESmearingEGMTool.cc#L83C40-L83C45
@@ -810,14 +842,49 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             ** 2
                         )
 
+                        if (self.data_kind == "mc" and self.doFlow_corrections):
+
+                            diphotons["sigma_m_over_m_Smeared_corr"] = 0.5 * numpy.sqrt(
+                                (
+                                    numpy.sqrt((diphotons["pho_lead"].corr_energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
+                                    / (
+                                        diphotons["pho_lead"].pt
+                                        * numpy.cosh(diphotons["pho_lead"].eta)
+                                    )
+                                )
+                                ** 2
+                                + (
+                                    numpy.sqrt((diphotons["pho_sublead"].corr_energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
+                                    / (
+                                        diphotons["pho_sublead"].pt
+                                        * numpy.cosh(diphotons["pho_sublead"].eta)
+                                    )
+                                )
+                                ** 2
+                            )
+
                     # Decorrelating the mass resolution - Still need to supress the decorrelator noises
                     if self.doDeco:
-                        # Instead of the nominal sigma_m_over_m, we will use the smeared version of it -> (https://indico.cern.ch/event/1319585/#169-update-on-the-run-3-mass-r)
+
+                        # Decorrelate nominal sigma_m_over_m
+                        diphotons["sigma_m_over_m_nominal_decorr"] = decorrelate_mass_resolution(diphotons, type="nominal", year=self.year[dataset_name][0])
+
+                        # decorrelate smeared nominal sigma_m_overm_m
                         if (self.Smear_sigma_m):
-                            diphotons["sigma_m_over_m_decorr"] = decorrelate_mass_resolution(diphotons)
-                        else:
-                            warnings.warn("Smeamering need to be applied in order to decorrelate the (Smeared) mass resolution. -- Exiting!")
-                            sys.exit(0)
+                            diphotons["sigma_m_over_m_smeared_decorr"] = decorrelate_mass_resolution(diphotons, type="smeared", year=self.year[dataset_name][0])
+
+                        # decorrelate flow corrected sigma_m_over_m
+                        if (self.doFlow_corrections):
+                            diphotons["sigma_m_over_m_corr_decorr"] = decorrelate_mass_resolution(diphotons, type="corr", year=self.year[dataset_name][0])
+
+                        # decorrelate flow corrected smeared sigma_m_over_m
+                        if (self.doFlow_corrections and self.Smear_sigma_m):
+                            diphotons["sigma_m_over_m_corr_smeared_decorr"] = decorrelate_mass_resolution(diphotons, type="corr_smeared", year=self.year[dataset_name][0])
+
+                        # Instead of the nominal sigma_m_over_m, we will use the smeared version of it -> (https://indico.cern.ch/event/1319585/#169-update-on-the-run-3-mass-r)
+                        # else:
+                        #    warnings.warn("Smeamering need to be applied in order to decorrelate the (Smeared) mass resolution. -- Exiting!")
+                        #    sys.exit(0)
 
                     if self.output_location is not None:
                         if self.output_format == "root":

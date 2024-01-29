@@ -204,6 +204,12 @@ def get_main_parser():
         help="Print debug information with a logger",
     )
     parser.add_argument(
+        "--fiducialCuts",
+        default="classical",
+        choices=["classical", "geometric", "none"],
+        help="Apply fiducial cuts at detector level according to standard CMS approach (classical with 1/3 and 1/4 thresholds for scaled pT of lead and sublead), geometric cuts (proposed in 2106.08329), or none at all. Fiducial selection at particle level is handled with taggers.",
+    )
+    parser.add_argument(
         "--doDeco",
         default=False,
         action="store_true",

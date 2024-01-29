@@ -46,6 +46,7 @@ class ZmmyProcessor(HggBaseProcessor):
         skipCQR: bool = False,
         skipJetVetoMap: bool = False,
         year: Dict[str, List[str]] = None,
+        fiducialCuts: str = "classical",
         doDeco: bool = False,
         Smear_sigma_m: bool = False,
         doFlow_corrections: bool = False,
@@ -58,11 +59,12 @@ class ZmmyProcessor(HggBaseProcessor):
             apply_trigger=apply_trigger,
             output_location=output_location,
             taggers=taggers,
-            trigger_group="Muon",
+            trigger_group=".*DoubleMuon.*",
             analysis="ZmmyAnalysis",
             skipCQR=skipCQR,
             skipJetVetoMap=skipJetVetoMap,
             year=year,
+            fiducialCuts=fiducialCuts,
             doDeco=doDeco,
             Smear_sigma_m=Smear_sigma_m,
             doFlow_corrections=doFlow_corrections,
@@ -102,7 +104,7 @@ class ZmmyProcessor(HggBaseProcessor):
         triggers = self.meta["TriggerPaths"][self.trigger_group][self.analysis]
         hlt = events.HLT
         for trigger in triggers:
-            actual_trigger = trigger.replace("HLT_", "")
+            actual_trigger = trigger.replace("HLT_", "").replace("*", "")
             for field in hlt.fields:
                 if field == actual_trigger:
                     trigger_names.append(field)
@@ -396,6 +398,43 @@ class ZmmyProcessor(HggBaseProcessor):
             ntuple["mmy_phi"] = events.mmy.obj_mmy.phi
             ntuple["mmy_mass"] = events.mmy.obj_mmy.mass
 
+        # Making the photon selection
+        photons = photons[eve_sel.all(*(eve_sel.names))]
+
+        photons["trkSumPtSolidConeDR04"] = ntuple["photon_trkSumPtSolidConeDR04"]
+        photons["trkSumPtHollowConeDR03"] = ntuple["photon_trkSumPtHollowConeDR03"]
+
+        # Performing per photon corrections using normalizing flows
+        # The corrections are made before pre-selection so it enable us to recalculate pre-selection SFs
+        if self.data_kind == "mc" and self.doFlow_corrections:
+
+            # Applyting the Flow corrections to all photons before pre-selection
+            counts = ak.num(photons)
+            corrected_inputs, var_list = calculate_flow_corrections(
+                photons,
+                events,
+                self.meta["flashggPhotons"]["flow_inputs"],
+                self.meta["flashggPhotons"]["Isolation_transform_order"],
+                year=self.year[dataset][0],
+            )
+
+            # adding the corrected values to the tnp_candidates
+            for i in range(len(var_list)):
+                photons["corr_" + str(var_list[i])] = ak.unflatten(
+                    np.ascontiguousarray(corrected_inputs[:, i]), counts
+                )
+
+                ntuple["photon_corr_" + str(var_list[i])] = photons["corr_" + str(var_list[i])]
+
+            ntuple["photon_corr_mvaID_run3"] = ak.unflatten(
+                self.add_corr_photonid_mva_run3(photons, events), counts
+            )
+
+        # Recalculate photon mvaID after the pt subtractions
+        ntuple["photon_mvaID_run3"] = ak.unflatten(
+            self.add_photonid_mva_run3(photons, events), counts
+        )
+
         if self.data_kind == "mc":
             # annotate diphotons with dZ information (difference between z position of GenVtx and PV) as required by flashggfinalfits
             ntuple["dZ"] = events.GenVtx.z - events.PV.z
@@ -430,8 +469,6 @@ class ZmmyProcessor(HggBaseProcessor):
                         logger=logger,
                         year=self.year[dataset][0],
                     )
-            ntuple["weight_central"] = event_weights.weight()
-
             ntuple["weight_central"] = event_weights.weight()
 
             # systematic variations of event weights go to nominal output dataframe:
@@ -521,9 +558,10 @@ class ZmmyHist(HggBaseProcessor):
         skipCQR: bool = False,
         skipJetVetoMap: bool = False,
         year: Dict[str, List[str]] = None,
+        fiducialCuts: str = "classical",
         doDeco: bool = False,
         output_format: str = "parquet",
-        trigger_group: str = "Muon",
+        trigger_group: str = ".*DoubleMuon.*",
         analysis: str = "ZmmyHist",
     ) -> None:
         super().__init__(
@@ -538,6 +576,7 @@ class ZmmyHist(HggBaseProcessor):
             skipCQR=skipCQR,
             skipJetVetoMap=skipJetVetoMap,
             year=year,
+            fiducialCuts=fiducialCuts,
             doDeco=doDeco,
             output_format=output_format,
         )
@@ -991,6 +1030,7 @@ class ZmmyZptHist(ZmmyHist):
         skipCQR: bool = False,
         skipJetVetoMap: bool = False,
         year: Dict[str, List[str]] = None,
+        fiducialCuts: str = "classical",
         doDeco: bool = False,
         output_format: str = "parquet",
     ) -> None:
@@ -1001,10 +1041,11 @@ class ZmmyZptHist(ZmmyHist):
             apply_trigger=apply_trigger,
             output_location=output_location,
             taggers=taggers,
-            trigger_group="Muon",
+            trigger_group=".*DoubleMuon.*",
             analysis="ZmmyZptHist",
             skipCQR=skipCQR,
             year=year,
+            fiducialCuts=fiducialCuts,
             doDeco=doDeco,
             output_format=output_format,
         )

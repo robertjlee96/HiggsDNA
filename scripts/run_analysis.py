@@ -211,6 +211,7 @@ if __name__ == "__main__":
                 args.skipCQR,
                 args.skipJetVetoMap,
                 year,
+                args.fiducialCuts,
                 args.doDeco,
                 args.Smear_sigma_m,
                 args.doFlow_corrections,

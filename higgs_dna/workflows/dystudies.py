@@ -32,6 +32,7 @@ class DYStudiesProcessor(HggBaseProcessor):
         skipCQR: bool = False,
         skipJetVetoMap: bool = False,
         year: Dict[str, List[str]] = None,
+        fiducialCuts: str = "classical",
         doDeco: bool = False,
         Smear_sigma_m: bool = False,
         doFlow_corrections: bool = False,
@@ -49,6 +50,7 @@ class DYStudiesProcessor(HggBaseProcessor):
             skipCQR=skipCQR,
             skipJetVetoMap=skipJetVetoMap,
             year=year,
+            fiducialCuts=fiducialCuts,
             doDeco=doDeco,
             Smear_sigma_m=Smear_sigma_m,
             doFlow_corrections=doFlow_corrections,
@@ -76,6 +78,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
         skipCQR: bool = False,
         skipJetVetoMap: bool = False,
         year: Optional[Dict[str, List[str]]] = None,
+        fiducialCuts: str = "classical",
         doDeco: bool = False,
         Smear_sigma_m: bool = False,
         doFlow_corrections: bool = False,
@@ -93,6 +96,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
             skipCQR=skipCQR,
             skipJetVetoMap=False,
             year=year if year is not None else {},
+            fiducialCuts=fiducialCuts,
             doDeco=doDeco,
             Smear_sigma_m=Smear_sigma_m,
             doFlow_corrections=doFlow_corrections,
@@ -330,6 +334,24 @@ class TagAndProbeProcessor(HggBaseProcessor):
                             year=self.year[dataset_name][0],
                         )
 
+                # systematic variations of event weights go to nominal output dataframe:
+                if do_variation == "nominal":
+                    for systematic_name in systematic_names:
+                        if systematic_name in available_weight_systematics:
+                            logger.info(
+                                f"Adding systematic {systematic_name} to weight collection of dataset {dataset_name}"
+                            )
+                            varying_function = available_weight_systematics[
+                                systematic_name
+                            ]
+                            event_weights = varying_function(
+                                events=events[flat_tag_and_probe_mask],
+                                photons=events.Photon[flat_tag_and_probe_mask],
+                                weights=event_weights,
+                                dataset_name=dataset_name,
+                                year=self.year[dataset_name][0],
+                            )
+
             # Calculating sigma_m_overm_m
             tnp_candidates["sigma_m_over_m"] = 0.5 * numpy.sqrt(
                 (
@@ -425,10 +447,9 @@ class TagAndProbeProcessor(HggBaseProcessor):
                                 "Adding systematic weight variations to nominal output file."
                             )
                         for modifier in event_weights.variations:
-                            tnp_candidates["weight_" + modifier] = numpy.hstack(event_weights.weight(
+                            df["weight_" + modifier] = numpy.hstack(event_weights.weight(
                                 modifier=modifier
                             ) * n_event_tnp_cand)
-                            df["weight_" + modifier] = df["tag_weight_" + modifier]
 
                     # storing the central weights
                     df["weight_central"] = numpy.hstack(event_weights.weight() * n_event_tnp_cand)
@@ -439,7 +460,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
                     # dropping the nominal and varitation weights
                     df.drop(["tag_weight", "probe_weight"], axis=1, inplace=True)
                     for modifier in event_weights.variations:
-                        df.drop(["tag_weight_" + modifier , "probe_weight_" + modifier], axis=1, inplace=True)
+                        df.drop(["weight_" + modifier], axis=1, inplace=True)
 
                 df["nPV"] = df["tag_nPV"]
                 df.drop(["tag_nPV", "probe_nPV"], axis=1, inplace=True)

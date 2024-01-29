@@ -459,8 +459,6 @@ class TagAndProbeProcessor(HggBaseProcessor):
 
                     # dropping the nominal and varitation weights
                     df.drop(["tag_weight", "probe_weight"], axis=1, inplace=True)
-                    for modifier in event_weights.variations:
-                        df.drop(["weight_" + modifier], axis=1, inplace=True)
 
                 df["nPV"] = df["tag_nPV"]
                 df.drop(["tag_nPV", "probe_nPV"], axis=1, inplace=True)

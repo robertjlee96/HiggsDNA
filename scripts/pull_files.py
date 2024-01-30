@@ -517,8 +517,13 @@ if __name__ == "__main__":
         get_Flow_files(logger, args.target_dir)
         get_ctag_json(logger, args.target_dir)
         get_photonid_json(logger, args.target_dir)
-        get_pileup_Run2(logger, args.target_dir)
         get_jetmet_json(logger, args.target_dir)
+        get_jec_files(logger, args.target_dir)
+        get_jer_files(logger, args.target_dir)
+        get_material_json(logger, args.target_dir)
+        get_trigger_json(logger, args.target_dir)
+        get_presel_json(logger, args.target_dir)
+        get_eveto_json(logger, args.target_dir)
     elif args.target == "GoldenJSON":
         get_goldenjson(logger, args.target_dir)
     elif args.target == "PU_run2":

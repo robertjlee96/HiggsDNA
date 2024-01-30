@@ -276,7 +276,7 @@ def Material(pt, events, year="2017", is_correction=True):
     _pt = ak.flatten(events.Photon.pt)
 
     # era/year defined as parameter of the function, only 2017 is implemented up to now
-    avail_years = ["2017"]
+    avail_years = ["2017", "2022preEE", "2022postEE"]  # use Run 2 files also for Run 3, preliminary
     if year not in avail_years:
         print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
         exit()

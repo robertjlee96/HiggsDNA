@@ -439,7 +439,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         counts = awkward.num(photons)
                         corrected_inputs,var_list = calculate_flow_corrections(photons, events, self.meta["flashggPhotons"]["flow_inputs"], self.meta["flashggPhotons"]["Isolation_transform_order"], year=self.year[dataset_name][0])
 
-                        # adding the corrected values to the tnp_candidates
+                        # adding the corrected values to the photons
                         for i in range(len(var_list)):
                             photons["corr_" + str(var_list[i])] = awkward.unflatten(corrected_inputs[:,i] , counts)
 

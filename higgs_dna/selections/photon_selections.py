@@ -94,7 +94,8 @@ def photon_preselection(
         & (photons.r9 > self.min_full5x5_r9_EB_low_r9)
         & (photons.r9 < self.min_full5x5_r9_EB_high_r9)
         & (
-            photons.pfChargedIsoPFPV  # for v11
+            #photons.pfChargedIsoPFPV  # for v11
+            photons.trkSumPtHollowConeDR03  #v12 and above
             < self.max_trkSumPtHollowConeDR03_EB_low_r9
         )
         & (photons.sieie < self.max_sieie_EB_low_r9)
@@ -105,7 +106,8 @@ def photon_preselection(
         & (photons.r9 > self.min_full5x5_r9_EE_low_r9)
         & (photons.r9 < self.min_full5x5_r9_EE_high_r9)
         & (
-            photons.pfChargedIsoPFPV  # for v11
+            #photons.pfChargedIsoPFPV  # for v11
+            photons.trkSumPtHollowConeDR03  #v12 and above
             < self.max_trkSumPtHollowConeDR03_EE_low_r9
         )
         & (photons.sieie < self.max_sieie_EE_low_r9)

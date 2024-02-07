@@ -290,19 +290,13 @@ class TagAndProbeProcessor(HggBaseProcessor):
                 )  # was: (tnp_candidates.tag.chargedHadronIso / tnp_candidates.tag.pt < 0.3)
             )
 
-            # probe selections
-            probe_mask = (
-                tnp_candidates.probe.pfChargedIsoPFPV < 20
-            ) & (  # was: (tnp_candidates.probe.chargedHadronIso < 20)
-                tnp_candidates.probe.pfChargedIsoPFPV / tnp_candidates.probe.pt
-                < 0.3  # was: tnp_candidates.probe.chargedHadronIso / tnp_candidates.probe.pt < 0.3
-            )
+            # No selection on the probe to not bias it!
 
             # apply selections
-            tnp_candidates = tnp_candidates[tag_mask & probe_mask]
+            tnp_candidates = tnp_candidates[tag_mask]
 
             # Since the Weights object accepts only flat masks, the tag and probe mask is flattened
-            flat_tag_and_probe_mask = ak.any(tag_mask & probe_mask, axis=1)
+            flat_tag_and_probe_mask = ak.any(tag_mask, axis=1)
 
             """
             This n_event_tnp_cand array is created to keep track of how many tag and probe candidates we have at each event

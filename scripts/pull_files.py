@@ -222,12 +222,23 @@ def get_presel_json(logger, target_dir):
             os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/"
         )
 
+    path_for_early_Analysis = "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/SFs/preselection"
+
     from_to_dict = {
         "2017": {
             "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/PreselSF.json",
-            "to": f"{to_prefix}",
-        }
+            "to": f"{to_prefix}/Preselection/2017/PreselSF.json",
+        },
+        "2022preEE": {
+            "from": f"{path_for_early_Analysis}/Preselection_2022PreEE.json",
+            "to": f"{to_prefix}/Preselection/2022/Preselection_2022PreEE.json",
+        },
+        "2022postEE": {
+            "from": f"{path_for_early_Analysis}/Preselection_2022PostEE.json",
+            "to": f"{to_prefix}/Preselection/2022/Preselection_2022PostEE.json",
+        },
     }
+    
     fetch_file("PreselSF", logger, from_to_dict, type="copy")
 
 
@@ -293,10 +304,20 @@ def get_photonid_json(logger, target_dir):
             os.path.dirname(__file__), "../higgs_dna/systematics/JSONs"
         )
 
+    path_for_early_Analysis = "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/SFs/photon_id_mva"
+
     from_to_dict = {
         "2017": {
             "from": "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/EGM/2017_UL/photon.json.gz",
-            "to": f"{to_prefix}/SF_photon_ID/photon.json.gz",
+            "to": f"{to_prefix}/SF_photon_ID/2017/photon.json.gz",
+        },
+        "2022preEE": {
+            "from": f"{path_for_early_Analysis}/PhotonIDMVA_2022PreEE.json",
+            "to": f"{to_prefix}/SF_photon_ID/2022/PhotonIDMVA_2022PreEE.json",
+        },
+        "2022postEE": {
+            "from": f"{path_for_early_Analysis}/PhotonIDMVA_2022PostEE.json",
+            "to": f"{to_prefix}/SF_photon_ID/2022/PhotonIDMVA_2022PostEE.json",
         },
     }
     fetch_file("PhotonID", logger, from_to_dict, type="copy")

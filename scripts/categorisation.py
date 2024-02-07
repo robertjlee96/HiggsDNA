@@ -89,7 +89,7 @@ def plot_category(hist_sig, hists_bkg, x_vals, y_vals_sig, y_vals_bkg, params_si
     ax.set_ylim(0., 1.5 * ax.get_ylim()[1])
     ax.legend(ncol=2)
     ax.set_xlim(100.,180.)
-    hep.cms.label(data=True, ax=ax, loc=0, label="Simulation Work in Progress", com=13.6, lumi=20.7, fontsize=22)
+    hep.cms.label(data=True, ax=ax, loc=0, label="Simulation Work in Progress", com=13.6, lumi=35.1, fontsize=22)
 
 
 # values from https://twiki.cern.ch/twiki/bin/view/LHCPhysics/LHCHWG136TeVxsec_extrap and XSDB
@@ -103,72 +103,179 @@ dict_xSecs = {
     "GJetPT20to40": 242.5e3,
     "GJetPT40": 919.1e3,
 }
-lumi = 20.7  # /fb, 21.7 is recorded 2022F+G, 20.7 is GoldenJSON, https://twiki.cern.ch/twiki/bin/viewauth/CMS/PdmVRun3Analysis
+lumi_preEE = 8.1  # https://twiki.cern.ch/twiki/bin/viewauth/CMS/PdmVRun3Analysis#2022_Analysis_Summary_Table with normtag
+lumi_postEE = 27.0  # https://twiki.cern.ch/twiki/bin/viewauth/CMS/PdmVRun3Analysis#2022_Analysis_Summary_Table with normtag
 
 base_path = "/path/to/my/samples/processed/with/HiggsDNA/"
 
 dict_paths_signal = {
-    "ggH": base_path + "GluGluHToGG_postEE_M125_2022/nominal/",
-    "VBF": base_path + "VBFtoGG_postEE_M125_2022/nominal/",
-    "VH": base_path + "VHtoGG_postEE_M125_2022/nominal/",
-    "ttH": base_path + "ttHtoGG_postEE_M125_2022/nominal/"
-}
-dict_paths_bkg = {
-    "Diphoton": base_path + "Diphoton/nominal/",
-    "GJetPT20to40": base_path + "GJetPt20to40/nominal/",
-    "GJetPT40": base_path + "GJetPt40toInf/nominal/"
+    "ggH_preEE": base_path + "GluGluHtoGG_M-125_preEE/nominal/",
+    "ggH_postEE": base_path + "GluGluHtoGG_M-125_postEE/nominal/",
+    "VBF_preEE": base_path + "VBFHtoGG_M-125_preEE/nominal/",
+    "VBF_postEE": base_path + "VBFHtoGG_M-125_postEE/nominal/",
+    "VH_preEE": base_path + "VHtoGG_M-125_preEE/nominal/",
+    "VH_postEE": base_path + "VHtoGG_M-125_postEE/nominal/",
+    "ttH_preEE": base_path + "ttHtoGG_M-125_preEE/nominal/",
+    "ttH_postEE": base_path + "ttHtoGG_M-125_postEE/nominal/"
 }
 
-signal_events = []
+dict_paths_bkg = {
+    "Diphoton_preEE": base_path + "GG-Box-3Jets_MGG-80_preEE/nominal/",
+    "Diphoton_postEE": base_path + "GG-Box-3Jets_MGG-80_postEE/nominal/",
+    "GJetPT20to40_preEE": base_path + "GJet_PT-20to40_DoubleEMEnriched_MGG-80_preEE/nominal/",
+    "GJetPT20to40_postEE": base_path + "GJet_PT-20to40_DoubleEMEnriched_MGG-80_postEE/nominal/",
+    "GJetPT40_preEE": base_path + "GJet_PT-40_DoubleEMEnriched_MGG-80_preEE/nominal/",
+    "GJetPT40_postEE": base_path + "GJet_PT-40_DoubleEMEnriched_MGG-80_postEE/nominal/"
+}
+
+
+signal_events_preEE = []
+signal_events_postEE = []
+
 for process in dict_paths_signal.keys():
+    campaign = process.split('_')[-1]
+    lumi = lumi_preEE if campaign == "preEE" else lumi_postEE
+
     files_signal = glob.glob(dict_paths_signal[process] + "/*.parquet")
     data_signal = [pd.read_parquet(f) for f in files_signal]
-    events = pd.concat(data_signal,ignore_index=True)
-    events = events[
-        (events.mass > 100) & (events.mass < 180)
-    ]
-    sum_genw_beforesel = 0
-    for file in files_signal:
-        sum_genw_beforesel += float(pq.read_table(file).schema.metadata[b'sum_genw_presel'])
-    events["weight"] *= (lumi * dict_xSecs[process] / sum_genw_beforesel)
-    signal_events.append(events)
-signal_events = pd.concat(signal_events,ignore_index=True)
-signal_events["min_mvaID"] = np.min([signal_events.lead_mvaID.values, signal_events.sublead_mvaID.values], axis=0)
+    events = pd.concat(data_signal, ignore_index=True)
+    events = events[(events.mass > 100) & (events.mass < 180)]
 
-bkg_events = []
+    sum_genw_beforesel = sum(float(pq.read_table(file).schema.metadata[b'sum_genw_presel']) for file in files_signal)
+    events["weight"] *= (lumi * dict_xSecs[process.split('_')[0]] / sum_genw_beforesel)
+
+    if campaign == "preEE":
+        signal_events_preEE.append(events)
+    else:
+        signal_events_postEE.append(events)
+
+# Concatenate all events
+signal_events_preEE = pd.concat(signal_events_preEE, ignore_index=True)
+signal_events_preEE["min_mvaID"] = np.min([signal_events_preEE.lead_corr_mvaID_run3.values, signal_events_preEE.sublead_corr_mvaID_run3.values], axis=0)
+signal_events_postEE = pd.concat(signal_events_postEE, ignore_index=True)
+signal_events_postEE["min_mvaID"] = np.min([signal_events_postEE.lead_corr_mvaID_run3.values, signal_events_postEE.sublead_corr_mvaID_run3.values], axis=0)
+signal_events = pd.concat([signal_events_preEE, signal_events_postEE], ignore_index=True)
+
+bkg_events_preEE = []
+bkg_events_postEE = []
+
 for process in dict_paths_bkg.keys():
+    campaign = process.split('_')[-1]
+    lumi = lumi_preEE if campaign == "preEE" else lumi_postEE
+
     files_bkg = glob.glob(dict_paths_bkg[process] + "/*.parquet")
     data_bkg = [pd.read_parquet(f) for f in files_bkg]
     events = pd.concat(data_bkg, ignore_index=True)
-    events = events[
-        (events.mass > 100) & (events.mass < 180)
-    ]
-    sum_genw_beforesel = 0
-    for file in files_bkg:
-        sum_genw_beforesel += float(pq.read_table(file).schema.metadata[b'sum_genw_presel'])
-    events["weight"] *= (lumi * dict_xSecs[process] / sum_genw_beforesel)
-    events["process"] = process
+    events = events[(events.mass > 100) & (events.mass < 180)]
+
+    sum_genw_beforesel = sum(float(pq.read_table(file).schema.metadata[b'sum_genw_presel']) for file in files_bkg)
+    events["weight"] *= (lumi * dict_xSecs[process.split('_')[0]] / sum_genw_beforesel)
+    events["process"] = process.split('_')[0]
+
     if "GJet" in process:
         print("INFO: applying overlap removal for sample", process)
         events = events[events.lead_genPartFlav + events.sublead_genPartFlav != 2]
-    bkg_events.append(events)
-bkg_events = pd.concat(bkg_events,ignore_index=True)
-bkg_events["min_mvaID"] = np.min([bkg_events.lead_mvaID.values, bkg_events.sublead_mvaID.values], axis=0)
 
-relevant_columns_sig = ['mass', 'weight', 'sigma_m_over_m_decorr', 'min_mvaID']
+    if campaign == "preEE":
+        bkg_events_preEE.append(events)
+    else:
+        bkg_events_postEE.append(events)
+
+bkg_events_preEE = pd.concat(bkg_events_preEE, ignore_index=True)
+bkg_events_preEE["min_mvaID"] = np.min([bkg_events_preEE.lead_corr_mvaID_run3.values, bkg_events_preEE.sublead_corr_mvaID_run3.values], axis=0)
+bkg_events_postEE = pd.concat(bkg_events_postEE, ignore_index=True)
+bkg_events_postEE["min_mvaID"] = np.min([bkg_events_postEE.lead_corr_mvaID_run3.values, bkg_events_postEE.sublead_corr_mvaID_run3.values], axis=0)
+# remove events already here to make it faster...
+bkg_events_preEE = bkg_events_preEE[bkg_events_preEE["min_mvaID"] > 0.]
+bkg_events_postEE = bkg_events_postEE[bkg_events_postEE["min_mvaID"] > 0.]
+bkg_events = pd.concat([bkg_events_preEE, bkg_events_postEE], ignore_index=True)
+
+# we have several versions of the resolution estimator: sigma_m_over_m_corr_smeared_decorr, sigma_m_over_m_corr_decorr. Define this as extra variable to be chosen here:
+resolution = "sigma_m_over_m_corr_smeared_decorr"
+# resolution = "sigma_m_over_m_corr_decorr"
+
+relevant_columns_sig = ['mass', 'weight', resolution, 'min_mvaID']
+signal_events_preEE = signal_events_preEE[relevant_columns_sig]
+signal_events_preEE["weight"] = 10 * signal_events_preEE["weight"].values
+signal_events_postEE = signal_events_postEE[relevant_columns_sig]
+signal_events_postEE["weight"] = 10 * signal_events_postEE["weight"].values
 signal_events = signal_events[relevant_columns_sig]
 signal_events["weight"] = 10 * signal_events["weight"].values
-relevant_columns_bkg = ['mass', 'weight', 'sigma_m_over_m_decorr', 'min_mvaID', 'process']
+
+relevant_columns_bkg = ['mass', 'weight', resolution, 'min_mvaID', 'process']
+bkg_events_preEE = bkg_events_preEE[relevant_columns_bkg]
+bkg_events_postEE = bkg_events_postEE[relevant_columns_bkg]
 bkg_events = bkg_events[relevant_columns_bkg]
 
-resboundaries = np.linspace(0.005, 0.025, 21)
-MVAboundaries = np.linspace(0., 0.3, 31)
+scale_bkg = True
+if scale_bkg:
+    scale_diphoton = 1.42
+    scale_GJet = 2.38
+    print("INFO: scaling diphoton and GJet acording to chi2 fit to MVA ID with data.")
+    bkg_events_preEE["weight"][bkg_events_preEE.process == "Diphoton"] *= scale_diphoton
+    bkg_events_preEE["weight"][bkg_events_preEE.process != "Diphoton"] *= scale_GJet
+    bkg_events_postEE["weight"][bkg_events_postEE.process == "Diphoton"] *= scale_diphoton
+    bkg_events_postEE["weight"][bkg_events_postEE.process != "Diphoton"] *= scale_GJet
+    bkg_events["weight"][bkg_events.process == "Diphoton"] *= scale_diphoton
+    bkg_events["weight"][bkg_events.process != "Diphoton"] *= scale_GJet
+
+
+cross_check_with_data = False
+if cross_check_with_data:
+    print("INFO: running categorisation as a cross-check using data sidebands to determine the bkg. \n This is only implemented for 3 categories!")
+    # Paths for the actual data
+    dict_paths_data = {
+        "DataC_2022": base_path + "DataC_2022/nominal/",
+        "DataD_2022": base_path + "DataD_2022/nominal/",
+        "DataE_2022": base_path + "DataE_2022/nominal/",
+        "DataF_2022": base_path + "DataF_2022/nominal/",
+        "DataG_2022": base_path + "DataG_2022/nominal/"
+    }
+
+    events_data_preEE = []
+    events_data_postEE = []
+    for process, path in dict_paths_data.items():
+        print("INFO: reading files for", process)
+        files_data = glob.glob(path + "/*.parquet")
+        data = [pd.read_parquet(f) for f in files_data]
+        events = pd.concat(data, ignore_index=True)
+        events = events[(events.mass > 100) & (events.mass < 180)]
+        # blinding
+        events = events[(events.mass < 120) | (events.mass > 130)]
+
+        if process in ["DataC_2022", "DataD_2022"]:
+            events_data_preEE.append(events)
+        else:
+            events_data_postEE.append(events)
+
+    events_data_preEE = pd.concat(events_data_preEE, ignore_index=True)
+    events_data_postEE = pd.concat(events_data_postEE, ignore_index=True)
+    events_data_preEE["min_mvaID"] = np.min([events_data_preEE.lead_mvaID.values, events_data_preEE.sublead_mvaID.values], axis=0)
+    events_data_postEE["min_mvaID"] = np.min([events_data_postEE.lead_mvaID.values, events_data_postEE.sublead_mvaID.values], axis=0)
+
+    # remove events already here to make it faster...
+    events_data_preEE = events_data_preEE[events_data_preEE["min_mvaID"] > 0.]
+    events_data_postEE = events_data_postEE[events_data_postEE["min_mvaID"] > 0.]
+
+    relevant_columns_data = ['mass', 'sigma_m_over_m_decorr', "sigma_m_over_m_smeared_decorr", 'min_mvaID']
+    events_data_preEE = events_data_preEE[relevant_columns_data]
+    events_data_postEE = events_data_postEE[relevant_columns_data]
+    events_data = pd.concat([events_data_preEE, events_data_postEE], ignore_index=True)
+
+# it is worth to run over a coarse grid first and then over a fine grid around the expected maximum, so adapt values accordingly!
+if resolution == "sigma_m_over_m_corr_smeared_decorr":
+    resboundaries = np.linspace(0.008, 0.02, 25)
+elif resolution == "sigma_m_over_m_corr_decorr":
+    resboundaries = np.linspace(0.005, 0.018, 14)
+
+MVAboundaries = np.linspace(0.1, 0.3, 21)
 relative_metrics = []
 cats = [1, 2, 3, 4]  # MEOW
 
+
 for n_cat in cats:
 
-    print(f"\n INFO: starting calculation for {n_cat} categories.\n")
+    print(f"\n INFO: starting calculation for {n_cat} categorie(s).\n")
 
     if n_cat == 1:
         path_plots_1_cat = "./Plots_1cat/"
@@ -237,7 +344,8 @@ for n_cat in cats:
         print("Metric for 1 category:", metric_1cat)
 
     if 1 not in cats:
-        metric_1cat = 33.055  # just for later comparison
+        metric_1cat = 42.81  # just for later comparison, adjust to your metric value
+        relative_metrics.append(metric_1cat)
 
     if n_cat == 2:
         t0 = time.time()
@@ -248,10 +356,10 @@ for n_cat in cats:
             params = []  # for later plotting
             for i, MVAbound in enumerate(MVAboundaries):
 
-                events_sig_cat0 = signal_events[(signal_events['sigma_m_over_m_decorr'] < resbound) & (signal_events['min_mvaID'] > MVAbound)]
-                events_sig_cat1 = signal_events[(signal_events['sigma_m_over_m_decorr'] >= resbound) & (signal_events['min_mvaID'] > MVAbound)]
-                events_bkg_cat0 = bkg_events[(bkg_events['sigma_m_over_m_decorr'] < resbound) & (bkg_events['min_mvaID'] > MVAbound)]
-                events_bkg_cat1 = bkg_events[(bkg_events['sigma_m_over_m_decorr'] >= resbound) & (bkg_events['min_mvaID'] > MVAbound)]
+                events_sig_cat0 = signal_events[(signal_events[resolution] < resbound) & (signal_events['min_mvaID'] > MVAbound)]
+                events_sig_cat1 = signal_events[(signal_events[resolution] >= resbound) & (signal_events['min_mvaID'] > MVAbound)]
+                events_bkg_cat0 = bkg_events[(bkg_events[resolution] < resbound) & (bkg_events['min_mvaID'] > MVAbound)]
+                events_bkg_cat1 = bkg_events[(bkg_events[resolution] >= resbound) & (bkg_events['min_mvaID'] > MVAbound)]
 
                 ##### background fit
                 hist_bkg_cat0 = hist.Hist(hist.axis.Regular(160, 100, 180))
@@ -271,13 +379,20 @@ for n_cat in cats:
                 hist_sig_cat0.fill(events_sig_cat0.mass.values, weight=events_sig_cat0.weight.values)
                 histo, bin_edges = hist_sig_cat0.to_numpy()
                 initial_guess = [5000, 124, 5, 5000, 125, 1]
-                params_sig_cat0, _ = curve_fit(double_gaussian, bin_centers, histo, p0=initial_guess)
+                try:
+                    params_sig_cat0, _ = curve_fit(double_gaussian, bin_centers, histo, p0=initial_guess)
+                except RuntimeError:
+                    print(f"WARNING: signal fit in cat. with res. bound [{resbound:.3f} and MVA bound {MVAbound:.3f} failed.")
+                    params_sig_cat0 = [0., 124, 999, 0., 125, 999]
 
                 hist_sig_cat1 = hist.Hist(hist.axis.Regular(160, 100, 180))
                 hist_sig_cat1.fill(events_sig_cat1.mass.values, weight=events_sig_cat1.weight.values)
                 histo, bin_edges = hist_sig_cat1.to_numpy()
-                initial_guess = [5000, 124, 5, 5000, 125, 1]
-                params_sig_cat1, _ = curve_fit(double_gaussian, bin_centers, histo, p0=initial_guess)
+                try:
+                    params_sig_cat1, _ = curve_fit(double_gaussian, bin_centers, histo, p0=initial_guess)
+                except RuntimeError:
+                    print(f"WARNING: signal fit in cat. with res. bound [{resbound:.3f} and MVA bound {MVAbound:.3f} failed.")
+                    params_sig_cat1 = [0., 124, 999, 0., 125, 999]
 
                 params.append((params_sig_cat0, params_bkg_cat0, params_sig_cat1, params_bkg_cat1))
 
@@ -307,14 +422,14 @@ for n_cat in cats:
                 _metrics.append(metric)
 
             # Plot best MVA category (if above threshold)
-            if np.max(_metrics) / metric_1cat > 1.08:
+            if np.max(_metrics) / metric_1cat > 1.07:
                 max_MVAbound = MVAboundaries[np.argmax(_metrics)]
 
                 # select arrays for best MVA bound again
-                events_sig_cat0 = signal_events[(signal_events['sigma_m_over_m_decorr'] < resbound) & (signal_events['min_mvaID'] > max_MVAbound)]
-                events_sig_cat1 = signal_events[(signal_events['sigma_m_over_m_decorr'] >= resbound) & (signal_events['min_mvaID'] > max_MVAbound)]
-                events_bkg_cat0 = bkg_events[(bkg_events['sigma_m_over_m_decorr'] < resbound) & (bkg_events['min_mvaID'] > max_MVAbound)]
-                events_bkg_cat1 = bkg_events[(bkg_events['sigma_m_over_m_decorr'] >= resbound) & (bkg_events['min_mvaID'] > max_MVAbound)]
+                events_sig_cat0 = signal_events[(signal_events[resolution] < resbound) & (signal_events['min_mvaID'] > max_MVAbound)]
+                events_sig_cat1 = signal_events[(signal_events[resolution] >= resbound) & (signal_events['min_mvaID'] > max_MVAbound)]
+                events_bkg_cat0 = bkg_events[(bkg_events[resolution] < resbound) & (bkg_events['min_mvaID'] > max_MVAbound)]
+                events_bkg_cat1 = bkg_events[(bkg_events[resolution] >= resbound) & (bkg_events['min_mvaID'] > max_MVAbound)]
 
                 # histogramming
                 hists_signal = [hist.Hist(hist.axis.Regular(80, 100, 180)) for _ in range(2)]
@@ -366,31 +481,37 @@ for n_cat in cats:
         t1 = time.time()
         print(f"time for the whole 2 cat scan: {t1-t0:.2f}s.")
 
-    if n_cat == 3:
+    if 2 not in cats:
+        metric_2cats = 60.18  # just for later comparison
+        relative_metrics.append(metric_2cats)
+
+    if n_cat == 3 and not cross_check_with_data:
         t0 = time.time()
         metrics = np.zeros((len(resboundaries), len(resboundaries)))
         metrics_df = pd.DataFrame(columns=["resBound1", "resBound2", "MVA_bound", "relativeMetric"])
 
         for i, bound1 in enumerate(resboundaries):
             print("\n bound:", i)
-            if bound1 > 0.012:
-                print("WARNING: skipping cats with bound 1 > 0.012 for time reasons. Make sure that this fits your values!")  # these are worse anyways with the values we have here
+            if bound1 > 0.02:
+                print("WARNING: skipping cats with bound 1 > 0.02 for time reasons. Make sure that this fits your values!")  # these are worse anyways with the values we have here
 
             for j, bound2 in enumerate(resboundaries):
+                if bound2 <= bound1:  # Ensuring increasing order of resboundaries, saving time
+                    continue
                 _metrics = []
                 params = []
                 for iMVA, MVAbound in enumerate(MVAboundaries):
 
                     events_sig_cats = [
-                        signal_events[(signal_events['sigma_m_over_m_decorr'] < bound1) & (signal_events['min_mvaID'] > MVAbound)],
-                        signal_events[(signal_events['sigma_m_over_m_decorr'] >= bound1) & (signal_events['sigma_m_over_m_decorr'] < bound2) & (signal_events['min_mvaID'] > MVAbound)],
-                        signal_events[(signal_events['sigma_m_over_m_decorr'] >= bound2) & (signal_events['min_mvaID'] > MVAbound)]
+                        signal_events[(signal_events[resolution] < bound1) & (signal_events['min_mvaID'] > MVAbound)],
+                        signal_events[(signal_events[resolution] >= bound1) & (signal_events[resolution] < bound2) & (signal_events['min_mvaID'] > MVAbound)],
+                        signal_events[(signal_events[resolution] >= bound2) & (signal_events['min_mvaID'] > MVAbound)]
                     ]
 
                     events_bkg_cats = [
-                        bkg_events[(bkg_events['sigma_m_over_m_decorr'] < bound1) & (bkg_events['min_mvaID'] > MVAbound)],
-                        bkg_events[(bkg_events['sigma_m_over_m_decorr'] >= bound1) & (bkg_events['sigma_m_over_m_decorr'] < bound2) & (bkg_events['min_mvaID'] > MVAbound)],
-                        bkg_events[(bkg_events['sigma_m_over_m_decorr'] >= bound2) & (bkg_events['min_mvaID'] > MVAbound)]
+                        bkg_events[(bkg_events[resolution] < bound1) & (bkg_events['min_mvaID'] > MVAbound)],
+                        bkg_events[(bkg_events[resolution] >= bound1) & (bkg_events[resolution] < bound2) & (bkg_events['min_mvaID'] > MVAbound)],
+                        bkg_events[(bkg_events[resolution] >= bound2) & (bkg_events['min_mvaID'] > MVAbound)]
                     ]
 
                     _params = []  # for later plotting
@@ -400,7 +521,7 @@ for n_cat in cats:
                         hist_bkg = hist.Hist(hist.axis.Regular(160, 100, 180))
                         hist_bkg.fill(events_bkg_cats[k].mass.values, weight=events_bkg_cats[k].weight.values)
                         histo, bin_edges = hist_bkg.to_numpy()
-                        bin_centers = [(bin_edges[_l] + bin_edges[_l + 1]) / 2 for _l in range(len(histo))]
+                        bin_centers = np.array([(bin_edges[_l] + bin_edges[_l + 1]) / 2 for _l in range(len(histo))])
                         params_bkg, _ = curve_fit(exponential, bin_centers, histo, p0=([10000, 40, 0]))
 
                         hist_sig = hist.Hist(hist.axis.Regular(160, 100, 180))
@@ -435,21 +556,21 @@ for n_cat in cats:
                 metrics[i, j] = np.max(_metrics)
 
                 # Plot best MVA category for the current resolution category
-                if np.max(_metrics) / metric_1cat > 1.10:
+                if np.max(_metrics) / metric_1cat > 1.07:
                     metrics_df.loc[len(metrics_df)] = [bound1, bound2, MVAboundaries[np.argmax(_metrics)], np.max(_metrics) / metric_1cat]
                     max_MVAbound = MVAboundaries[np.argmax(_metrics)]
 
                     # Select arrays for best MVA bound again
                     events_sig_cats = [
-                        signal_events[(signal_events['sigma_m_over_m_decorr'] < bound1) & (signal_events['min_mvaID'] > max_MVAbound)],
-                        signal_events[(signal_events['sigma_m_over_m_decorr'] >= bound1) & (signal_events['sigma_m_over_m_decorr'] < bound2) & (signal_events['min_mvaID'] > max_MVAbound)],
-                        signal_events[(signal_events['sigma_m_over_m_decorr'] >= bound2) & (signal_events['min_mvaID'] > max_MVAbound)]
+                        signal_events[(signal_events[resolution] < bound1) & (signal_events['min_mvaID'] > max_MVAbound)],
+                        signal_events[(signal_events[resolution] >= bound1) & (signal_events[resolution] < bound2) & (signal_events['min_mvaID'] > max_MVAbound)],
+                        signal_events[(signal_events[resolution] >= bound2) & (signal_events['min_mvaID'] > max_MVAbound)]
                     ]
 
                     events_bkg_cats = [
-                        bkg_events[(bkg_events['sigma_m_over_m_decorr'] < bound1) & (bkg_events['min_mvaID'] > max_MVAbound)],
-                        bkg_events[(bkg_events['sigma_m_over_m_decorr'] >= bound1) & (bkg_events['sigma_m_over_m_decorr'] < bound2) & (bkg_events['min_mvaID'] > max_MVAbound)],
-                        bkg_events[(bkg_events['sigma_m_over_m_decorr'] >= bound2) & (bkg_events['min_mvaID'] > max_MVAbound)]
+                        bkg_events[(bkg_events[resolution] < bound1) & (bkg_events['min_mvaID'] > max_MVAbound)],
+                        bkg_events[(bkg_events[resolution] >= bound1) & (bkg_events[resolution] < bound2) & (bkg_events['min_mvaID'] > max_MVAbound)],
+                        bkg_events[(bkg_events[resolution] >= bound2) & (bkg_events['min_mvaID'] > max_MVAbound)]
                     ]
 
                     # Histogramming
@@ -481,24 +602,36 @@ for n_cat in cats:
                     fig.savefig(path + "bound2_{}.pdf".format(j))
                     plt.close()
 
-        relative_metrics.append(np.max(metrics))
+        relative_metrics.append(np.max(metrics[~np.isnan(metrics)]))
         t1 = time.time()
         print(f"time for the whole 3 cat scan: {t1-t0:.2f}s.")
         metrics_df.to_csv("./metrics_3cats.csv", float_format='%.5f')
 
-        # Create heatmap
-        fig, ax = plt.subplots(figsize=(10, 8))
+        fig, ax = plt.subplots(figsize=(9,8))
         width = (resboundaries[-1] - resboundaries[0]) / (len(resboundaries) - 1)
         c = ax.imshow(metrics.T / metric_1cat, cmap='viridis', vmin=1, origin="lower", extent=[resboundaries[0], resboundaries[-1] + width, resboundaries[0], resboundaries[-1] + width])
 
-        # Set labels and title
-        ax.set_xlabel('Boundary 1 Value')
-        ax.set_ylabel('Boundary 2 Value')
-        ax.set_title('Sensitivity 3 cats / 1 cat')
+        ax.set_xlabel('Lower resolution boundary', fontsize=22)
+        ax.set_ylabel('Upper resolution boundary', fontsize=22)
 
-        # Display colorbar
-        cbar = fig.colorbar(c, ax=ax)
-        cbar.set_label('Metric Value')
+        # Get the position of the current axis
+        pos = ax.get_position()
+
+        # Adjust the margin to a smaller value so the color bar is closer to the heatmap
+        cbar_margin = 0.01  # Reduce the margin so the color bar is closer to the heatmap
+        cbar_width = pos.width * 0.75 / len(resboundaries)  # Proportional width
+
+        cbar_ax = fig.add_axes([pos.x1 + cbar_margin, pos.y0, cbar_width, pos.height])
+
+        # Create the color bar in the new axis
+        cbar = fig.colorbar(c, cax=cbar_ax)
+        cbar.set_label('Rel. significance w.r.t. 1 cat.', fontsize=20, labelpad=10)
+        cbar.ax.tick_params(labelsize=16)
+
+        # Set the tick labels for the color bar to be horizontal
+        cbar.ax.set_yticklabels(cbar.ax.get_yticklabels(), rotation=0)
+
+        ax.tick_params(axis='both', which='major', labelsize=18)
 
         num_rows, num_cols = metrics.T.shape
         for i in range(num_rows):
@@ -512,16 +645,148 @@ for n_cat in cats:
                 ax.text(x, y, f"{value:.2f}", va='center', ha='center', color='white', fontsize=fontsize)
                 print(x, y, f"{value:.2f}")
 
-        plt.tight_layout()
+        hep.cms.label(data=True, ax=ax, loc=0, label="Work in Progress", com=13.6, fontsize=22)
         plt.savefig("./sensitivity_3_cats.pdf")
 
-        path_plots_4_cats = "./Plots_4cats/"
-        if not os.path.exists(path_plots_4_cats):
-            os.makedirs(path_plots_4_cats)
-
-        metrics = np.zeros((len(resboundaries), len(resboundaries), len(resboundaries)))
-        metrics_df = pd.DataFrame(columns=["resBound1", "resBound2", "resBound3", "MVA_bound", "relativeMetric"])
+    if n_cat == 3 and cross_check_with_data:
         t0 = time.time()
+        metrics = np.zeros((len(resboundaries), len(resboundaries)))
+        metrics_df = pd.DataFrame(columns=["resBound1", "resBound2", "MVA_bound", "relativeMetric"])
+
+        for i, bound1 in enumerate(resboundaries):
+            print("\n bound:", i)
+            if bound1 > 0.02:
+                print("WARNING: skipping cats with bound 1 > 0.02 for time reasons. Make sure that this fits your values!")  # these are worse anyways with the values we have here
+
+            for j, bound2 in enumerate(resboundaries):
+                if bound2 <= bound1:  # Ensuring increasing order of resboundaries, saving time
+                    continue
+                _metrics = []
+                params = []
+                for iMVA, MVAbound in enumerate(MVAboundaries):
+
+                    events_sig_cats = [
+                        signal_events[(signal_events[resolution] < bound1) & (signal_events['min_mvaID'] > MVAbound)],
+                        signal_events[(signal_events[resolution] >= bound1) & (signal_events[resolution] < bound2) & (signal_events['min_mvaID'] > MVAbound)],
+                        signal_events[(signal_events[resolution] >= bound2) & (signal_events['min_mvaID'] > MVAbound)]
+                    ]
+
+                    events_bkg_cats = [
+                        events_data[(events_data['sigma_m_over_m_smeared_decorr'] < bound1) & (events_data['min_mvaID'] > MVAbound)],
+                        events_data[(events_data['sigma_m_over_m_smeared_decorr'] >= bound1) & (events_data['sigma_m_over_m_smeared_decorr'] < bound2) & (events_data['min_mvaID'] > MVAbound)],
+                        events_data[(events_data['sigma_m_over_m_smeared_decorr'] >= bound2) & (events_data['min_mvaID'] > MVAbound)]
+                    ]
+
+                    _params = []  # for later plotting
+                    metric_val = 0
+
+                    for k in range(3):
+                        hist_bkg = hist.Hist(hist.axis.Regular(160, 100, 180))
+                        hist_bkg.fill(events_bkg_cats[k].mass.values)
+                        histo, bin_edges = hist_bkg.to_numpy()
+                        bin_centers = np.array([(bin_edges[_l] + bin_edges[_l + 1]) / 2 for _l in range(len(histo))])
+                        # exclude signal window
+                        blinding_mask = (bin_centers < 120) | (bin_centers > 130)
+                        params_bkg, _ = curve_fit(exponential, bin_centers[blinding_mask], histo[blinding_mask], p0=([10000, 40, 0]))
+
+                        hist_sig = hist.Hist(hist.axis.Regular(160, 100, 180))
+                        hist_sig.fill(events_sig_cats[k].mass.values, weight=events_sig_cats[k].weight.values)
+                        histo, bin_edges = hist_sig.to_numpy()
+                        initial_guess = [5000, 124, 5, 5000, 125, 1]
+
+                        try:
+                            params_sig, _ = curve_fit(double_gaussian, bin_centers, histo, p0=initial_guess)
+                        except RuntimeError:
+                            print(f"WARNING: signal fit in cat. with res. bounds [{bound1:.3f},{bound2:.3f}] and MVA bound {MVAbound:.3f} failed.")
+                            params_sig = [0., 124, 999, 0., 125, 999]
+
+                        _params.append(params_sig)
+                        _params.append(params_bkg)
+
+                        x_steps = np.linspace(bin_edges[0], bin_edges[-1], 10000)
+                        y_vals = double_gaussian(x_steps, *params_sig)
+                        dx = x_steps[1] - x_steps[0]
+                        y_vals /= np.sum(y_vals * dx)
+
+                        central_interval = get_central_interval(y_vals, dx, area=0.68)
+                        signal_integral, _ = quad(double_gaussian, central_interval[0], central_interval[1], args=tuple(params_sig))
+                        background_integral, _ = quad(exponential, central_interval[0], central_interval[1], args=tuple(params_bkg))
+
+                        metric_val += (signal_integral / np.sqrt(background_integral)) ** 2
+
+                    metric = np.sqrt(metric_val)
+                    _metrics.append(metric)
+                    params.append(_params)
+
+                metrics[i, j] = np.max(_metrics)
+                print(np.max(_metrics))
+                print("1cat", metric_1cat)
+
+                # Plot best MVA category for the current resolution category
+                if np.max(_metrics) / metric_1cat > 1.07:
+                    metrics_df.loc[len(metrics_df)] = [bound1, bound2, MVAboundaries[np.argmax(_metrics)], np.max(_metrics) / metric_1cat]
+                    max_MVAbound = MVAboundaries[np.argmax(_metrics)]
+
+                    # Select arrays for best MVA bound again
+                    events_sig_cats = [
+                        signal_events[(signal_events[resolution] < bound1) & (signal_events['min_mvaID'] > max_MVAbound)],
+                        signal_events[(signal_events[resolution] >= bound1) & (signal_events[resolution] < bound2) & (signal_events['min_mvaID'] > max_MVAbound)],
+                        signal_events[(signal_events[resolution] >= bound2) & (signal_events['min_mvaID'] > max_MVAbound)]
+                    ]
+
+                    events_bkg_cats = [
+                        bkg_events[(bkg_events[resolution] < bound1) & (bkg_events['min_mvaID'] > max_MVAbound)],
+                        bkg_events[(bkg_events[resolution] >= bound1) & (bkg_events[resolution] < bound2) & (bkg_events['min_mvaID'] > max_MVAbound)],
+                        bkg_events[(bkg_events[resolution] >= bound2) & (bkg_events['min_mvaID'] > max_MVAbound)]
+                    ]
+
+                    events_data_cats = [
+                        events_data[(events_data['sigma_m_over_m_smeared_decorr'] < bound1) & (events_data['min_mvaID'] > max_MVAbound)],
+                        events_data[(events_data['sigma_m_over_m_smeared_decorr'] >= bound1) & (events_data['sigma_m_over_m_smeared_decorr'] < bound2) & (events_data['min_mvaID'] > max_MVAbound)],
+                        events_data[(events_data['sigma_m_over_m_smeared_decorr'] >= bound2) & (events_data['min_mvaID'] > max_MVAbound)]
+                    ]
+
+                    # Histogramming
+                    hists_signal = [hist.Hist(hist.axis.Regular(80, 100, 180)) for _ in range(3)]
+                    hists_data = [hist.Hist(hist.axis.Regular(80, 100, 180)) for _ in range(3)]
+                    hists_diphoton = [hist.Hist(hist.axis.Regular(80, 100, 180)) for _ in range(3)]
+                    hists_GJet = [hist.Hist(hist.axis.Regular(80, 100, 180)) for _ in range(3)]
+                    # hist of squared weights for error bars of weighted hists. I am not aware of an easier method to get correct error bars with the hist package....
+                    hists_bkg_unc = [hist.Hist(hist.axis.Regular(80, 100, 180)) for _ in range(3)]
+                    for i_, (event_sig, event_bkg, event_data) in enumerate(zip(events_sig_cats, events_bkg_cats, events_data_cats)):
+                        hists_signal[i_].fill(event_sig.mass.values, weight=event_sig.weight.values)
+                        hists_data[i_].fill(event_data.mass.values)
+                        hists_diphoton[i_].fill(event_bkg.mass[event_bkg.process == "Diphoton"].values, weight=event_bkg.weight[event_bkg.process == "Diphoton"].values)
+                        hists_GJet[i_].fill(event_bkg.mass[event_bkg.process != "Diphoton"].values, weight=event_bkg.weight[event_bkg.process != "Diphoton"].values)
+                        hists_bkg_unc[i_].fill(event_bkg.mass.values, weight=event_bkg.weight.values**2)
+
+                    # Extract fitted values
+                    params_list = params[np.argmax(_metrics)]
+                    y_vals_bkg = [exponential(x_steps, *params_list[_i * 2 + 1]) for _i in range(3)]
+                    y_vals_sig = [double_gaussian(x_steps, *params_list[_i * 2]) for _i in range(3)]
+
+                    # Put to figure
+                    fig, axes = plt.subplots(1, 3, figsize=(30, 10))
+                    for _i in range(3):
+                        plot_category(hists_signal[_i], [hists_GJet[_i], hists_diphoton[_i]], x_steps, y_vals_sig[_i] * 2, y_vals_bkg[_i] * 2, params_list[_i * 2], ax=axes[_i], hist_unc_bkg=hists_bkg_unc[_i])
+                        hep.histplot(hists_data[_i], label="Data 2022", ax=axes[_i], yerr=True, color="black", histtype='errorbar', markersize=12, elinewidth=3)
+                        axes[_i].legend(ncol=2)
+                    fig.suptitle("MVA ID bound: {:.3f}, resolution bounds: [{:.3f},{:.3f}], metric: {:.4f}".format(max_MVAbound, bound1, bound2, np.max(_metrics) / metric_1cat), fontsize=24)
+                    fig.tight_layout()
+                    path = "./Plots_3catsData/bound1_{:.3f}/".format(bound1)
+                    if not os.path.exists(path):
+                        os.makedirs(path)
+                    fig.savefig(path + "bound2_{}.pdf".format(j))
+                    plt.close()
+
+        relative_metrics.append(np.max(metrics))
+        t1 = time.time()
+        print(f"time for the whole 3 cat scan using actual data: {t1-t0:.2f}s.")
+        metrics_df.to_csv("./metrics_3catsData.csv", float_format='%.5f')
+
+    if 3 not in cats:
+        metric_3cats = metric_2cats  # just for later comparison
+        relative_metrics.append(metric_3cats)
 
     if n_cat == 4:
         path_plots_4_cats = "./Plots_4cats/"
@@ -534,28 +799,28 @@ for n_cat in cats:
 
         for i, bound1 in enumerate(resboundaries):
             print("\n bound 1:", i)
-            if bound1 > 0.012:
+            if bound1 > 0.013:
                 print("WARNING: skipping cats with bound 1 > 0.012 for time reasons. Make sure that this fits your values!")  # these are worse anyways with the values we have here
             for j, bound2 in enumerate(resboundaries):
                 print("\t bound 2:", j)
                 for k, bound3 in enumerate(resboundaries):
-                    if bound2 <= bound1 or bound3 <= bound2:  # Ensuring increasing order of resboundaries
+                    if bound2 <= bound1 or bound3 <= bound2:  # Ensuring increasing order of resboundaries, saving time
                         continue
                     _metrics = []
                     params = []
                     for iMVA, MVAbound in enumerate(MVAboundaries):
                         events_sig_cats = [
-                            signal_events[(signal_events['sigma_m_over_m_decorr'] < bound1) & (signal_events['min_mvaID'] > MVAbound)],
-                            signal_events[(signal_events['sigma_m_over_m_decorr'] >= bound1) & (signal_events['sigma_m_over_m_decorr'] < bound2) & (signal_events['min_mvaID'] > MVAbound)],
-                            signal_events[(signal_events['sigma_m_over_m_decorr'] >= bound2) & (signal_events['sigma_m_over_m_decorr'] < bound3) & (signal_events['min_mvaID'] > MVAbound)],
-                            signal_events[(signal_events['sigma_m_over_m_decorr'] >= bound3) & (signal_events['min_mvaID'] > MVAbound)]
+                            signal_events[(signal_events[resolution] < bound1) & (signal_events['min_mvaID'] > MVAbound)],
+                            signal_events[(signal_events[resolution] >= bound1) & (signal_events[resolution] < bound2) & (signal_events['min_mvaID'] > MVAbound)],
+                            signal_events[(signal_events[resolution] >= bound2) & (signal_events[resolution] < bound3) & (signal_events['min_mvaID'] > MVAbound)],
+                            signal_events[(signal_events[resolution] >= bound3) & (signal_events['min_mvaID'] > MVAbound)]
                         ]
 
                         events_bkg_cats = [
-                            bkg_events[(bkg_events['sigma_m_over_m_decorr'] < bound1) & (bkg_events['min_mvaID'] > MVAbound)],
-                            bkg_events[(bkg_events['sigma_m_over_m_decorr'] >= bound1) & (bkg_events['sigma_m_over_m_decorr'] < bound2) & (bkg_events['min_mvaID'] > MVAbound)],
-                            bkg_events[(bkg_events['sigma_m_over_m_decorr'] >= bound2) & (bkg_events['sigma_m_over_m_decorr'] < bound3) & (bkg_events['min_mvaID'] > MVAbound)],
-                            bkg_events[(bkg_events['sigma_m_over_m_decorr'] >= bound3) & (bkg_events['min_mvaID'] > MVAbound)]
+                            bkg_events[(bkg_events[resolution] < bound1) & (bkg_events['min_mvaID'] > MVAbound)],
+                            bkg_events[(bkg_events[resolution] >= bound1) & (bkg_events[resolution] < bound2) & (bkg_events['min_mvaID'] > MVAbound)],
+                            bkg_events[(bkg_events[resolution] >= bound2) & (bkg_events[resolution] < bound3) & (bkg_events['min_mvaID'] > MVAbound)],
+                            bkg_events[(bkg_events[resolution] >= bound3) & (bkg_events['min_mvaID'] > MVAbound)]
                         ]
 
                         metric_val = 0
@@ -564,7 +829,7 @@ for n_cat in cats:
                             hist_bkg = hist.Hist(hist.axis.Regular(160, 100, 180))
                             hist_bkg.fill(events_bkg_cats[l_].mass.values, weight=events_bkg_cats[l_].weight.values)
                             histo, bin_edges = hist_bkg.to_numpy()
-                            bin_centers = [(bin_edges[_l] + bin_edges[_l + 1]) / 2 for _l in range(len(histo))]
+                            bin_centers = np.array([(bin_edges[_l] + bin_edges[_l + 1]) / 2 for _l in range(len(histo))])
                             params_bkg, _ = curve_fit(exponential, bin_centers, histo, p0=([10000, 40, 0]))
 
                             hist_sig = hist.Hist(hist.axis.Regular(160, 100, 180))
@@ -597,26 +862,26 @@ for n_cat in cats:
                         params.append(_params)
 
                     metrics[i, j, k] = np.max(_metrics)
-                    print(np.max(_metrics))
+                    print(np.max(_metrics) / metric_1cat)
 
                     # Plot best MVA category for the current resolution category
-                    if np.max(_metrics) / metric_1cat > 1.12:
+                    if np.max(_metrics) / metric_1cat > 1.05:
                         metrics_df.loc[len(metrics_df)] = [bound1, bound2, bound3, MVAboundaries[np.argmax(_metrics)], np.max(_metrics) / metric_1cat]
                         max_MVAbound = MVAboundaries[np.argmax(_metrics)]
 
                         # Select arrays for best MVA bound again
                         events_sig_cats = [
-                            signal_events[(signal_events['sigma_m_over_m_decorr'] < bound1) & (signal_events['min_mvaID'] > max_MVAbound)],
-                            signal_events[(signal_events['sigma_m_over_m_decorr'] >= bound1) & (signal_events['sigma_m_over_m_decorr'] < bound2) & (signal_events['min_mvaID'] > max_MVAbound)],
-                            signal_events[(signal_events['sigma_m_over_m_decorr'] >= bound2) & (signal_events['sigma_m_over_m_decorr'] < bound3) & (signal_events['min_mvaID'] > max_MVAbound)],
-                            signal_events[(signal_events['sigma_m_over_m_decorr'] >= bound3) & (signal_events['min_mvaID'] > max_MVAbound)]
+                            signal_events[(signal_events[resolution] < bound1) & (signal_events['min_mvaID'] > max_MVAbound)],
+                            signal_events[(signal_events[resolution] >= bound1) & (signal_events[resolution] < bound2) & (signal_events['min_mvaID'] > max_MVAbound)],
+                            signal_events[(signal_events[resolution] >= bound2) & (signal_events[resolution] < bound3) & (signal_events['min_mvaID'] > max_MVAbound)],
+                            signal_events[(signal_events[resolution] >= bound3) & (signal_events['min_mvaID'] > max_MVAbound)]
                         ]
 
                         events_bkg_cats = [
-                            bkg_events[(bkg_events['sigma_m_over_m_decorr'] < bound1) & (bkg_events['min_mvaID'] > max_MVAbound)],
-                            bkg_events[(bkg_events['sigma_m_over_m_decorr'] >= bound1) & (bkg_events['sigma_m_over_m_decorr'] < bound2) & (bkg_events['min_mvaID'] > max_MVAbound)],
-                            bkg_events[(bkg_events['sigma_m_over_m_decorr'] >= bound2) & (bkg_events['sigma_m_over_m_decorr'] < bound3) & (bkg_events['min_mvaID'] > max_MVAbound)],
-                            bkg_events[(bkg_events['sigma_m_over_m_decorr'] >= bound3) & (bkg_events['min_mvaID'] > max_MVAbound)]
+                            bkg_events[(bkg_events[resolution] < bound1) & (bkg_events['min_mvaID'] > max_MVAbound)],
+                            bkg_events[(bkg_events[resolution] >= bound1) & (bkg_events[resolution] < bound2) & (bkg_events['min_mvaID'] > max_MVAbound)],
+                            bkg_events[(bkg_events[resolution] >= bound2) & (bkg_events[resolution] < bound3) & (bkg_events['min_mvaID'] > max_MVAbound)],
+                            bkg_events[(bkg_events[resolution] >= bound3) & (bkg_events['min_mvaID'] > max_MVAbound)]
                         ]
 
                         # Histogramming
@@ -636,7 +901,7 @@ for n_cat in cats:
                         # Put to figure
                         fig, axes = plt.subplots(1, 4, figsize=(40, 10))
                         for _i in range(4):
-                            plot_category(hists_signal[_i], [hists_GJet[_i], hists_diphoton[_i]], x_steps, y_vals_sig[_i], y_vals_bkg[_i], params_list[i * 2], ax=axes[_i])
+                            plot_category(hists_signal[_i], [hists_GJet[_i], hists_diphoton[_i]], x_steps, y_vals_sig[_i], y_vals_bkg[_i], params_list[_i * 2], ax=axes[_i])
 
                         fig.suptitle("MVA ID bound: {:.3f}, resolution bounds: [{:.3f},{:.3f},{:.3f}], metric: {:.4f}".format(max_MVAbound, bound1, bound2, bound3, np.max(_metrics) / metric_1cat), fontsize=24)
                         fig.tight_layout()
@@ -671,12 +936,17 @@ for n_cat in cats:
             plt.savefig(path_plots_4_cats + f"sensitivity_{i}.pdf")
             plt.clf()
 
-        relative_metrics.append(np.max(metrics))
+        relative_metrics.append(np.max(metrics[~np.isnan(metrics)]))
         metrics_df.to_csv("./metrics_4cats.csv", float_format='%.5f')
         t1 = time.time()
         print(f"time for the whole 4 cat scan: {t1-t0:.2f}s.")
 
+if 4 not in cats:
+    metric_4cats = metric_3cats  # just for later comparison
+    relative_metrics.append(metric_4cats)
+
 relative_metrics = np.array(relative_metrics) / metric_1cat
+print(relative_metrics)
 
 labels = ["1 cat.", "2 cat.", "3 cat.", "4 cat."]
 categories = [1, 2, 3, 4]
@@ -685,8 +955,7 @@ plt.scatter(categories, relative_metrics, color='blue', s=100)
 for i, label in enumerate(labels):
     plt.annotate(label, (categories[i], relative_metrics[i]), textcoords="offset points", xytext=(0,10), ha='center', fontsize=14)
 plt.xlabel("Number of categories")
-plt.ylabel("Relative significance")
-plt.xticks(categories)  # Set the x-ticks to be the category numbers
+plt.ylabel("Rel. approx. significance")
 plt.grid(True, which='both', linestyle='--', linewidth=0.5)
 plt.ylim(0.9, 1.3)
 plt.tight_layout()

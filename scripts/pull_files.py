@@ -21,7 +21,7 @@ parser.add_argument(
     help="Choose the target to download (default: %(default)s)",
     default="GoldenJson",
 
-    choices=["GoldenJSON", "cTag", "PhotonID", "PU_run2", "SS", "JetMET","CDFs", "JEC", "JER", "Material", "TriggerSF", "PreselSF", "eVetoSF","Flows"],
+    choices=["GoldenJSON", "cTag", "PhotonID", "PU", "SS", "JetMET","CDFs", "JEC", "JER", "Material", "TriggerSF", "PreselSF", "eVetoSF","Flows"],
 
 )
 
@@ -488,7 +488,7 @@ def get_jetmet_json(logger, target_dir):
     fetch_file("JetMET", logger, from_to_dict, type="copy")
 
 
-def get_pileup_Run2(logger, target_dir):
+def get_pileup(logger, target_dir):
     # Base URL for pileup JSONs
     base_path = "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/LUM"
 
@@ -516,9 +516,25 @@ def get_pileup_Run2(logger, target_dir):
             "from": f"{base_path}/2018_UL/puWeights.json.gz",
             "to": f"{to_prefix}/pileup_2018.json.gz",
         },
+        "2022_preEE": {
+            "from": f"{base_path}/2022_Summer22/puWeights.json.gz",
+            "to": f"{to_prefix}/pileup_2022preEE.json.gz",
+        },
+        "2022_postEE": {
+            "from": f"{base_path}/2022_Summer22EE/puWeights.json.gz",
+            "to": f"{to_prefix}/pileup_2022postEE.json.gz",
+        },
+        "2023_preBPix": {
+            "from": f"{base_path}/2023_Summer23/puWeights.json.gz",
+            "to": f"{to_prefix}/pileup_2023preBPix.json.gz",
+        },
+        "2023_postBPix": {
+            "from": f"{base_path}/2023_Summer23BPix/puWeights.json.gz",
+            "to": f"{to_prefix}/pileup_2023postBPix.json.gz",
+        },
     }
 
-    fetch_file("Pileup_Run2", logger, from_to_dict, type="copy")
+    fetch_file("Pileup", logger, from_to_dict, type="copy")
 
 
 if __name__ == "__main__":
@@ -528,11 +544,11 @@ if __name__ == "__main__":
     p = pathlib.Path(*p.parts[:-1])  # remove file name
     p.mkdir(parents=True, exist_ok=True)
 
-    logger = setup_logger(level=args.log, logfile=logfile, time=True)
+    logger = setup_logger(level=args.log, logfile=logfile)
 
     if args.all:
         get_goldenjson(logger, args.target_dir)
-        get_pileup_Run2(logger, args.target_dir)
+        get_pileup(logger, args.target_dir)
         get_scale_and_smearing(logger, args.target_dir)
         get_mass_decorrelation_CDF(logger, args.target_dir)
         get_Flow_files(logger, args.target_dir)
@@ -547,8 +563,8 @@ if __name__ == "__main__":
         get_eveto_json(logger, args.target_dir)
     elif args.target == "GoldenJSON":
         get_goldenjson(logger, args.target_dir)
-    elif args.target == "PU_run2":
-        get_pileup_Run2(logger, args.target_dir)
+    elif args.target == "PU":
+        get_pileup(logger, args.target_dir)
     elif args.target == "SS":
         get_scale_and_smearing(logger, args.target_dir)
     elif args.target == "CDFs":

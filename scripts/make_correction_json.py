@@ -3,9 +3,16 @@ import correctionlib
 import correctionlib.schemav2 as cs
 import rich
 from optparse import OptionParser
+import pydantic
+
+print(pydantic.__version__)
+print(correctionlib.__version__)
 
 # This script is meant to create json files containing the correction and systematic variations as were used in flashgg
 # the files are created using correctionlib, copying the binning, corrections and errors from flashgg
+
+# The script works with the most recent version of correctionlib, to be compatible with older releases one should 
+# change the istances of "cset.model_dump_json" to "cset.json" to not stumble into errors
 
 usage = "Usage: python %prog [options]"
 parser = OptionParser(usage=usage)

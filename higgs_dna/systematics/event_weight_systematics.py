@@ -5,7 +5,6 @@ from scipy.interpolate import interp1d
 import correctionlib
 import awkward as ak
 from higgs_dna.utils.misc_utils import choose_jet
-import uproot
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,7 +29,7 @@ def SF_photon_ID(
         json_file = os.path.join(os.path.dirname(__file__), "JSONs/SF_photon_ID/2022/PhotonIDMVA_2022PreEE.json")
     elif year == "2022postEE":
         json_file = os.path.join(os.path.dirname(__file__), "JSONs/SF_photon_ID/2022/PhotonIDMVA_2022PostEE.json")
-    
+
     evaluator = correctionlib.CorrectionSet.from_file(json_file)["PhotonIDMVA_SF"]
 
     # In principle, we should use the fully correct formula https://indico.cern.ch/event/1360948/contributions/5783762/attachments/2788516/4870824/24_02_02_HIG-23-014_PreAppPres.pdf#page=7
@@ -67,9 +66,9 @@ def SF_photon_ID(
                 abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].pt, "uncertainty"
             )
 
-            sfup = (sf_lead + sf_unc_lead) * (sf_sublead + sf_unc_sublead)  / _sf
+            sfup = (sf_lead + sf_unc_lead) * (sf_sublead + sf_unc_sublead) / _sf
 
-            sfdown = (sf_lead - sf_unc_lead) * (sf_sublead - sf_unc_sublead)  / _sf
+            sfdown = (sf_lead - sf_unc_lead) * (sf_sublead - sf_unc_sublead) / _sf
 
     weights.add(name="SF_photon_ID", weight=sf, weightUp=sfup, weightDown=sfdown)
 
@@ -80,82 +79,38 @@ def Pileup(events, weights, year, is_correction=True, **kwargs):
     """
     Function to apply either the pileup correction to MC to make it match the pileup profile of a certain year/period,
     or the respective uncertainties.
-    The parameter `year` needs to be specified as one of ["2022preEE", "2022postEE"] for Run-3 or ["2016preVFP", "2016postVFP", "2017", "2018"] for Run-2.
-    By now, only the Run-2 files are available from LUM POG in the correctionlib format...
-    The pileup histos for Run-3 were produced by Junquan, the JSONs for Run-2 first need to be pulled with `scripts/pull_files.py`!
+    The parameter `year` needs to be specified as one of ["2022preEE", "2022postEE", "23preBPix", "23postBPix"] for Run-3 or ["2016preVFP", "2016postVFP", "2017", "2018"] for Run-2.
+    By now, the Run-2 and Run-3 up to 2023D files are available from LUM POG in the correctionlib format...
+    The pileup histos for Run-3 were produced by Junquan, the JSONs for Run-2 and Run-3 first need to be pulled with `scripts/pull_files.py`!
     """
+    path_to_json = os.path.join(os.path.dirname(__file__), "../systematics/JSONs/pileup/pileup_{}.json.gz".format(year))
+    if "16" in year:
+        name = "Collisions16_UltraLegacy_goldenJSON"
+    elif "17" in year:
+        name = "Collisions17_UltraLegacy_goldenJSON"
+    elif "18" in year:
+        name = "Collisions18_UltraLegacy_goldenJSON"
+    elif "22preEE" in year:
+        name = "Collisions2022_355100_357900_eraBCD_GoldenJson"
+    elif "22postEE" in year:
+        name = "Collisions2022_359022_362760_eraEFG_GoldenJson"
+    elif "23preBPix" in year:
+        name = "Collisions2023_366403_369802_eraBC_GoldenJson"
+    elif "23postBPix" in year:
+        name = "Collisions2023_369803_370790_eraD_GoldenJson"
 
-    # This block should be removed when Run-3 correctionlib JSONs are available...
-    if "22" in year:
-        if year == "2022preEE":
-            path_pileup = os.path.join(os.path.dirname(__file__), "JSONs/pileup/2022/preEE/")
-        elif year == "2022postEE":
-            path_pileup = os.path.join(os.path.dirname(__file__), "JSONs/pileup/2022/postEE/")
+    evaluator = correctionlib.CorrectionSet.from_file(path_to_json)[name]
 
-        # get the MC pileup distribution by histogramming Pileup.nPU
-        pileup_MC = np.histogram(
-            ak.to_numpy(events.Pileup.nPU), bins=100, range=(0, 100)
-        )[0].astype("float64")
-        # avoid division by zero later
-        pileup_MC[pileup_MC == 0.0] = 1
-        pileup_MC /= pileup_MC.sum()
-
-        # data distributions from LUM hists
-        pileup_profile = uproot.open(path_pileup + "nominal.root")["pileup"]
-        pileup_profile = pileup_profile.to_numpy()[0]
-        pileup_profile /= pileup_profile.sum()
-
-        pileup_correction = pileup_profile / pileup_MC
-        # remove large MC reweighting factors to prevent artifacts
-        pileup_correction[pileup_correction > 10] = 10
-        sf_nom = pileup_correction[ak.to_numpy(events.Pileup.nPU)]
-
-        if is_correction:
-            sf = sf_nom
-            sfup, sfdown = None, None
-
-        else:
-            sf = np.ones(len(weights._weight))
-
-            pileup_profile_up = uproot.open(path_pileup + "up.root")["pileup"]
-            pileup_profile_up = pileup_profile_up.to_numpy()[0]
-            pileup_profile_up /= pileup_profile_up.sum()
-            pileup_correction_up = pileup_profile_up / pileup_MC
-            pileup_correction_up[pileup_correction_up > 10] = 10
-            sfup = pileup_correction_up[ak.to_numpy(events.Pileup.nPU)] / sf_nom
-
-            pileup_profile_down = uproot.open(path_pileup + "down.root")["pileup"]
-            pileup_profile_down = pileup_profile_down.to_numpy()[0]
-            pileup_profile_down /= pileup_profile_down.sum()
-            pileup_correction_down = pileup_profile_down / pileup_MC
-            pileup_correction_down[pileup_correction_down > 10] = 10
-            sfdown = pileup_correction_down[ak.to_numpy(events.Pileup.nPU)] / sf_nom
-
-        weights.add(name="Pileup", weight=sf, weightUp=sfup, weightDown=sfdown)
-
-        return weights
+    if is_correction:
+        sf = evaluator.evaluate(events.Pileup.nTrueInt, "nominal")
+        sfup, sfdown = None, None
 
     else:
-        path_to_json = os.path.join(os.path.dirname(__file__), "../systematics/JSONs/pileup/pileup_{}.json.gz".format(year))
-        if "16" in year:
-            name = "Collisions16_UltraLegacy_goldenJSON"
-        elif "17" in year:
-            name = "Collisions17_UltraLegacy_goldenJSON"
-        elif "18" in year:
-            name = "Collisions18_UltraLegacy_goldenJSON"
+        sf = np.ones(len(weights._weight))
+        sf_nom = evaluator.evaluate(events.Pileup.nTrueInt, "nominal")
 
-        evaluator = correctionlib.CorrectionSet.from_file(path_to_json)[name]
-
-        if is_correction:
-            sf = evaluator.evaluate(events.Pileup.nPU, "nominal")
-            sfup, sfdown = None, None
-
-        else:
-            sf = np.ones(len(weights._weight))
-            sf_nom = evaluator.evaluate(events.Pileup.nPU, "nominal")
-
-            sfup = evaluator.evaluate(events.Pileup.nPU, "up") / sf_nom
-            sfdown = evaluator.evaluate(events.Pileup.nPU, "down") / sf_nom
+        sfup = evaluator.evaluate(events.Pileup.nTrueInt, "up") / sf_nom
+        sfdown = evaluator.evaluate(events.Pileup.nTrueInt, "down") / sf_nom
 
     weights.add(name="Pileup", weight=sf, weightUp=sfup, weightDown=sfdown)
 
@@ -419,7 +374,7 @@ def PreselSF(photons, weights, year="2017", is_correction=True, **kwargs):
         json_file = os.path.join(os.path.dirname(__file__), "JSONs/Preselection/2022/Preselection_2022PreEE.json")
     elif year == "2022postEE":
         json_file = os.path.join(os.path.dirname(__file__), "JSONs/Preselection/2022/Preselection_2022PostEE.json")
-    
+
     if year == "2017":
         evaluator = correctionlib.CorrectionSet.from_file(json_file)["PreselSF"]
     elif "2022" in year:
@@ -503,9 +458,9 @@ def PreselSF(photons, weights, year="2017", is_correction=True, **kwargs):
                 abs(photons["pho_sublead"].ScEta), photons["pho_sublead"].r9, photons["pho_sublead"].pt, "uncertainty"
             )
 
-            sfup = (sf_lead + sf_unc_lead) * (sf_sublead + sf_unc_sublead)  / _sf
+            sfup = (sf_lead + sf_unc_lead) * (sf_sublead + sf_unc_sublead) / _sf
 
-            sfdown = (sf_lead - sf_unc_lead) * (sf_sublead - sf_unc_sublead)  / _sf
+            sfdown = (sf_lead - sf_unc_lead) * (sf_sublead - sf_unc_sublead) / _sf
 
     weights.add(name="PreselSF", weight=sf, weightUp=sfup, weightDown=sfdown)
 

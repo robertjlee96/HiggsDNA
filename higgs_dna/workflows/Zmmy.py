@@ -208,33 +208,6 @@ class ZmmyProcessor(HggBaseProcessor):
         # select photons
         photons = events.Photon
 
-        # Performing per photon corrections using normalizing flows
-        # The corrections are made before pre-selection so it enable us to recalculate pre-selection SFs
-        if self.data_kind == "mc" and self.doFlow_corrections:
-            # Applyting the Flow corrections to all photons before pre-selection
-            counts = ak.num(photons)
-            corrected_inputs, var_list = calculate_flow_corrections(
-                photons,
-                events,
-                self.meta["flashggPhotons"]["flow_inputs"],
-                self.meta["flashggPhotons"]["Isolation_transform_order"],
-                year=self.year[dataset][0],
-            )
-
-            # adding the corrected values to the tnp_candidates
-            for i in range(len(var_list)):
-                photons["corr_" + str(var_list[i])] = ak.unflatten(
-                    corrected_inputs[:, i], counts
-                )
-
-            # Now adding the corrected mvaID to the photon entries
-            photons["mvaID_run3"] = ak.unflatten(
-                self.add_photonid_mva_run3(photons, events), counts
-            )
-            photons["corr_mvaID_run3"] = ak.unflatten(
-                self.add_corr_photonid_mva_run3(photons, events), counts
-            )
-
         good_photons = photons[select_photons_zmmy(self, photons)]
         n_good_photon = ak.sum(ak.ones_like(good_photons.pt) > 0, axis=1)
         eve_sel.add("n_photon", n_good_photon > 0)
@@ -281,14 +254,12 @@ class ZmmyProcessor(HggBaseProcessor):
             )
             ntuple["muon_far_track_ptErr"] = events.mmy.muon_far.ptErr
             # photon
-            ntuple = dress_branches(ntuple, events.mmy.photon, "photon")
-            ntuple["photon_muon_near_dR"] = events.mmy.photon.delta_r(
-                events.mmy.muon_near
-            )
-            ntuple["photon_muon_far_dR"] = events.mmy.photon.delta_r(
-                events.mmy.muon_far
-            )
-            # dr with SC eta
+            ## get photon in mmy system
+            photon_in_mmy = ak.copy(events.mmy.photon)
+            ## Store deltaR first, the other variables should be Normalizing flowed, then be stored
+            photon_in_mmy["muon_near_dR"] = photon_in_mmy.delta_r(events.mmy.muon_near)
+            photon_in_mmy["muon_far_dR"] = photon_in_mmy.delta_r(events.mmy.muon_far)
+            ## dr with SC eta
             vec_muon_near = ak.Array(
                 {
                     "rho": events.mmy.muon_near.pt,
@@ -307,86 +278,116 @@ class ZmmyProcessor(HggBaseProcessor):
             )
             vec_photon = ak.Array(
                 {
-                    "rho": events.mmy.photon.pt,
-                    "phi": events.mmy.photon.phi,
-                    "eta": events.mmy.photon.ScEta,
+                    "rho": photon_in_mmy.pt,
+                    "phi": photon_in_mmy.phi,
+                    "eta": photon_in_mmy.ScEta,
                 },
                 with_name="Vector3D",
             )
-            ntuple["photon_muon_near_dR_SC"] = vec_muon_near.deltaR(vec_photon)
-            ntuple["photon_muon_far_dR_SC"] = vec_muon_far.deltaR(vec_photon)
-            # modify tracker isolation
-            ## backup traker isolation
-            ntuple["photon_trkSumPtHollowConeDR03_nano"] = ntuple[
-                "photon_trkSumPtHollowConeDR03"
+            photon_in_mmy["muon_near_dR_SC"] = vec_muon_near.deltaR(vec_photon)
+            photon_in_mmy["muon_far_dR_SC"] = vec_muon_far.deltaR(vec_photon)
+            ## update traker iso
+            ### backup traker isolation
+            photon_in_mmy["trkSumPtHollowConeDR03_nano"] = photon_in_mmy[
+                "trkSumPtHollowConeDR03"
             ]
-            ntuple["photon_trkSumPtSolidConeDR04_nano"] = ntuple[
-                "photon_trkSumPtSolidConeDR04"
+            photon_in_mmy["trkSumPtSolidConeDR04_nano"] = photon_in_mmy[
+                "trkSumPtSolidConeDR04"
             ]
-            ## modification refer to: https://indico.cern.ch/event/1319573/contributions/5694074/attachments/2769362/4824835/202312_Zmmg_Hgg.pdf#page=5
-            ### photon_trkSumPtHollowConeDR03
-            #### only near muon in the cone, and iso/pt1 > 0.998
+            ### modification refer to: https://indico.cern.ch/event/1319573/contributions/5694074/attachments/2769362/4824835/202312_Zmmg_Hgg.pdf#page=5
+            #### photon_trkSumPtHollowConeDR03
+            ##### only near muon in the cone, and iso/pt1 > 0.998
             sel_one_incone_mu_trkIso03 = (
-                (ntuple["photon_muon_near_dR_SC"] < 0.3)
-                & (ntuple["photon_muon_far_dR_SC"] > 0.3)
+                (photon_in_mmy["muon_near_dR_SC"] < 0.3)
+                & (photon_in_mmy["muon_far_dR_SC"] > 0.3)
                 & (
-                    ntuple["photon_trkSumPtHollowConeDR03_nano"]
+                    photon_in_mmy["trkSumPtHollowConeDR03_nano"]
                     / ntuple["muon_near_pt"]
                     > 0.998
                 )
             )
-            #### both near and far muon are in the cone, and iso/(pt1+pt2) > 0.95
+            ##### both near and far muon are in the cone, and iso/(pt1+pt2) > 0.95
             sel_two_incone_mu_trkIso03 = (
-                (ntuple["photon_muon_near_dR_SC"] < 0.3)
-                & (ntuple["photon_muon_far_dR_SC"] < 0.3)
+                (photon_in_mmy["muon_near_dR_SC"] < 0.3)
+                & (photon_in_mmy["muon_far_dR_SC"] < 0.3)
                 & (
-                    (ntuple["photon_trkSumPtHollowConeDR03_nano"])
+                    (photon_in_mmy["trkSumPtHollowConeDR03_nano"])
                     / (ntuple["muon_near_pt"] + ntuple["muon_far_pt"])
                     > 0.95
                 )
             )
-            #### subtract muon pt
+            ##### subtract muon pt
             tmp_pho_trkIso03 = (
-                ntuple["photon_trkSumPtHollowConeDR03_nano"]
+                photon_in_mmy["trkSumPtHollowConeDR03_nano"]
                 - sel_one_incone_mu_trkIso03 * ntuple["muon_near_pt"]
                 - sel_two_incone_mu_trkIso03
                 * (ntuple["muon_near_pt"] + ntuple["muon_far_pt"])
             )
-            #### update photon_trkSumPtHollowConeDR03
-            ntuple["photon_trkSumPtHollowConeDR03"] = ak.where(
+            ##### update photon_trkSumPtHollowConeDR03
+            photon_in_mmy["trkSumPtHollowConeDR03"] = ak.where(
                 tmp_pho_trkIso03 > 0, tmp_pho_trkIso03, 0
             )
-            ### photon_trkSumPtSolidConeDR04
-            #### only near muon in the cone, and iso/pt1 > 0.998
+            #### photon_trkSumPtSolidConeDR04
+            ##### only near muon in the cone, and iso/pt1 > 0.998
             sel_one_incone_mu_trkIso04 = (
-                (ntuple["photon_muon_near_dR_SC"] < 0.4)
-                & (ntuple["photon_muon_far_dR_SC"] > 0.4)
+                (photon_in_mmy["muon_near_dR_SC"] < 0.4)
+                & (photon_in_mmy["muon_far_dR_SC"] > 0.4)
                 & (
-                    ntuple["photon_trkSumPtSolidConeDR04_nano"] / ntuple["muon_near_pt"]
+                    photon_in_mmy["trkSumPtSolidConeDR04_nano"] / ntuple["muon_near_pt"]
                     > 0.998
                 )
             )
-            #### both near and far muon are in the cone, and iso/(pt1+pt2) > 0.95
+            ##### both near and far muon are in the cone, and iso/(pt1+pt2) > 0.95
             sel_two_incone_mu_trkIso04 = (
-                (ntuple["photon_muon_near_dR_SC"] < 0.4)
-                & (ntuple["photon_muon_far_dR_SC"] < 0.4)
+                (photon_in_mmy["muon_near_dR_SC"] < 0.4)
+                & (photon_in_mmy["muon_far_dR_SC"] < 0.4)
                 & (
-                    (ntuple["photon_trkSumPtSolidConeDR04_nano"])
+                    (photon_in_mmy["trkSumPtSolidConeDR04_nano"])
                     / (ntuple["muon_near_pt"] + ntuple["muon_far_pt"])
                     > 0.95
                 )
             )
-            #### subtract muon pt
+            ##### subtract muon pt
             tmp_pho_trkIso04 = (
-                ntuple["photon_trkSumPtSolidConeDR04_nano"]
+                photon_in_mmy["trkSumPtSolidConeDR04_nano"]
                 - sel_one_incone_mu_trkIso04 * ntuple["muon_near_pt"]
                 - sel_two_incone_mu_trkIso04
                 * (ntuple["muon_near_pt"] + ntuple["muon_far_pt"])
             )
-            #### update photon_trkSumPtSolidConeDR04
-            ntuple["photon_trkSumPtSolidConeDR04"] = ak.where(
+            ##### update photon_trkSumPtSolidConeDR04
+            photon_in_mmy["trkSumPtSolidConeDR04"] = ak.where(
                 tmp_pho_trkIso04 > 0, tmp_pho_trkIso04, 0
             )
+            ###### Redo store of the photons
+            photon_in_mmy_collection = ak.singletons(photon_in_mmy)
+            counts = ak.num(photon_in_mmy_collection)
+            ## Performing photon corrections using normalizing flows
+            if self.data_kind == "mc" and self.doFlow_corrections:
+                # Applyting the Flow corrections to all photons before pre-selection
+                corrected_inputs, var_list = calculate_flow_corrections(
+                    photon_in_mmy_collection,
+                    events,
+                    self.meta["flashggPhotons"]["flow_inputs"],
+                    self.meta["flashggPhotons"]["Isolation_transform_order"],
+                    year=self.year[dataset][0],
+                )
+
+                # adding the corrected values to the tnp_candidates
+                for i in range(len(var_list)):
+                    photon_in_mmy_collection["corr_" + str(var_list[i])] = ak.unflatten(
+                        np.ascontiguousarray(corrected_inputs[:, i]), counts
+                    )
+                photon_in_mmy_collection["corr_mvaID_run3"] = ak.unflatten(
+                    self.add_corr_photonid_mva_run3(photon_in_mmy_collection, events),
+                    counts,
+                )
+
+            # Recalculate photon mvaID after the pt subtractions
+            photon_in_mmy_collection["mvaID_run3"] = ak.unflatten(
+                self.add_photonid_mva_run3(photon_in_mmy_collection, events), counts
+            )
+            photon_in_mmy = ak.flatten(photon_in_mmy_collection)
+            ntuple = dress_branches(ntuple, photon_in_mmy, "photon")
             # dimuon
             ntuple["dimuon_pt"] = events.mmy.obj_dimuon.pt
             ntuple["dimuon_eta"] = events.mmy.obj_dimuon.eta
@@ -397,43 +398,6 @@ class ZmmyProcessor(HggBaseProcessor):
             ntuple["mmy_eta"] = events.mmy.obj_mmy.eta
             ntuple["mmy_phi"] = events.mmy.obj_mmy.phi
             ntuple["mmy_mass"] = events.mmy.obj_mmy.mass
-
-        # Making the photon selection
-        photons = photons[eve_sel.all(*(eve_sel.names))]
-
-        photons["trkSumPtSolidConeDR04"] = ntuple["photon_trkSumPtSolidConeDR04"]
-        photons["trkSumPtHollowConeDR03"] = ntuple["photon_trkSumPtHollowConeDR03"]
-
-        # Performing per photon corrections using normalizing flows
-        # The corrections are made before pre-selection so it enable us to recalculate pre-selection SFs
-        if self.data_kind == "mc" and self.doFlow_corrections:
-
-            # Applyting the Flow corrections to all photons before pre-selection
-            counts = ak.num(photons)
-            corrected_inputs, var_list = calculate_flow_corrections(
-                photons,
-                events,
-                self.meta["flashggPhotons"]["flow_inputs"],
-                self.meta["flashggPhotons"]["Isolation_transform_order"],
-                year=self.year[dataset][0],
-            )
-
-            # adding the corrected values to the tnp_candidates
-            for i in range(len(var_list)):
-                photons["corr_" + str(var_list[i])] = ak.unflatten(
-                    np.ascontiguousarray(corrected_inputs[:, i]), counts
-                )
-
-                ntuple["photon_corr_" + str(var_list[i])] = photons["corr_" + str(var_list[i])]
-
-            ntuple["photon_corr_mvaID_run3"] = ak.unflatten(
-                self.add_corr_photonid_mva_run3(photons, events), counts
-            )
-
-        # Recalculate photon mvaID after the pt subtractions
-        ntuple["photon_mvaID_run3"] = ak.unflatten(
-            self.add_photonid_mva_run3(photons, events), counts
-        )
 
         if self.data_kind == "mc":
             # annotate diphotons with dZ information (difference between z position of GenVtx and PV) as required by flashggfinalfits

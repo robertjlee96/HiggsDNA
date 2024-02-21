@@ -4,6 +4,7 @@ from higgs_dna.workflows.dystudies import (
 )
 from higgs_dna.workflows.taggers import taggers
 from higgs_dna.workflows.Zmmy import ZmmyProcessor, ZmmyHist, ZmmyZptHist
+from higgs_dna.workflows.top import TopProcessor
 
 workflows = {}
 
@@ -12,5 +13,6 @@ workflows["tagandprobe"] = TagAndProbeProcessor
 workflows["zmmy"] = ZmmyProcessor
 workflows["zmmyHist"] = ZmmyHist
 workflows["zmmyZptHist"] = ZmmyZptHist
+workflows["top"] = TopProcessor
 
 __all__ = ["workflows", "taggers", "DYStudiesProcessor"]

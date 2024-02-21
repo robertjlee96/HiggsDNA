@@ -350,7 +350,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
                             )
 
             # Calculating sigma_m_overm_m
-            if (self.doFlow_corrections):
+            if self.data_kind == "mc" and self.doFlow_corrections:
                 tnp_candidates["sigma_m_over_m"] = 0.5 * numpy.sqrt(
                     (
                         tnp_candidates["tag"].raw_energyErr
@@ -369,8 +369,9 @@ class TagAndProbeProcessor(HggBaseProcessor):
                     )
                     ** 2
                 )
-            else:
-                tnp_candidates["sigma_m_over_m"] = 0.5 * numpy.sqrt(
+
+                # We can now also calculate the corrected sigma_m_over_m
+                tnp_candidates["sigma_m_over_m_corr"] = 0.5 * numpy.sqrt(
                     (
                         tnp_candidates["tag"].energyErr
                         / (
@@ -389,11 +390,8 @@ class TagAndProbeProcessor(HggBaseProcessor):
                     ** 2
                 )
 
-            # Only perform the sigma_m correction if it is a MC event and if flow corrections were specified!
-            if self.data_kind == "mc" and self.doFlow_corrections:
-
-                # We can now also calculate the corrected sigma_m_over_m
-                tnp_candidates["sigma_m_over_m_corr"] = 0.5 * numpy.sqrt(
+            else:
+                tnp_candidates["sigma_m_over_m"] = 0.5 * numpy.sqrt(
                     (
                         tnp_candidates["tag"].energyErr
                         / (
@@ -417,7 +415,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
             if (self.Smear_sigma_m):
 
                 # Adding the smeared energyErr error to the ntuples!
-                if (self.doFlow_corrections):
+                if self.doFlow_corrections and self.data_kind == "mc":
                     tnp_candidates["tag","energyErr_Smeared"] = numpy.sqrt((tnp_candidates["tag"].raw_energyErr)**2 + (tnp_candidates["tag"].rho_smear * ((tnp_candidates["tag"].pt * numpy.cosh(tnp_candidates["tag"].eta)))) ** 2)
                     tnp_candidates["probe","energyErr_Smeared"] = numpy.sqrt((tnp_candidates["probe"].raw_energyErr) ** 2 + (tnp_candidates["probe"].rho_smear * ((tnp_candidates["probe"].pt * numpy.cosh(tnp_candidates["probe"].eta)))) ** 2)
 
@@ -431,24 +429,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
                         )
                         ** 2
                     )
-                else:
-                    tnp_candidates["tag","energyErr_Smeared"] = numpy.sqrt((tnp_candidates["tag"].energyErr)**2 + (tnp_candidates["tag"].rho_smear * ((tnp_candidates["tag"].pt * numpy.cosh(tnp_candidates["tag"].eta)))) ** 2)
-                    tnp_candidates["probe","energyErr_Smeared"] = numpy.sqrt((tnp_candidates["probe"].energyErr) ** 2 + (tnp_candidates["probe"].rho_smear * ((tnp_candidates["probe"].pt * numpy.cosh(tnp_candidates["probe"].eta)))) ** 2)
-
-                    tnp_candidates["sigma_m_over_m_Smeared"] = 0.5 * numpy.sqrt(
-                        (
-                            tnp_candidates["tag"].energyErr_Smeared / (tnp_candidates["tag"].pt * numpy.cosh(tnp_candidates["tag"].eta))
-                        )
-                        ** 2
-                        + (
-                            tnp_candidates["probe"].energyErr_Smeared / (tnp_candidates["probe"].pt * numpy.cosh(tnp_candidates["probe"].eta))
-                        )
-                        ** 2
-                    )
-
-                # We can also calculate the smeared sigma_m_over_m for the corrected flow samples
-                if (self.doFlow_corrections and self.data_kind == "mc"):
-
+                
                     # Adding the smeared energyErr error to the ntuples!
                     tnp_candidates["tag","corr_energyErr_Smeared"] = numpy.sqrt((tnp_candidates["tag"].energyErr) ** 2 + (tnp_candidates["tag"].rho_smear * ((tnp_candidates["tag"].pt * numpy.cosh(tnp_candidates["tag"].eta)))) ** 2)
                     tnp_candidates["probe","corr_energyErr_Smeared"] = numpy.sqrt((tnp_candidates["probe"].energyErr) ** 2 + (tnp_candidates["probe"].rho_smear * ((tnp_candidates["probe"].pt * numpy.cosh(tnp_candidates["probe"].eta)))) ** 2)
@@ -460,6 +441,22 @@ class TagAndProbeProcessor(HggBaseProcessor):
                         ** 2
                         + (
                             tnp_candidates["probe"].corr_energyErr_Smeared / (tnp_candidates["probe"].pt * numpy.cosh(tnp_candidates["probe"].eta))
+                        )
+                        ** 2
+                    )
+                
+                
+                else:
+                    tnp_candidates["tag","energyErr_Smeared"] = numpy.sqrt((tnp_candidates["tag"].energyErr)**2 + (tnp_candidates["tag"].rho_smear * ((tnp_candidates["tag"].pt * numpy.cosh(tnp_candidates["tag"].eta)))) ** 2)
+                    tnp_candidates["probe","energyErr_Smeared"] = numpy.sqrt((tnp_candidates["probe"].energyErr) ** 2 + (tnp_candidates["probe"].rho_smear * ((tnp_candidates["probe"].pt * numpy.cosh(tnp_candidates["probe"].eta)))) ** 2)
+
+                    tnp_candidates["sigma_m_over_m_Smeared"] = 0.5 * numpy.sqrt(
+                        (
+                            tnp_candidates["tag"].energyErr_Smeared / (tnp_candidates["tag"].pt * numpy.cosh(tnp_candidates["tag"].eta))
+                        )
+                        ** 2
+                        + (
+                            tnp_candidates["probe"].energyErr_Smeared / (tnp_candidates["probe"].pt * numpy.cosh(tnp_candidates["probe"].eta))
                         )
                         ** 2
                     )

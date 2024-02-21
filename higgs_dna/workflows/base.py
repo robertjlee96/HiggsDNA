@@ -777,7 +777,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     # Note that pt*cosh(eta) is equal to the energy of a four vector
                     # Note that you need to call it slightly different than in the output of HiggsDNA as pho_lead -> lead is only done in dumping utils
 
-                    if (self.doFlow_corrections):
+                    if (self.data_kind == "mc" and self.doFlow_corrections):
                         diphotons["sigma_m_over_m"] = 0.5 * numpy.sqrt(
                             (
                                 diphotons["pho_lead"].raw_energyErr
@@ -796,8 +796,10 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             )
                             ** 2
                         )
-                    else:
-                        diphotons["sigma_m_over_m"] = 0.5 * numpy.sqrt(
+
+
+
+                        diphotons["sigma_m_over_m_corr"] = 0.5 * numpy.sqrt(
                             (
                                 diphotons["pho_lead"].energyErr
                                 / (
@@ -816,9 +818,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                             ** 2
                         )
 
-                    if (self.data_kind == "mc" and self.doFlow_corrections):
-
-                        diphotons["sigma_m_over_m_corr"] = 0.5 * numpy.sqrt(
+                    else:
+                        diphotons["sigma_m_over_m"] = 0.5 * numpy.sqrt(
                             (
                                 diphotons["pho_lead"].energyErr
                                 / (
@@ -843,7 +844,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     # Just a reminder, the pt/energy of teh data is not smearing, but the smearing term is added to the data sigma_m_over_m
                     if (self.Smear_sigma_m):
 
-                        if (self.doFlow_corrections):
+                        if (self.doFlow_corrections and self.data_kind == "mc" ):
                             # Adding the smeared BDT error to the ntuples!
                             diphotons["pho_lead","energyErr_Smeared"] = numpy.sqrt((diphotons["pho_lead"].raw_energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
                             diphotons["pho_sublead","energyErr_Smeared"] = numpy.sqrt((diphotons["pho_sublead"].raw_energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
@@ -866,33 +867,33 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                 )
                                 ** 2
                             )
+
+                            # Now flow correction + smearing
+                            diphotons["sigma_m_over_m_Smeared_corr"] = 0.5 * numpy.sqrt(
+                                    (
+                                        numpy.sqrt((diphotons["pho_lead"].energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
+                                        / (
+                                            diphotons["pho_lead"].pt
+                                            * numpy.cosh(diphotons["pho_lead"].eta)
+                                        )
+                                    )
+                                    ** 2
+                                    + (
+                                        numpy.sqrt((diphotons["pho_sublead"].energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
+                                        / (
+                                            diphotons["pho_sublead"].pt
+                                            * numpy.cosh(diphotons["pho_sublead"].eta)
+                                        )
+                                    )
+                                    ** 2
+                                )
+
                         else:
                             # Adding the smeared BDT error to the ntuples!
                             diphotons["pho_lead","energyErr_Smeared"] = numpy.sqrt((diphotons["pho_lead"].energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
                             diphotons["pho_sublead","energyErr_Smeared"] = numpy.sqrt((diphotons["pho_sublead"].energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
 
                             diphotons["sigma_m_over_m_Smeared"] = 0.5 * numpy.sqrt(
-                                (
-                                    numpy.sqrt((diphotons["pho_lead"].energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
-                                    / (
-                                        diphotons["pho_lead"].pt
-                                        * numpy.cosh(diphotons["pho_lead"].eta)
-                                    )
-                                )
-                                ** 2
-                                + (
-                                    numpy.sqrt((diphotons["pho_sublead"].energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
-                                    / (
-                                        diphotons["pho_sublead"].pt
-                                        * numpy.cosh(diphotons["pho_sublead"].eta)
-                                    )
-                                )
-                                ** 2
-                            )
-
-                        if (self.data_kind == "mc" and self.doFlow_corrections):
-
-                            diphotons["sigma_m_over_m_Smeared_corr"] = 0.5 * numpy.sqrt(
                                 (
                                     numpy.sqrt((diphotons["pho_lead"].energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
                                     / (

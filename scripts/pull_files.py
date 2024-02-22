@@ -221,8 +221,8 @@ def get_presel_json(logger, target_dir):
         to_prefix = os.path.join(
             os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/"
         )
-
-    path_for_early_Analysis = "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/SFs/preselection"
+    # Old ones with puely restricted probe and non-conservative uncertainties: "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/SFs/preselection/restrictedProbe"
+    path_for_early_Analysis = "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/SFs/preselection/restrictedProbeConservativeUncs"
 
     from_to_dict = {
         "2017": {

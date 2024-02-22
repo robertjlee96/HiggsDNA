@@ -429,7 +429,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
                         )
                         ** 2
                     )
-                
+
                     # Adding the smeared energyErr error to the ntuples!
                     tnp_candidates["tag","corr_energyErr_Smeared"] = numpy.sqrt((tnp_candidates["tag"].energyErr) ** 2 + (tnp_candidates["tag"].rho_smear * ((tnp_candidates["tag"].pt * numpy.cosh(tnp_candidates["tag"].eta)))) ** 2)
                     tnp_candidates["probe","corr_energyErr_Smeared"] = numpy.sqrt((tnp_candidates["probe"].energyErr) ** 2 + (tnp_candidates["probe"].rho_smear * ((tnp_candidates["probe"].pt * numpy.cosh(tnp_candidates["probe"].eta)))) ** 2)
@@ -444,8 +444,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
                         )
                         ** 2
                     )
-                
-                
+
                 else:
                     tnp_candidates["tag","energyErr_Smeared"] = numpy.sqrt((tnp_candidates["tag"].energyErr)**2 + (tnp_candidates["tag"].rho_smear * ((tnp_candidates["tag"].pt * numpy.cosh(tnp_candidates["tag"].eta)))) ** 2)
                     tnp_candidates["probe","energyErr_Smeared"] = numpy.sqrt((tnp_candidates["probe"].energyErr) ** 2 + (tnp_candidates["probe"].rho_smear * ((tnp_candidates["probe"].pt * numpy.cosh(tnp_candidates["probe"].eta)))) ** 2)

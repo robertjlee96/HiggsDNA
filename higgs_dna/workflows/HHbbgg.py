@@ -1,8 +1,4 @@
-from higgs_dna.tools.chained_quantile import ChainedQuantileRegression
-from higgs_dna.tools.diphoton_mva import calculate_diphoton_mva
-from higgs_dna.tools.xgb_loader import load_bdt
-from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_mva
-from higgs_dna.tools.photonid_mva import calculate_photonid_mva_run3, load_photonid_mva_run3
+from higgs_dna.workflows.base import HggBaseProcessor
 from higgs_dna.tools.SC_eta import add_photon_SC_eta
 from higgs_dna.tools.EELeak_region import veto_EEleak_flag
 from higgs_dna.selections.photon_selections import photon_preselection
@@ -11,28 +7,25 @@ from higgs_dna.selections.jet_selections import select_jets, jetvetomap
 from higgs_dna.selections.lumi_selections import select_lumis
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array, diphoton_list_to_pandas, dump_pandas
 from higgs_dna.utils.misc_utils import choose_jet
+from higgs_dna.selections.HHbbgg_selections import getCosThetaStar_CS, get_HHbbgg, getCosThetaStar_gg, getCosThetaStar_jj, DeltaR
 from higgs_dna.tools.flow_corrections import calculate_flow_corrections
 
 from higgs_dna.tools.mass_decorrelator import decorrelate_mass_resolution
+from higgs_dna.tools.truth_info import get_truth_info_dict
 
 # from higgs_dna.utils.dumping_utils import diphoton_list_to_pandas, dump_pandas
-from higgs_dna.metaconditions import photon_id_mva_weights
-from higgs_dna.metaconditions import diphoton as diphoton_mva_dir
 from higgs_dna.systematics import object_systematics as available_object_systematics
 from higgs_dna.systematics import object_corrections as available_object_corrections
 from higgs_dna.systematics import weight_systematics as available_weight_systematics
 from higgs_dna.systematics import weight_corrections as available_weight_corrections
 
 import functools
-import operator
-import os
 import warnings
 from typing import Any, Dict, List, Optional
 import awkward
 import numpy
 import sys
 import vector
-from coffea import processor
 from coffea.analysis_tools import Weights
 from copy import deepcopy
 
@@ -43,206 +36,51 @@ logger = logging.getLogger(__name__)
 vector.register_awkward()
 
 
-class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
+class HHbbggProcessor(HggBaseProcessor):
     def __init__(
         self,
         metaconditions: Dict[str, Any],
-        systematics: Optional[Dict[str, List[str]]],
-        corrections: Optional[Dict[str, List[str]]],
-        apply_trigger: bool,
-        output_location: Optional[str],
-        taggers: Optional[List[Any]],
-        trigger_group: str,
-        analysis: str,
-        skipCQR: bool,
-        skipJetVetoMap: bool,
-        year: Optional[Dict[str, List[str]]],
-        fiducialCuts: str,
-        doDeco: bool,
-        Smear_sigma_m: bool,
-        doFlow_corrections: bool,
-        output_format: str,
+        systematics: Dict[str, List[Any]] = None,
+        corrections: Dict[str, List[Any]] = None,
+        apply_trigger: bool = False,
+        output_location: Optional[str] = None,
+        taggers: Optional[List[Any]] = None,
+        skipCQR: bool = False,
+        skipJetVetoMap: bool = False,
+        year: Dict[str, List[str]] = None,
+        fiducialCuts: str = "classical",
+        doDeco: bool = False,
+        Smear_sigma_m: bool = False,
+        doFlow_corrections: bool = False,
+        output_format: str = "parquet"
     ) -> None:
-        self.meta = metaconditions
-        self.systematics = systematics if systematics is not None else {}
-        self.corrections = corrections if corrections is not None else {}
-        self.apply_trigger = apply_trigger
-        self.output_location = output_location
-        self.trigger_group = trigger_group
-        self.analysis = analysis
-        self.skipCQR = skipCQR
-        self.skipJetVetoMap = skipJetVetoMap
-        self.year = year if year is not None else {}
-        self.fiducialCuts = fiducialCuts
-        self.doDeco = doDeco
-        self.Smear_sigma_m = Smear_sigma_m
-        self.doFlow_corrections = doFlow_corrections
-        self.output_format = output_format
-
-        # muon selection cuts
-        self.muon_pt_threshold = 10
-        self.muon_max_eta = 2.4
-        self.mu_iso_wp = "medium"
-        self.global_muon = False
-
-        # electron selection cuts
-        self.electron_pt_threshold = 15
-        self.electron_max_eta = 2.5
-        self.el_iso_wp = "WP80"
-
-        # jet selection cuts
-        self.jet_dipho_min_dr = 0.4
-        self.jet_pho_min_dr = 0.4
-        self.jet_ele_min_dr = 0.4
-        self.jet_muo_min_dr = 0.4
-        self.jet_pt_threshold = 20
-        self.jet_max_eta = 4.7
-
-        self.clean_jet_dipho = True
-        self.clean_jet_pho = True
-        self.clean_jet_ele = False
-        self.clean_jet_muo = False
-
-        # diphoton preselection cuts
-        self.min_pt_photon = 25.0
-        self.min_pt_lead_photon = 35.0
-        self.min_mvaid = -0.9
-        self.max_sc_eta = 2.5
-        self.gap_barrel_eta = 1.4442
-        self.gap_endcap_eta = 1.566
-        self.max_hovere = 0.08
-        self.min_full5x5_r9 = 0.8
-        self.max_chad_iso = 20.0
-        self.max_chad_rel_iso = 0.3
-
-        self.min_full5x5_r9_EB_high_r9 = 0.85
-        self.min_full5x5_r9_EE_high_r9 = 0.9
-        self.min_full5x5_r9_EB_low_r9 = 0.5
-        self.min_full5x5_r9_EE_low_r9 = 0.8
-        self.max_trkSumPtHollowConeDR03_EB_low_r9 = (
-            6.0  # for v11, we cut on Photon_pfChargedIsoPFPV
+        super().__init__(
+            metaconditions,
+            systematics=systematics,
+            corrections=corrections,
+            apply_trigger=apply_trigger,
+            output_location=output_location,
+            taggers=taggers,
+            trigger_group=".*DoubleEG.*",
+            analysis="mainAnalysis",
+            skipCQR=skipCQR,
+            skipJetVetoMap=skipJetVetoMap,
+            year=year,
+            fiducialCuts=fiducialCuts,
+            doDeco=doDeco,
+            Smear_sigma_m=Smear_sigma_m,
+            doFlow_corrections=doFlow_corrections,
+            output_format=output_format
         )
-        self.max_trkSumPtHollowConeDR03_EE_low_r9 = 6.0  # Leaving the names of the preselection cut variables the same to change as little as possible
-        self.max_sieie_EB_low_r9 = 0.015
-        self.max_sieie_EE_low_r9 = 0.035
-        self.max_pho_iso_EB_low_r9 = 4.0
-        self.max_pho_iso_EE_low_r9 = 4.0
-
-        self.eta_rho_corr = 1.5
-        self.low_eta_rho_corr = 0.16544
-        self.high_eta_rho_corr = 0.13212
-        # EA values for Run3 from Egamma
-        self.EA1_EB1 = 0.102056
-        self.EA2_EB1 = -0.000398112
-        self.EA1_EB2 = 0.0820317
-        self.EA2_EB2 = -0.000286224
-        self.EA1_EE1 = 0.0564915
-        self.EA2_EE1 = -0.000248591
-        self.EA1_EE2 = 0.0428606
-        self.EA2_EE2 = -0.000171541
-        self.EA1_EE3 = 0.0395282
-        self.EA2_EE3 = -0.000121398
-        self.EA1_EE4 = 0.0369761
-        self.EA2_EE4 = -8.10369e-05
-        self.EA1_EE5 = 0.0369417
-        self.EA2_EE5 = -2.76885e-05
-        self.e_veto = 0.5
-
-        logger.debug(f"Setting up processor with metaconditions: {self.meta}")
-
-        self.taggers = []
-        if taggers is not None:
-            self.taggers = taggers
-            self.taggers.sort(key=lambda x: x.priority)
-
-        self.prefixes = {"pho_lead": "lead", "pho_sublead": "sublead"}
-
-        if not self.doDeco:
-            logger.info("Skipping Mass resolution decorrelation as required")
-        else:
-            logger.info("Performing Mass resolution decorrelation as required")
-
-        # build the chained quantile regressions
-        if not self.skipCQR:
-            try:
-                self.chained_quantile: Optional[
-                    ChainedQuantileRegression
-                ] = ChainedQuantileRegression(**self.meta["PhoIdInputCorrections"])
-            except Exception as e:
-                warnings.warn(f"Could not instantiate ChainedQuantileRegression: {e}")
-                self.chained_quantile = None
-        else:
-            logger.info("Skipping CQR as required")
-            self.chained_quantile = None
-
-        # initialize photonid_mva
-        photon_id_mva_dir = os.path.dirname(photon_id_mva_weights.__file__)
-        try:
-            logger.debug(
-                f"Looking for {self.meta['flashggPhotons']['photonIdMVAweightfile_EB']} in {photon_id_mva_dir}"
-            )
-            self.photonid_mva_EB = load_photonid_mva(
-                os.path.join(
-                    photon_id_mva_dir,
-                    self.meta["flashggPhotons"]["photonIdMVAweightfile_EB"],
-                )
-            )
-            self.photonid_mva_EE = load_photonid_mva(
-                os.path.join(
-                    photon_id_mva_dir,
-                    self.meta["flashggPhotons"]["photonIdMVAweightfile_EE"],
-                )
-            )
-        except Exception as e:
-            warnings.warn(f"Could not instantiate PhotonID MVA on the fly: {e}")
-            self.photonid_mva_EB = None
-            self.photonid_mva_EE = None
-
-        # initialize diphoton mva
-        diphoton_weights_dir = os.path.dirname(diphoton_mva_dir.__file__)
-        logger.debug(
-            f"Base path to look for IDMVA weight files: {diphoton_weights_dir}"
-        )
-
-        try:
-            self.diphoton_mva = load_bdt(
-                os.path.join(
-                    diphoton_weights_dir, self.meta["flashggDiPhotonMVA"]["weightFile"]
-                )
-            )
-        except Exception as e:
-            warnings.warn(f"Could not instantiate diphoton MVA: {e}")
-            self.diphoton_mva = None
+        self.trigger_group = ".*DoubleEG.*"
+        self.analysis = "mainAnalysis"
 
     def process_extra(self, events: awkward.Array) -> awkward.Array:
-        raise NotImplementedError
-
-    def apply_filters_and_triggers(self, events: awkward.Array) -> awkward.Array:
-        # met filters
-        met_filters = self.meta["flashggMetFilters"][self.data_kind]
-        filtered = functools.reduce(
-            operator.and_,
-            (events.Flag[metfilter.split("_")[-1]] for metfilter in met_filters),
-        )
-
-        triggered = awkward.ones_like(filtered)
-        if self.apply_trigger:
-            trigger_names = []
-            triggers = self.meta["TriggerPaths"][self.trigger_group][self.analysis]
-            hlt = events.HLT
-            for trigger in triggers:
-                actual_trigger = trigger.replace("HLT_", "").replace("*", "")
-                for field in hlt.fields:
-                    if field.startswith(actual_trigger):
-                        trigger_names.append(field)
-            triggered = functools.reduce(
-                operator.or_, (hlt[trigger_name] for trigger_name in trigger_names)
-            )
-
-        return events[filtered & triggered]
+        return events, {}
 
     def process(self, events: awkward.Array) -> Dict[Any, Any]:
         dataset_name = events.metadata["dataset"]
+        filename = events.metadata["filename"]
 
         # data or monte carlo?
         self.data_kind = "mc" if hasattr(events, "GenPart") else "data"
@@ -338,7 +176,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     f"Applying correction {correction_name} to dataset {dataset_name}"
                 )
                 varying_function = available_object_corrections[correction_name]
-                events = varying_function(events=events, year=self.year[dataset_name][0])
+                events = varying_function(events=events)
             elif correction_name in available_weight_corrections:
                 # event weight corrections will be applied after photon preselection / application of further taggers
                 continue
@@ -439,16 +277,13 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         counts = awkward.num(photons)
                         corrected_inputs,var_list = calculate_flow_corrections(photons, events, self.meta["flashggPhotons"]["flow_inputs"], self.meta["flashggPhotons"]["Isolation_transform_order"], year=self.year[dataset_name][0])
 
-                        # Store the raw nanoAOD value and update photon ID MVA value for preselection
-                        photons["mvaID_run3"] = awkward.unflatten(self.add_photonid_mva_run3(photons, events), counts)
-                        photons["mvaID_nano"] = photons["mvaID"]
-
-                        # Store the raw values of the inputs and update the input values with the corrections since some variables used in the preselection
+                        # adding the corrected values to the tnp_candidates
                         for i in range(len(var_list)):
-                            photons["raw_" + str(var_list[i])] = photons[str(var_list[i])]
-                            photons[str(var_list[i])] = awkward.unflatten(corrected_inputs[:,i] , counts)
+                            photons["corr_" + str(var_list[i])] = awkward.unflatten(corrected_inputs[:,i] , counts)
 
-                        photons["mvaID"] = awkward.unflatten(self.add_photonid_mva_run3(photons, events), counts)
+                        # Now adding the corrected mvaID to the photon entries
+                        photons["mvaID_run3"] = awkward.unflatten(self.add_photonid_mva_run3(photons, events), counts)
+                        photons["corr_mvaID_run3"] = awkward.unflatten(self.add_corr_photonid_mva_run3(photons, events), counts)
 
                     # photon preselection
                     photons = photon_preselection(self, photons, events, year=self.year[dataset_name][0])
@@ -482,16 +317,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     ]
 
                     # Determine if event passes fiducial Hgg cuts at detector-level
-                    if self.fiducialCuts == 'classical':
-                        fid_det_passed = (diphotons.pho_lead.pt / diphotons.mass > 1 / 3) & (diphotons.pho_sublead.pt / diphotons.mass > 1 / 4) & (diphotons.pho_lead.pfRelIso03_all_quadratic * diphotons.pho_lead.pt < 10) & ((diphotons.pho_sublead.pfRelIso03_all_quadratic * diphotons.pho_sublead.pt) < 10) & (numpy.abs(diphotons.pho_lead.eta) < 2.5) & (numpy.abs(diphotons.pho_sublead.eta) < 2.5)
-                    elif self.fiducialCuts == 'geometric':
-                        fid_det_passed = (numpy.sqrt(diphotons.pho_lead.pt * diphotons.pho_sublead.pt) / diphotons.mass > 1 / 3) & (diphotons.pho_sublead.pt / diphotons.mass > 1 / 4) & (diphotons.pho_lead.pfRelIso03_all_quadratic * diphotons.pho_lead.pt < 10) & (diphotons.pho_sublead.pfRelIso03_all_quadratic * diphotons.pho_sublead.pt < 10) & (numpy.abs(diphotons.pho_lead.eta) < 2.5) & (numpy.abs(diphotons.pho_sublead.eta) < 2.5)
-                    elif self.fiducialCuts == 'none':
-                        fid_det_passed = diphotons.pho_lead.pt > -10  # This is a very dummy way but I do not know how to make a true array of outer shape of diphotons
-                    else:
-                        warnings.warn("You chose %s the fiducialCuts mode, but this is currently not supported. You should check your settings. For this run, no fiducial selection at detector level is applied." % self.fiducialCuts)
-                        fid_det_passed = diphotons.pho_lead.pt > -10
-
+                    fid_det_passed = (diphotons.pho_lead.pt / diphotons.mass > 1 / 3) & (diphotons.pho_sublead.pt / diphotons.mass > 1 / 4) & (diphotons.pho_lead.pfRelIso03_all_quadratic * diphotons.pho_lead.pt < 10) & ((diphotons.pho_sublead.pfRelIso03_all_quadratic * diphotons.pho_sublead.pt) < 10) & (numpy.abs(diphotons.pho_lead.eta) < 2.5) & (numpy.abs(diphotons.pho_sublead.eta) < 2.5)
                     diphotons = diphotons[fid_det_passed]
 
                     # baseline modifications to diphotons
@@ -592,6 +418,108 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     diphotons["second_jet_charge"] = second_jet_charge
 
                     diphotons["n_jets"] = n_jets
+
+                    ## --------- Beginning of the part added for the HHTobbgg analysis -------
+
+                    # Add the truth information
+                    if self.data_kind == "mc":
+                        param_values = get_truth_info_dict(filename)
+                        for key in param_values.keys():
+                            diphotons[key] = param_values[key]
+
+                    # Creatiion a dijet
+                    dijets = awkward.combinations(
+                        jets, 2, fields=("first_jet", "second_jet")
+                    )
+
+                    # HHbbgg :  now turn the dijets into candidates with four momenta and such
+                    dijets_4mom = dijets["first_jet"] + dijets["second_jet"]
+                    dijets["pt"] = dijets_4mom.pt
+                    dijets["eta"] = dijets_4mom.eta
+                    dijets["phi"] = dijets_4mom.phi
+                    dijets["mass"] = dijets_4mom.mass
+                    dijets["charge"] = dijets_4mom.charge
+                    dijets["DeepFlavB_sum"] = dijets["first_jet"].btagDeepFlav_B + dijets["second_jet"].btagDeepFlav_B
+                    dijets = awkward.with_name(dijets, "PtEtaPhiMCandidate")
+
+                    # Selection on the dijet
+                    dijets = dijets[dijets.mass < 190]
+                    dijets = dijets[dijets.mass > 70]
+                    dijets = dijets[awkward.argsort(dijets.DeepFlavB_sum, ascending=False)]
+
+                    lead_jet_pt = choose_jet(dijets["first_jet"].pt, 0, -999.0)
+                    lead_jet_eta = choose_jet(dijets["first_jet"].eta, 0, -999.0)
+                    lead_jet_phi = choose_jet(dijets["first_jet"].phi, 0, -999.0)
+                    lead_jet_mass = choose_jet(dijets["first_jet"].mass, 0, -999.0)
+                    lead_jet_charge = choose_jet(dijets["first_jet"].charge, 0, -999.0)
+                    lead_jet_Btag = choose_jet(dijets["first_jet"].btagDeepFlav_B, 0, -999.0)
+
+                    sublead_jet_pt = choose_jet(dijets["second_jet"].pt, 1, -999.0)
+                    sublead_jet_eta = choose_jet(dijets["second_jet"].eta, 1, -999.0)
+                    sublead_jet_phi = choose_jet(dijets["second_jet"].phi, 1, -999.0)
+                    sublead_jet_mass = choose_jet(dijets["second_jet"].mass, 1, -999.0)
+                    sublead_jet_charge = choose_jet(dijets["second_jet"].charge, 1, -999.0)
+                    sublead_jet_Btag = choose_jet(dijets["second_jet"].btagDeepFlav_B, 0, -999.0)
+
+                    dijet_pt = choose_jet(dijets.pt, 0, -999.0)
+                    dijet_eta = choose_jet(dijets.eta, 0, -999.0)
+                    dijet_phi = choose_jet(dijets.phi, 0, -999.0)
+                    dijet_mass = choose_jet(dijets.mass, 0, -999.0)
+                    dijet_charge = choose_jet(dijets.charge, 0, -999.0)
+
+                    # Get the HHbbgg object
+                    HHbbgg = get_HHbbgg(self, diphotons, dijets)
+
+                    # Write the variables in diphotons
+                    diphotons["HHbbggCandidate_pt"] = HHbbgg.obj_HHbbgg.pt
+                    diphotons["HHbbggCandidate_eta"] = HHbbgg.obj_HHbbgg.eta
+                    diphotons["HHbbggCandidate_phi"] = HHbbgg.obj_HHbbgg.phi
+                    diphotons["HHbbggCandidate_mass"] = HHbbgg.obj_HHbbgg.mass
+
+                    diphotons["lead_jet_pt"] = lead_jet_pt
+                    diphotons["lead_jet_eta"] = lead_jet_eta
+                    diphotons["lead_jet_phi"] = lead_jet_phi
+                    diphotons["lead_jet_mass"] = lead_jet_mass
+                    diphotons["lead_jet_charge"] = lead_jet_charge
+                    diphotons["lead_jet_Btag"] = lead_jet_Btag
+
+                    diphotons["sublead_jet_pt"] = sublead_jet_pt
+                    diphotons["sublead_jet_eta"] = sublead_jet_eta
+                    diphotons["sublead_jet_phi"] = sublead_jet_phi
+                    diphotons["sublead_jet_mass"] = sublead_jet_mass
+                    diphotons["sublead_jet_charge"] = sublead_jet_charge
+                    diphotons["sublead_jet_Btag"] = sublead_jet_Btag
+
+                    diphotons["dijet_pt"] = dijet_pt
+                    diphotons["dijet_eta"] = dijet_eta
+                    diphotons["dijet_phi"] = dijet_phi
+                    diphotons["dijet_mass"] = dijet_mass
+                    diphotons["dijet_charge"] = dijet_charge
+
+                    diphotons["pholead_PtOverM"] = HHbbgg.pho_lead.pt / HHbbgg.obj_diphoton.mass
+                    diphotons["phosublead_PtOverM"] = HHbbgg.pho_sublead.pt / HHbbgg.obj_diphoton.mass
+
+                    diphotons["FirstJet_PtOverM"] = diphotons["lead_jet_pt"] / diphotons["dijet_mass"]
+                    diphotons["SecondJet_PtOverM"] = diphotons["sublead_jet_pt"] / diphotons["dijet_mass"]
+
+                    diphotons["CosThetaStar_CS"] = getCosThetaStar_CS(HHbbgg, 6800)
+                    diphotons["CosThetaStar_gg"] = getCosThetaStar_gg(HHbbgg)
+                    diphotons["CosThetaStar_jj"] = getCosThetaStar_jj(HHbbgg)
+
+                    diphotons["DeltaR_j1g1"] = DeltaR(HHbbgg.first_jet, HHbbgg.pho_lead)
+                    diphotons["DeltaR_j2g1"] = DeltaR(HHbbgg.second_jet, HHbbgg.pho_lead)
+                    diphotons["DeltaR_j1g2"] = DeltaR(HHbbgg.first_jet, HHbbgg.pho_sublead)
+                    diphotons["DeltaR_j2g2"] = DeltaR(HHbbgg.second_jet, HHbbgg.pho_sublead)
+
+                    DeltaR_comb = awkward.Array([diphotons["DeltaR_j1g1"], diphotons["DeltaR_j2g1"], diphotons["DeltaR_j1g2"], diphotons["DeltaR_j2g2"]])
+
+                    diphotons["DeltaR_jg_min"] = awkward.min(DeltaR_comb, axis=0)
+
+                    diphotons = diphotons[
+                        diphotons["sublead_jet_pt"] > -998
+                    ]
+
+                    ## ----------  End of the HHTobbgg part ----------
 
                     # run taggers on the events list with added diphotons
                     # the shape here is ensured to be broadcastable
@@ -703,12 +631,12 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                     )
                                     if systematic_name == "LHEScale":
                                         if hasattr(events, "LHEScaleWeight"):
-                                            diphotons["nweight_LHEScale"] = awkward.num(
+                                            diphotons["nLHEScaleWeight"] = awkward.num(
                                                 events.LHEScaleWeight[selection_mask],
                                                 axis=1,
                                             )
                                             diphotons[
-                                                "weight_LHEScale"
+                                                "LHEScaleWeight"
                                             ] = events.LHEScaleWeight[selection_mask]
                                         else:
                                             logger.info(
@@ -717,7 +645,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                     elif systematic_name == "LHEPdf":
                                         if hasattr(events, "LHEPdfWeight"):
                                             # two AlphaS weights are removed
-                                            diphotons["nweight_LHEPdf"] = (
+                                            diphotons["nLHEPdfWeight"] = (
                                                 awkward.num(
                                                     events.LHEPdfWeight[selection_mask],
                                                     axis=1,
@@ -725,7 +653,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                                 - 2
                                             )
                                             diphotons[
-                                                "weight_LHEPdf"
+                                                "LHEPdfWeight"
                                             ] = events.LHEPdfWeight[selection_mask][
                                                 :, :-2
                                             ]
@@ -776,65 +704,24 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     ### Add mass resolution uncertainty
                     # Note that pt*cosh(eta) is equal to the energy of a four vector
                     # Note that you need to call it slightly different than in the output of HiggsDNA as pho_lead -> lead is only done in dumping utils
-
-                    if (self.data_kind == "mc" and self.doFlow_corrections):
-                        diphotons["sigma_m_over_m"] = 0.5 * numpy.sqrt(
-                            (
-                                diphotons["pho_lead"].raw_energyErr
-                                / (
-                                    diphotons["pho_lead"].pt
-                                    * numpy.cosh(diphotons["pho_lead"].eta)
-                                )
+                    diphotons["sigma_m_over_m"] = 0.5 * numpy.sqrt(
+                        (
+                            diphotons["pho_lead"].energyErr
+                            / (
+                                diphotons["pho_lead"].pt
+                                * numpy.cosh(diphotons["pho_lead"].eta)
                             )
-                            ** 2
-                            + (
-                                diphotons["pho_sublead"].raw_energyErr
-                                / (
-                                    diphotons["pho_sublead"].pt
-                                    * numpy.cosh(diphotons["pho_sublead"].eta)
-                                )
-                            )
-                            ** 2
                         )
-
-                        diphotons["sigma_m_over_m_corr"] = 0.5 * numpy.sqrt(
-                            (
-                                diphotons["pho_lead"].energyErr
-                                / (
-                                    diphotons["pho_lead"].pt
-                                    * numpy.cosh(diphotons["pho_lead"].eta)
-                                )
+                        ** 2
+                        + (
+                            diphotons["pho_sublead"].energyErr
+                            / (
+                                diphotons["pho_sublead"].pt
+                                * numpy.cosh(diphotons["pho_sublead"].eta)
                             )
-                            ** 2
-                            + (
-                                diphotons["pho_sublead"].energyErr
-                                / (
-                                    diphotons["pho_sublead"].pt
-                                    * numpy.cosh(diphotons["pho_sublead"].eta)
-                                )
-                            )
-                            ** 2
                         )
-
-                    else:
-                        diphotons["sigma_m_over_m"] = 0.5 * numpy.sqrt(
-                            (
-                                diphotons["pho_lead"].energyErr
-                                / (
-                                    diphotons["pho_lead"].pt
-                                    * numpy.cosh(diphotons["pho_lead"].eta)
-                                )
-                            )
-                            ** 2
-                            + (
-                                diphotons["pho_sublead"].energyErr
-                                / (
-                                    diphotons["pho_sublead"].pt
-                                    * numpy.cosh(diphotons["pho_sublead"].eta)
-                                )
-                            )
-                            ** 2
-                        )
+                        ** 2
+                    )
 
                     # This is the mass SigmaM/M value including the smearing term from the Scale and smearing
                     # The implementation follows the flashGG implementation -> https://github.com/cms-analysis/flashgg/blob/4edea8897e2a4b0518dca76ba6c9909c20c40ae7/DataFormats/src/Photon.cc#L293
@@ -842,96 +729,37 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     # Just a reminder, the pt/energy of teh data is not smearing, but the smearing term is added to the data sigma_m_over_m
                     if (self.Smear_sigma_m):
 
-                        if (self.doFlow_corrections and self.data_kind == "mc"):
-                            # Adding the smeared BDT error to the ntuples!
-                            diphotons["pho_lead","energyErr_Smeared"] = numpy.sqrt((diphotons["pho_lead"].raw_energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
-                            diphotons["pho_sublead","energyErr_Smeared"] = numpy.sqrt((diphotons["pho_sublead"].raw_energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
+                        # Adding the smeared BDT error to the ntuples!
+                        diphotons["pho_lead","energyErr_Smeared"] = numpy.sqrt((diphotons["pho_lead"].energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
+                        diphotons["pho_sublead","energyErr_Smeared"] = numpy.sqrt((diphotons["pho_sublead"].energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
 
-                            diphotons["sigma_m_over_m_Smeared"] = 0.5 * numpy.sqrt(
-                                (
-                                    numpy.sqrt((diphotons["pho_lead"].raw_energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
-                                    / (
-                                        diphotons["pho_lead"].pt
-                                        * numpy.cosh(diphotons["pho_lead"].eta)
-                                    )
+                        diphotons["sigma_m_over_m_Smeared"] = 0.5 * numpy.sqrt(
+                            (
+                                numpy.sqrt((diphotons["pho_lead"].energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
+                                / (
+                                    diphotons["pho_lead"].pt
+                                    * numpy.cosh(diphotons["pho_lead"].eta)
                                 )
-                                ** 2
-                                + (
-                                    numpy.sqrt((diphotons["pho_sublead"].raw_energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
-                                    / (
-                                        diphotons["pho_sublead"].pt
-                                        * numpy.cosh(diphotons["pho_sublead"].eta)
-                                    )
-                                )
-                                ** 2
                             )
-
-                            # Now flow correction + smearing
-                            diphotons["sigma_m_over_m_Smeared_corr"] = 0.5 * numpy.sqrt(
-                                (
-                                    numpy.sqrt((diphotons["pho_lead"].energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
-                                    / (
-                                        diphotons["pho_lead"].pt
-                                        * numpy.cosh(diphotons["pho_lead"].eta)
-                                    )
+                            ** 2
+                            + (
+                                numpy.sqrt((diphotons["pho_sublead"].energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
+                                / (
+                                    diphotons["pho_sublead"].pt
+                                    * numpy.cosh(diphotons["pho_sublead"].eta)
                                 )
-                                ** 2
-                                + (
-                                    numpy.sqrt((diphotons["pho_sublead"].energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
-                                    / (
-                                        diphotons["pho_sublead"].pt
-                                        * numpy.cosh(diphotons["pho_sublead"].eta)
-                                    )
-                                )
-                                ** 2
                             )
-
-                        else:
-                            # Adding the smeared BDT error to the ntuples!
-                            diphotons["pho_lead","energyErr_Smeared"] = numpy.sqrt((diphotons["pho_lead"].energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
-                            diphotons["pho_sublead","energyErr_Smeared"] = numpy.sqrt((diphotons["pho_sublead"].energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
-
-                            diphotons["sigma_m_over_m_Smeared"] = 0.5 * numpy.sqrt(
-                                (
-                                    numpy.sqrt((diphotons["pho_lead"].energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
-                                    / (
-                                        diphotons["pho_lead"].pt
-                                        * numpy.cosh(diphotons["pho_lead"].eta)
-                                    )
-                                )
-                                ** 2
-                                + (
-                                    numpy.sqrt((diphotons["pho_sublead"].energyErr) ** 2 + (diphotons["pho_sublead"].rho_smear * ((diphotons["pho_sublead"].pt * numpy.cosh(diphotons["pho_sublead"].eta)))) ** 2)
-                                    / (
-                                        diphotons["pho_sublead"].pt
-                                        * numpy.cosh(diphotons["pho_sublead"].eta)
-                                    )
-                                )
-                                ** 2
-                            )
+                            ** 2
+                        )
 
                     # Decorrelating the mass resolution - Still need to supress the decorrelator noises
                     if self.doDeco:
-
-                        # Decorrelate nominal sigma_m_over_m
-                        diphotons["sigma_m_over_m_nominal_decorr"] = decorrelate_mass_resolution(diphotons, type="nominal", year=self.year[dataset_name][0])
-
-                        # decorrelate smeared nominal sigma_m_overm_m
-                        if (self.Smear_sigma_m):
-                            diphotons["sigma_m_over_m_smeared_decorr"] = decorrelate_mass_resolution(diphotons, type="smeared", year=self.year[dataset_name][0])
-
-                        # decorrelate flow corrected sigma_m_over_m
-                        if (self.doFlow_corrections):
-                            diphotons["sigma_m_over_m_corr_decorr"] = decorrelate_mass_resolution(diphotons, type="corr", year=self.year[dataset_name][0])
-
-                        # decorrelate flow corrected smeared sigma_m_over_m
-                        if (self.doFlow_corrections and self.Smear_sigma_m):
-                            diphotons["sigma_m_over_m_corr_smeared_decorr"] = decorrelate_mass_resolution(diphotons, type="corr_smeared", year=self.year[dataset_name][0])
-
                         # Instead of the nominal sigma_m_over_m, we will use the smeared version of it -> (https://indico.cern.ch/event/1319585/#169-update-on-the-run-3-mass-r)
-                        # else:
-                        #    warnings.warn("Smeamering need to be applied in order to decorrelate the (Smeared) mass resolution. -- Exiting!")
-                        #    sys.exit(0)
+                        if (self.Smear_sigma_m):
+                            diphotons["sigma_m_over_m_decorr"] = decorrelate_mass_resolution(diphotons)
+                        else:
+                            warnings.warn("Smeamering need to be applied in order to decorrelate the (Smeared) mass resolution. -- Exiting!")
+                            sys.exit(0)
 
                     if self.output_location is not None:
                         if self.output_format == "root":
@@ -968,81 +796,4 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         return histos_etc
 
     def postprocess(self, accumulant: Dict[Any, Any]) -> Any:
-        raise NotImplementedError
-
-    def add_diphoton_mva(
-        self, diphotons: awkward.Array, events: awkward.Array
-    ) -> awkward.Array:
-        return calculate_diphoton_mva(
-            (self.diphoton_mva, self.meta["flashggDiPhotonMVA"]["inputs"]),
-            diphotons,
-            events,
-        )
-
-    def add_photonid_mva(
-        self, photons: awkward.Array, events: awkward.Array
-    ) -> awkward.Array:
-        photons["fixedGridRhoAll"] = events.Rho.fixedGridRhoAll * awkward.ones_like(
-            photons.pt
-        )
-        counts = awkward.num(photons, axis=-1)
-        photons = awkward.flatten(photons)
-        isEB = awkward.to_numpy(numpy.abs(photons.eta) < 1.5)
-        mva_EB = calculate_photonid_mva(
-            (self.photonid_mva_EB, self.meta["flashggPhotons"]["inputs_EB"]), photons
-        )
-        mva_EE = calculate_photonid_mva(
-            (self.photonid_mva_EE, self.meta["flashggPhotons"]["inputs_EE"]), photons
-        )
-        mva = awkward.where(isEB, mva_EB, mva_EE)
-        photons["mvaID"] = mva
-
-        return awkward.unflatten(photons, counts)
-
-    def add_photonid_mva_run3(
-        self, photons: awkward.Array, events: awkward.Array
-    ) -> awkward.Array:
-
-        preliminary_path = os.path.join(os.path.dirname(__file__), '../tools/flows/run3_mvaID_models/')
-        photonid_mva_EB, photonid_mva_EE = load_photonid_mva_run3(preliminary_path)
-
-        rho = events.Rho.fixedGridRhoAll * awkward.ones_like(photons.pt)
-        rho = awkward.flatten(rho)
-
-        photons = awkward.flatten(photons)
-
-        isEB = awkward.to_numpy(numpy.abs(photons.eta) < 1.5)
-        mva_EB = calculate_photonid_mva_run3(
-            [photonid_mva_EB, self.meta["flashggPhotons"]["inputs_EB"]], photons , rho
-        )
-        mva_EE = calculate_photonid_mva_run3(
-            [photonid_mva_EE, self.meta["flashggPhotons"]["inputs_EE"]], photons, rho
-        )
-        mva = awkward.where(isEB, mva_EB, mva_EE)
-        photons["mvaID_run3"] = mva
-
-        return mva
-
-    def add_corr_photonid_mva_run3(
-        self, photons: awkward.Array, events: awkward.Array
-    ) -> awkward.Array:
-
-        preliminary_path = os.path.join(os.path.dirname(__file__), '../tools/flows/run3_mvaID_models/')
-        photonid_mva_EB, photonid_mva_EE = load_photonid_mva_run3(preliminary_path)
-
-        rho = events.Rho.fixedGridRhoAll * awkward.ones_like(photons.pt)
-        rho = awkward.flatten(rho)
-
-        photons = awkward.flatten(photons)
-
-        # Now calculating the corrected mvaID
-        isEB = awkward.to_numpy(numpy.abs(photons.eta) < 1.5)
-        corr_mva_EB = calculate_photonid_mva_run3(
-            [photonid_mva_EB, self.meta["flashggPhotons"]["inputs_EB_corr"]], photons, rho
-        )
-        corr_mva_EE = calculate_photonid_mva_run3(
-            [photonid_mva_EE, self.meta["flashggPhotons"]["inputs_EE_corr"]], photons, rho
-        )
-        corr_mva = awkward.where(isEB, corr_mva_EB, corr_mva_EE)
-
-        return corr_mva
+        pass

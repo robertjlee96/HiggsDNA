@@ -866,8 +866,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                                 ** 2
                             )
 
-                            # Now flow correction + smearing
-                            diphotons["sigma_m_over_m_Smeared_corr"] = 0.5 * numpy.sqrt(
+                            diphotons["sigma_m_over_m_Smeared_Corr"] = 0.5 * numpy.sqrt(
                                 (
                                     numpy.sqrt((diphotons["pho_lead"].energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
                                     / (

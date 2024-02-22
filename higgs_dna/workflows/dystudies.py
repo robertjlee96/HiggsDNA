@@ -410,9 +410,9 @@ class TagAndProbeProcessor(HggBaseProcessor):
                     ** 2
                 )
 
-            # adding the smearing of the mass resolution also for the tag and probe workflow - for both data and Simulation!
+            # Adding the smearing of the mass resolution also for the tag and probe workflow - for both data and Simulation!
             # Just a reminder, the pt/energy of teh data is not smearing, but the smearing term is added to the data sigma_m_over_m
-            if (self.Smear_sigma_m):
+            if self.Smear_sigma_m:
 
                 # Adding the smeared energyErr error to the ntuples!
                 if self.doFlow_corrections and self.data_kind == "mc":

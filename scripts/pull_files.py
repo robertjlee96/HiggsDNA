@@ -324,7 +324,8 @@ def get_photonid_json(logger, target_dir):
 
 
 def get_scale_and_smearing(logger, target_dir):
-    # see https://twiki.cern.ch/twiki/bin/viewauth/CMS/EgammSFandSSRun3#Scale_And_Smearings_Correctionli
+    # see https://twiki.cern.ch/twiki/bin/viewauth/CMS/EgammSFandSSRun3#Scale_And_Smearings_Correctionli for Run 3 
+    # see https://cms-talk.web.cern.ch/t/pnoton-energy-corrections-in-nanoaod-v11/34327/2 for Run 2, jsons are from https://github.com/cms-egamma/ScaleFactorsJSON/tree/master
     if target_dir is not None:
         to_prefix = target_dir
     else:
@@ -333,6 +334,22 @@ def get_scale_and_smearing(logger, target_dir):
         )
 
     from_to_dict = {
+        "2016preVFP": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/SandS/EGM_ScaleUnc_2016preVFP.json",
+            "to": f"{to_prefix}/EGM_ScaleUnc_2016preVFP.json",
+        },
+        "2016postVFP": {
+            "from": "//eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/SandS/EGM_ScaleUnc_2016postVFP.json",
+            "to": f"{to_prefix}/EGM_ScaleUnc_2016postVFP.json",
+        },
+        "2017": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/SandS/EGM_ScaleUnc_2017.json",
+            "to": f"{to_prefix}/EGM_ScaleUnc_2017.json",
+        },
+        "2018": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/SandS/EGM_ScaleUnc_2018.json",
+            "to": f"{to_prefix}/EGM_ScaleUnc_2018.json",
+        },
         "2022preEE": {
             "from": "/eos/cms/store/group/phys_egamma/akapoor/S+SJSON/2022Re-recoBCD/photonSS.json.gz",
             "to": f"{to_prefix}/SS_Rereco2022BCD.json.gz",

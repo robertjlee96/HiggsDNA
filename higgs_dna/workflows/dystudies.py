@@ -172,7 +172,7 @@ class TagAndProbeProcessor(HggBaseProcessor):
                 continue
 
         original_photons = events.Photon
-        
+
         # Performing per photon corrections using normalizing flows
         if self.data_kind == "mc" and self.doFlow_corrections:
 
@@ -190,8 +190,8 @@ class TagAndProbeProcessor(HggBaseProcessor):
                 original_photons[str(var_list[i])] = ak.unflatten(corrected_inputs[:,i] , counts)
 
             # Re-evaluate mvaID after corrections
-            original_photons["mvaID"] = ak.unflatten(self.add_photonid_mva_run3(original_photons, events), counts)        
-        
+            original_photons["mvaID"] = ak.unflatten(self.add_photonid_mva_run3(original_photons, events), counts)
+
         # systematic object variations
         for systematic_name in systematic_names:
             if systematic_name in available_object_systematics.keys():

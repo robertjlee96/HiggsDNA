@@ -207,7 +207,10 @@ class ZmmyProcessor(HggBaseProcessor):
         eve_sel.add("n_dimuon", n_good_dimuon > 0)
         # select photons
         photons = events.Photon
+<<<<<<< HEAD
+=======
 
+>>>>>>> master
         good_photons = photons[select_photons_zmmy(self, photons)]
         n_good_photon = ak.sum(ak.ones_like(good_photons.pt) > 0, axis=1)
         eve_sel.add("n_photon", n_good_photon > 0)
@@ -399,6 +402,34 @@ class ZmmyProcessor(HggBaseProcessor):
             ntuple["mmy_phi"] = events.mmy.obj_mmy.phi
             ntuple["mmy_mass"] = events.mmy.obj_mmy.mass
 
+<<<<<<< HEAD
+        # Making the photon selection
+        photons = photons[eve_sel.all(*(eve_sel.names))]
+
+        photons["trkSumPtSolidConeDR04"] = ntuple["photon_trkSumPtSolidConeDR04"]
+        photons["trkSumPtHollowConeDR03"] = ntuple["photon_trkSumPtHollowConeDR03"]
+
+        # Performing per photon corrections using normalizing flows
+        if self.data_kind == "mc" and self.doFlow_corrections:
+
+            # Applyting the Flow corrections to all photons before pre-selection
+            counts = ak.num(photons)
+            corrected_inputs,var_list = calculate_flow_corrections(photons, events, self.meta["flashggPhotons"]["flow_inputs"], self.meta["flashggPhotons"]["Isolation_transform_order"], year=self.year[dataset_name][0])
+
+            # Store the raw nanoAOD value and update photon ID MVA value for preselection
+            photons["mvaID_run3"] = ak.unflatten(self.add_photonid_mva_run3(photons, events), counts)
+            photons["mvaID_nano"] = photons["mvaID"]
+
+            # Store the raw values of the inputs and update the input values with the corrections since some variables used in the preselection
+            for i in range(len(var_list)):
+                photons["raw_" + str(var_list[i])] = ak.unflatten(np.ascontiguousarray(corrected_inputs[:, i]), counts) #photons[str(var_list[i])]
+                photons[str(var_list[i])] = ak.unflatten(corrected_inputs[:,i] , counts)
+
+            # Re-evaluate mvaID after corrections
+            photons["mvaID"] = ak.unflatten(self.add_photonid_mva_run3(photons, events), counts)   
+
+=======
+>>>>>>> master
         if self.data_kind == "mc":
             # annotate diphotons with dZ information (difference between z position of GenVtx and PV) as required by flashggfinalfits
             ntuple["dZ"] = events.GenVtx.z - events.PV.z

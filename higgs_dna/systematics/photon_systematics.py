@@ -121,8 +121,8 @@ def Smearing(pt, events, year="2022postEE", is_correction=True):
 
     if is_correction:
 
-        if year in ["2016preVFP", "2016postVFP", "2017", "2018"]:
-            logger.info("the smearing correction for Run 2 MC is alsready applied in nAOD")
+        if year in ["2016", "2016preVFP", "2016postVFP", "2017", "2018"]:
+            logger.info("the smearing correction for Run 2 MC is already applied in nAOD")
         else:
             # In theory, the energy should be smeared and not the pT, see: https://mattermost.web.cern.ch/cmseg/channels/egm-ss/6mmucnn8rjdgt8x9k5zaxbzqyh
             # However, there is a linear proportionality between pT and E: E = pT * cosh(eta)
@@ -151,7 +151,7 @@ def Smearing(pt, events, year="2022postEE", is_correction=True):
 
     else:
 
-        if year in ["2016preVFP", "2016postVFP", "2017", "2018"]:
+        if year in ["2016", "2016preVFP", "2016postVFP", "2017", "2018"]:
             # the correction is already applied for Run 2
             dEsigmaUp = ak.flatten(events.Photon.dEsigmaUp)
             dEsigmaDown = ak.flatten(events.Photon.dEsigmaDown)
@@ -220,12 +220,14 @@ def FNUF(pt, events, year="2017", is_correction=True):
     _pt = ak.flatten(events.Photon.pt)
 
     # era/year defined as parameter of the function, only 2017 is implemented up to now
-    avail_years = ["2017"]
+    avail_years = ["2016", "2016preVFP", "2016postVFP", "2017", "2018"]
     if year not in avail_years:
-        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        print(f"\n WARNING: only FNUF corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
         exit()
+    elif "2016" in year:
+        year = "2016"
 
-    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/FNUF.json")
+    jsonpog_file = os.path.join(os.path.dirname(__file__), f"JSONs/FNUF/{year}/FNUF_{year}.json")
     evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["FNUF"]
 
     if is_correction:
@@ -273,13 +275,15 @@ def ShowerShape(pt, events, year="2017", is_correction=True):
     _energy = ak.flatten(events.Photon.energy)
     _pt = ak.flatten(events.Photon.pt)
 
-    # era/year defined as parameter of the function, only 2017 is implemented up to now
-    avail_years = ["2017"]
+    # era/year defined as parameter of the function
+    avail_years = ["2016", "2016preVFP", "2016postVFP", "2017", "2018"]
     if year not in avail_years:
-        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        print(f"\n WARNING: only ShowerShape corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
         exit()
+    elif "2016" in year:
+        year = "2016"
 
-    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/ShowerShape.json")
+    jsonpog_file = os.path.join(os.path.dirname(__file__), f"JSONs/ShowerShape/{year}/ShowerShape_{year}.json")
     evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["ShowerShape"]
 
     if is_correction:
@@ -326,12 +330,17 @@ def Material(pt, events, year="2017", is_correction=True):
     _pt = ak.flatten(events.Photon.pt)
 
     # era/year defined as parameter of the function, only 2017 is implemented up to now
-    avail_years = ["2017", "2022preEE", "2022postEE"]  # use Run 2 files also for Run 3, preliminary
+    avail_years = ["2016", "2016preVFP", "2016postVFP", "2017", "2018", "2022preEE", "2022postEE"]
     if year not in avail_years:
-        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        print(f"\n WARNING: only eVetoSF corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
         exit()
+    elif "2016" in year:
+        year = "2016"
+    # use Run 2 files also for Run 3, preliminary
+    elif year in ["2022preEE", "2022postEE"]:
+        year = "2017"
 
-    jsonpog_file = os.path.join(os.path.dirname(__file__), "JSONs/Material.json")
+    jsonpog_file = os.path.join(os.path.dirname(__file__), f"JSONs/Material/{year}/Material_{year}.json")
     evaluator = correctionlib.CorrectionSet.from_file(jsonpog_file)["Material"]
 
     if is_correction:

@@ -20,9 +20,7 @@ parser.add_argument(
     dest="target",
     help="Choose the target to download (default: %(default)s)",
     default="GoldenJson",
-
-    choices=["GoldenJSON", "cTag", "PhotonID", "PU", "SS", "JetMET","CDFs", "JEC", "JER", "Material", "TriggerSF", "PreselSF", "eVetoSF","Flows"],
-
+    choices=["GoldenJSON", "cTag", "PhotonID", "PU", "SS", "JetMET", "CDFs", "JEC", "JER", "Material", "TriggerSF", "PreselSF", "eVetoSF", "Flows", "FNUF", "ShowerShape", "LooseMva"],
 )
 
 parser.add_argument(
@@ -181,16 +179,99 @@ def get_material_json(logger, target_dir):
         to_prefix = target_dir
     else:
         to_prefix = os.path.join(
-            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/"
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/Material"
         )
 
     from_to_dict = {
+        "2016": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2016/Material_2016.json",
+            "to": f"{to_prefix}/2016/Material_2016.json",
+        },
         "2017": {
-            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/Material.json",
-            "to": f"{to_prefix}",
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2017/Material_2017.json",
+            "to": f"{to_prefix}/2017/Material_2017.json",
+        },
+        "2018": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2018/Material_2018.json",
+            "to": f"{to_prefix}/2018/Material_2018.json",
         }
     }
     fetch_file("Material", logger, from_to_dict, type="copy")
+
+
+def get_fnuf_json(logger, target_dir):
+    if target_dir is not None:
+        to_prefix = target_dir
+    else:
+        to_prefix = os.path.join(
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/FNUF"
+        )
+
+    from_to_dict = {
+        "2016": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2016/FNUF_2016.json",
+            "to": f"{to_prefix}/2016/FNUF_2016.json",
+        },
+        "2017": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2017/FNUF_2017.json",
+            "to": f"{to_prefix}/2017/FNUF_2017.json",
+        },
+        "2018": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2018/FNUF_2018.json",
+            "to": f"{to_prefix}/2018/FNUF_2018.json",
+        }
+    }
+    fetch_file("FNUF", logger, from_to_dict, type="copy")
+
+
+def get_shower_shape_json(logger, target_dir):
+    if target_dir is not None:
+        to_prefix = target_dir
+    else:
+        to_prefix = os.path.join(
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/ShowerShape"
+        )
+
+    from_to_dict = {
+        "2016": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2016/ShowerShape_2016.json",
+            "to": f"{to_prefix}/2016/ShowerShape_2016.json",
+        },
+        "2017": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2017/ShowerShape_2017.json",
+            "to": f"{to_prefix}/2017/ShowerShape_2017.json",
+        },
+        "2018": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2018/ShowerShape_2018.json",
+            "to": f"{to_prefix}/2018/ShowerShape_2018.json",
+        }
+    }
+    fetch_file("ShowerShape", logger, from_to_dict, type="copy")
+
+
+def get_loose_mva_json(logger, target_dir):
+    if target_dir is not None:
+        to_prefix = target_dir
+    else:
+        to_prefix = os.path.join(
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/LooseMvaSF"
+        )
+
+    from_to_dict = {
+        "2016": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2017/LooseMvaSF_2016.json",
+            "to": f"{to_prefix}/2016/LooseMvaSF_2016.json",
+        },
+        "2017": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2017/LooseMvaSF_2017.json",
+            "to": f"{to_prefix}/2017/LooseMvaSF_2017.json",
+        },
+        "2018": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2018/LooseMvaSF_2018.json",
+            "to": f"{to_prefix}/2018/LooseMvaSF_2018.json",
+        }
+    }
+    fetch_file("LooseMva", logger, from_to_dict, type="copy")
 
 
 def get_trigger_json(logger, target_dir):
@@ -198,17 +279,33 @@ def get_trigger_json(logger, target_dir):
         to_prefix = target_dir
     else:
         to_prefix = os.path.join(
-            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/"
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/TriggerSF"
         )
 
     from_to_dict = {
+        "2016_lead": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2016/TriggerSF_lead_2016.json",
+            "to": f"{to_prefix}/2016/TriggerSF_lead_2016.json",
+        },
+        "2016_sublead": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2016/TriggerSF_sublead_2016.json",
+            "to": f"{to_prefix}/2016/TriggerSF_sublead_2016.json",
+        },
         "2017_lead": {
-            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/TriggerSF_lead.json",
-            "to": f"{to_prefix}",
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2017/TriggerSF_lead_2017.json",
+            "to": f"{to_prefix}/2017/TriggerSF_lead_2017.json",
         },
         "2017_sublead": {
-            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/TriggerSF_sublead.json",
-            "to": f"{to_prefix}",
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2017/TriggerSF_sublead_2017.json",
+            "to": f"{to_prefix}/2017/TriggerSF_sublead_2017.json",
+        },
+        "2018_lead": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2018/TriggerSF_lead_2018.json",
+            "to": f"{to_prefix}/2018/TriggerSF_lead_2018.json",
+        },
+        "2018_sublead": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2018/TriggerSF_sublead_2018.json",
+            "to": f"{to_prefix}/2018/TriggerSF_sublead_2018.json",
         }
     }
     fetch_file("TriggerSF", logger, from_to_dict, type="copy")
@@ -219,23 +316,31 @@ def get_presel_json(logger, target_dir):
         to_prefix = target_dir
     else:
         to_prefix = os.path.join(
-            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/"
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/Preselection"
         )
     # Old ones with puely restricted probe and non-conservative uncertainties: "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/SFs/preselection/restrictedProbe"
     path_for_early_Analysis = "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/SFs/preselection/restrictedProbeConservativeUncs"
 
     from_to_dict = {
+        "2016": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2017/PreselSF_2016.json",
+            "to": f"{to_prefix}/2016/PreselSF_2016.json",
+        },
         "2017": {
-            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/PreselSF.json",
-            "to": f"{to_prefix}/Preselection/2017/PreselSF.json",
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2017/PreselSF_2017.json",
+            "to": f"{to_prefix}/2017/PreselSF_2017.json",
+        },
+        "2018": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2018/PreselSF_2018.json",
+            "to": f"{to_prefix}/2018/PreselSF_2018.json",
         },
         "2022preEE": {
             "from": f"{path_for_early_Analysis}/Preselection_2022PreEE.json",
-            "to": f"{to_prefix}/Preselection/2022/Preselection_2022PreEE.json",
+            "to": f"{to_prefix}/2022/Preselection_2022PreEE.json",
         },
         "2022postEE": {
             "from": f"{path_for_early_Analysis}/Preselection_2022PostEE.json",
-            "to": f"{to_prefix}/Preselection/2022/Preselection_2022PostEE.json",
+            "to": f"{to_prefix}/2022/Preselection_2022PostEE.json",
         },
     }
     
@@ -247,21 +352,29 @@ def get_eveto_json(logger, target_dir):
         to_prefix = target_dir
     else:
         to_prefix = os.path.join(
-            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/"
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/ElectronVetoSF"
         )
 
     from_to_dict = {
+        "2016": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2016/eVetoSF_2016.json",
+            "to": f"{to_prefix}/2016/eVetoSF_2016.json",
+        },
         "2017": {
-            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/eVetoSF.json",
-            "to": f"{to_prefix}",
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2017/eVetoSF_2017.json",
+            "to": f"{to_prefix}/2017/eVetoSF_2017.json",
+        },
+        "2018": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2018/eVetoSF_2018.json",
+            "to": f"{to_prefix}/2018/eVetoSF_2018.json",
         },
         "2022preEE": {
             "from": "/eos/cms/store/group/phys_higgs/cmshgg/fmausolf/HiggsDNA_JSONs/preEE_CSEV_SFcorrections.json",
-            "to": f"{to_prefix}",
+            "to": f"{to_prefix}/2022/preEE_CSEV_SFcorrections.json",
         },
         "2022postEE": {
             "from": "/eos/cms/store/group/phys_higgs/cmshgg/fmausolf/HiggsDNA_JSONs/postEE_CSEV_SFcorrections.json",
-            "to": f"{to_prefix}",
+            "to": f"{to_prefix}/2022/postEE_CSEV_SFcorrections.json",
         }
     }
     fetch_file("eVetoSF", logger, from_to_dict, type="copy")
@@ -272,25 +385,25 @@ def get_ctag_json(logger, target_dir):
         to_prefix = target_dir
     else:
         to_prefix = os.path.join(
-            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs"
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/cTagSF/"
         )
 
     from_to_dict = {
         "2016preVFP": {
             "from": "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/BTV/2016preVFP_UL/ctagging.json.gz",
-            "to": f"{to_prefix}/cTagSF/ctagging_2016preVFP.json.gz",
+            "to": f"{to_prefix}/2016/ctagging_2016preVFP.json.gz",
         },
         "2016postVFP": {
             "from": "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/BTV/2016postVFP_UL/ctagging.json.gz",
-            "to": f"{to_prefix}/cTagSF/ctagging_2016postVFP.json.gz",
+            "to": f"{to_prefix}/2016/ctagging_2016postVFP.json.gz",
         },
         "2017": {
             "from": "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/BTV/2017_UL/ctagging.json.gz",
-            "to": f"{to_prefix}/cTagSF/ctagging_2017.json.gz",
+            "to": f"{to_prefix}/2017/ctagging_2017.json.gz",
         },
         "2018": {
             "from": "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/BTV/2018_UL/ctagging.json.gz",
-            "to": f"{to_prefix}/cTagSF/ctagging_2018.json.gz",
+            "to": f"{to_prefix}/2018/ctagging_2018.json.gz",
         },
     }
     fetch_file("cTag", logger, from_to_dict, type="copy")
@@ -301,23 +414,35 @@ def get_photonid_json(logger, target_dir):
         to_prefix = target_dir
     else:
         to_prefix = os.path.join(
-            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs"
+            os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/SF_photon_ID"
         )
 
     path_for_early_Analysis = "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/SFs/photon_id_mva"
 
     from_to_dict = {
+        "2016preVFP": {
+            "from": "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/EGM/2016preVFP_UL/photon.json.gz",
+            "to": f"{to_prefix}/2016/photon_preVFP.json.gz",
+        },
+        "2016postVFP": {
+            "from": "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/EGM/2016postVFP_UL/photon.json.gz",
+            "to": f"{to_prefix}/2016/photon_postVFP.json.gz",
+        },
         "2017": {
             "from": "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/EGM/2017_UL/photon.json.gz",
-            "to": f"{to_prefix}/SF_photon_ID/2017/photon.json.gz",
+            "to": f"{to_prefix}/2017/photon.json.gz",
+        },
+        "2018": {
+            "from": "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/EGM/2018_UL/photon.json.gz",
+            "to": f"{to_prefix}/2018/photon.json.gz",
         },
         "2022preEE": {
             "from": f"{path_for_early_Analysis}/PhotonIDMVA_2022PreEE.json",
-            "to": f"{to_prefix}/SF_photon_ID/2022/PhotonIDMVA_2022PreEE.json",
+            "to": f"{to_prefix}/2022/PhotonIDMVA_2022PreEE.json",
         },
         "2022postEE": {
             "from": f"{path_for_early_Analysis}/PhotonIDMVA_2022PostEE.json",
-            "to": f"{to_prefix}/SF_photon_ID/2022/PhotonIDMVA_2022PostEE.json",
+            "to": f"{to_prefix}/2022/PhotonIDMVA_2022PostEE.json",
         },
     }
     fetch_file("PhotonID", logger, from_to_dict, type="copy")
@@ -575,6 +700,9 @@ if __name__ == "__main__":
         get_jec_files(logger, args.target_dir)
         get_jer_files(logger, args.target_dir)
         get_material_json(logger, args.target_dir)
+        get_fnuf_json(logger, args.target_dir)
+        get_loose_mva_json(logger, args.target_dir)
+        get_shower_shape_json(logger, args.target_dir)
         get_trigger_json(logger, args.target_dir)
         get_presel_json(logger, args.target_dir)
         get_eveto_json(logger, args.target_dir)
@@ -600,6 +728,12 @@ if __name__ == "__main__":
         get_jer_files(logger, args.target_dir)
     elif args.target == "Material":
         get_material_json(logger, args.target_dir)
+    elif args.target == "FNUF":
+        get_fnuf_json(logger, args.target_dir)
+    elif args.target == "ShowerShape":
+        get_shower_shape_json(logger, args.target_dir)
+    elif args.target == "LooseMva":
+        get_loose_mva_json(logger, args.target_dir)
     elif args.target == "TriggerSF":
         get_trigger_json(logger, args.target_dir)
     elif args.target == "PreselSF":

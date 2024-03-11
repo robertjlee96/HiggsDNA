@@ -127,16 +127,18 @@ def LooseMvaSF(photons, weights, year="2017", is_correction=True, **kwargs):
     """
 
     # era/year defined as parameter of the function, only 2017 is implemented up to now
-    avail_years = ["2017", "2022preEE", "2022postEE"]
+    avail_years = ["2016", "2016preVFP", "2016postVFP", "2017", "2018", "2022preEE", "2022postEE"]
     if year not in avail_years:
-        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        print(f"\n WARNING: only LooseMvaSF corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
         exit()
+    elif "2016" in year:
+        year = "2016"
 
     # make this read the 2022 files when available!
     # 2017 file should be renamed with the year in its name...
-    json_file = os.path.join(os.path.dirname(__file__), "JSONs/LooseMvaSF.json")
+    json_file = os.path.join(os.path.dirname(__file__), f"JSONs/LooseMvaSF/{year}/LooseMvaSF_{year}.json")
     evaluator = correctionlib.CorrectionSet.from_file(json_file)["LooseMvaSF"]
-    if year == "2017":
+    if year in ["2016", "2017", "2018"]:
         if is_correction:
             # only calculate correction to nominal weight
             sf_lead = evaluator.evaluate(
@@ -259,15 +261,17 @@ def ElectronVetoSF(photons, weights, year="2017", is_correction=True, **kwargs):
     And for presentation on the study: https://indico.cern.ch/event/961164/contributions/4089584/attachments/2135019/3596299/Zmmg_UL2017%20With%20CorrMC_Hgg%20(02.11.2020).pdf
     """
 
-    # era/year defined as parameter of the function, only 2017 is implemented up to now
-    avail_years = ["2017", "2022preEE", "2022postEE"]
+    # era/year defined as parameter of the function
+    avail_years = ["2016", "2016preVFP", "2016postVFP", "2017", "2018", "2022preEE", "2022postEE"]
     if year not in avail_years:
-        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        print(f"\n WARNING: only eVetoSF corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
         exit()
+    elif "2016" in year:
+        year = "2016"
 
-    if year == "2017":
+    if year in ["2016", "2017", "2018"]:
         # 2017 file should be renamed with the year in its name...
-        json_file = os.path.join(os.path.dirname(__file__), "JSONs/eVetoSF.json")
+        json_file = os.path.join(os.path.dirname(__file__), f"JSONs/ElectronVetoSF/{year}/eVetoSF_{year}.json")
         evaluator = correctionlib.CorrectionSet.from_file(json_file)["ElectronVetoSF"]
         if is_correction:
             # only calculate correction to nominal weight
@@ -311,9 +315,9 @@ def ElectronVetoSF(photons, weights, year="2017", is_correction=True, **kwargs):
     elif "2022" in year:
         # presentation of SF: https://indico.cern.ch/event/1360961/#173-run-3-electron-veto-sfs
         if year == "2022preEE":
-            json_file = os.path.join(os.path.dirname(__file__), "JSONs/preEE_CSEV_SFcorrections.json")
+            json_file = os.path.join(os.path.dirname(__file__), "JSONs/ElectronVetoSF/2022/preEE_CSEV_SFcorrections.json")
         if year == "2022postEE":
-            json_file = os.path.join(os.path.dirname(__file__), "JSONs/postEE_CSEV_SFcorrections.json")
+            json_file = os.path.join(os.path.dirname(__file__), "JSONs/ElectronVetoSF/2022/postEE_CSEV_SFcorrections.json")
         evaluator = correctionlib.CorrectionSet.from_file(json_file)["CSEV_SFs"]
 
         if is_correction:
@@ -363,24 +367,26 @@ def PreselSF(photons, weights, year="2017", is_correction=True, **kwargs):
     """
 
     # era/year defined as parameter of the function
-    avail_years = ["2017", "2022preEE", "2022postEE"]
+    avail_years = ["2016", "2016preVFP", "2016postVFP", "2017", "2018", "2022preEE", "2022postEE"]
     if year not in avail_years:
-        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        print(f"\n WARNING: only PreselSF corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
         exit()
+    elif "2016" in year:
+        year = "2016"
 
-    if year == "2017":
-        json_file = os.path.join(os.path.dirname(__file__), "JSONs/Preselection/2017/PreselSF.json")
+    if year in ["2016", "2017", "2018"]:
+        json_file = os.path.join(os.path.dirname(__file__), f"JSONs/Preselection/{year}/PreselSF_{year}.json")
     elif year == "2022preEE":
         json_file = os.path.join(os.path.dirname(__file__), "JSONs/Preselection/2022/Preselection_2022PreEE.json")
     elif year == "2022postEE":
         json_file = os.path.join(os.path.dirname(__file__), "JSONs/Preselection/2022/Preselection_2022PostEE.json")
 
-    if year == "2017":
+    if year in ["2016", "2017", "2018"]:
         evaluator = correctionlib.CorrectionSet.from_file(json_file)["PreselSF"]
     elif "2022" in year:
         evaluator = correctionlib.CorrectionSet.from_file(json_file)["Preselection_SF"]
 
-    if year == "2017":
+    if year in ["2016", "2017", "2018"]:
         if is_correction:
             # only calculate correction to nominal weight
             sf_lead = evaluator.evaluate(
@@ -474,18 +480,20 @@ def TriggerSF(photons, weights, year="2017", is_correction=True, **kwargs):
     For original implementation look at: https://github.com/cms-analysis/flashgg/blob/2677dfea2f0f40980993cade55144636656a8a4f/Systematics/python/flashggDiPhotonSystematics2017_Legacy_cfi.py
     """
 
-    # era/year defined as parameter of the function, only 2017 is implemented up to now
-    avail_years = ["2017", "2022preEE", "2022postEE"]
+    # era/year defined as parameter of the function
+    avail_years = ["2016", "2016preVFP", "2016postVFP", "2017", "2018", "2022preEE", "2022postEE"]
     if year not in avail_years:
-        print(f"\n WARNING: only scale corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
+        print(f"\n WARNING: only TriggerSF corrections for the year strings {avail_years} are already implemented! \n Exiting. \n")
         exit()
+    elif "2016" in year:
+        year = "2016"
 
-    jsonpog_file_lead = os.path.join(os.path.dirname(__file__), "JSONs/TriggerSF_lead.json")
-    jsonpog_file_sublead = os.path.join(os.path.dirname(__file__), "JSONs/TriggerSF_sublead.json")
+    jsonpog_file_lead = os.path.join(os.path.dirname(__file__), f"JSONs/TriggerSF/{year}/TriggerSF_lead_{year}.json")
+    jsonpog_file_sublead = os.path.join(os.path.dirname(__file__), f"JSONs/TriggerSF/{year}/TriggerSF_sublead_{year}.json")
     evaluator_lead = correctionlib.CorrectionSet.from_file(jsonpog_file_lead)["TriggerSF"]
     evaluator_sublead = correctionlib.CorrectionSet.from_file(jsonpog_file_sublead)["TriggerSF"]
 
-    if year == "2017":
+    if year in ["2016", "2017", "2018"]:
         if is_correction:
             # only calculate correction to nominal weight
             sf_lead = evaluator_lead.evaluate(
@@ -747,28 +755,28 @@ def cTagSF(events, weights, is_correction=True, year="2017", **kwargs):
     ctag_correction_configs = {
         "2016preVFP": {
             "file": os.path.join(
-                os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2016preVFP.json.gz"
+                os.path.dirname(__file__), "JSONs/cTagSF/2016/ctagging_2016preVFP.json.gz"
             ),
             "method": "deepJet_shape",
             "systs": ctag_systematics,
         },
         "2016postVFP": {
             "file": os.path.join(
-                os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2016postVFP.json.gz"
+                os.path.dirname(__file__), "JSONs/cTagSF/2016/ctagging_2016postVFP.json.gz"
             ),
             "method": "deepJet_shape",
             "systs": ctag_systematics,
         },
         "2017": {
             "file": os.path.join(
-                os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2017.json.gz"
+                os.path.dirname(__file__), "JSONs/cTagSF/2017/ctagging_2017.json.gz"
             ),
             "method": "deepJet_shape",
             "systs": ctag_systematics,
         },
         "2018": {
             "file": os.path.join(
-                os.path.dirname(__file__), "JSONs/cTagSF/ctagging_2018.json.gz"
+                os.path.dirname(__file__), "JSONs/cTagSF/2018/ctagging_2018.json.gz"
             ),
             "method": "deepJet_shape",
             "systs": ctag_systematics,

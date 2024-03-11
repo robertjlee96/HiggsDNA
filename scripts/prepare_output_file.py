@@ -67,14 +67,14 @@ parser.add_option(
     "--ws_config",
     dest="config",
     type="string",
-    default="config_higgsdna_cats.py",
+    default="config_simple.py",
     help="configuration file for Tree2WS, as it is now it must be stored in Tree2WS directory in FinalFit",
 )
 parser.add_option(
     "--final_fit",
     dest="final_fit",
     type="string",
-    default="/work/bevila_t/HpC_Analysis/test_flashggfinalfit/CMSSW_10_2_13/src",
+    default="/afs/cern.ch/user/n/niharrin/cernbox/PhD/Higgs/CMSSW_10_2_13/src/",
     help="FlashggFinalFit path",
 )  # the default is just for me, it should be changed but I don't see a way to make this generally valid
 parser.add_option(
@@ -131,13 +131,38 @@ SCRIPT_DIR = os.path.dirname(
 )  # script directory
 
 process_dict = {
-    "GluGluHtoGG_M-125_preEE": "ggh",
-    "GluGluHtoGG_M-125_postEE": "ggh",
-    "VBFHtoGG_M-125_preEE": "vbf",
-    "VBFHtoGG_M-125_postEE": "vbf",
-    "VHtoGG_M-125_preEE": "vh",
-    "ttHtoGG_M-125_preEE": "tth",
-    "ttHtoGG_M-125_postEE": "tth",
+    "GluGluHtoGG_M-125_preEE": "ggh_125",
+    "GluGluHtoGG_M-125_postEE": "ggh_125",
+    "GluGluHtoGG_M-120_preEE": "ggh_120",
+    "GluGluHtoGG_M-120_postEE": "ggh_120",
+    "GluGluHtoGG_M-130_preEE": "ggh_130",
+    "GluGluHtoGG_M-130_postEE": "ggh_130",
+    "GluGluHtoGG": "ggh",
+    "VBFHtoGG_M-125_preEE": "vbf_125",
+    "VBFHtoGG_M-125_postEE": "vbf_125",
+    "VBFHtoGG_M-120_preEE": "vbf_120",
+    "VBFHtoGG_M-120_postEE": "vbf_120",
+    "VBFHtoGG_M-130_preEE": "vbf_130",
+    "VBFHtoGG_M-130_postEE": "vbf_130",
+    "VHtoGG_M-125_preEE": "vh_125",
+    "VHtoGG_M-125_postEE": "vh_125",
+    "VHtoGG_M-120_preEE": "vh_120",
+    "VHtoGG_M-120_postEE": "vh_120",
+    "VHtoGG_M-130_preEE": "vh_130",
+    "VHtoGG_M-130_postEE": "vh_130",
+    "ttHtoGG_M-125_preEE": "tth_125",
+    "ttHtoGG_M-125_postEE": "tth_125",
+    "ttHtoGG_M-120_preEE": "tth_120",
+    "ttHtoGG_M-120_postEE": "tth_120",
+    "ttHtoGG_M-130_preEE": "tth_130",
+    "ttHtoGG_M-130_postEE": "tth_130",
+    "DYto2L_2Jets": "dy",
+    "GG-Box-3Jets_MGG-80_postEE": "ggbox",
+    "GG-Box-3Jets_MGG-80_preEE": "ggbox",
+    "GJet_PT-20to40_DoubleEMEnriched_MGG-80_postEE": "gjet",
+    "GJet_PT-20to40_DoubleEMEnriched_MGG-80_preEE": "gjet",
+    "GJet_PT-40_DoubleEMEnriched_MGG-80_postEE": "gjet",
+    "GJet_PT-40_DoubleEMEnriched_MGG-80_preEE": "gjet"
 }
 
 # the key of the var_dict entries is also used as a key for the related root tree branch
@@ -176,7 +201,7 @@ if opt.cats:
         },
     }
 else:
-    cat_dict = {"UNTAGGED": {"cat_filter": [("pt", ">", -1.0)]}}
+    cat_dict = {"NOTAG": {"cat_filter": [("pt", ">", -1.0)]}}
 # I create a dictionary and save it to a temporary json so that this can be shared between the two scripts
 # and then gets deleted to not leave trash around. We have to care for the environment :P.
 # Not super elegant, open for suggestions
@@ -326,6 +351,8 @@ if opt.ws:
             doSystematics = "--doSystematics"
         else:
             doSystematics = ""
+        with open(f"{SCRIPT_DIR}/../higgs_dna/category.json") as f:
+            cat_file = json.load(f)
         for dir in files:
             dir = dir.split("\n")[0]
             # if MC
@@ -340,9 +367,12 @@ if opt.ws:
                     raise Exception(
                         f"The selected target path: {IN_PATH}/root/{dir} it's empty"
                     )
-                command = f"python trees2ws.py --inputConfig {opt.config} --productionMode {process_dict[dir]} --year 2017 {doSystematics} --inputTreeFile {filename}"
+                doNOTAG = ""
+                if ("NOTAG" in cat_file.keys()):
+                    doNOTAG = "--doNOTAG"
+                command = f"python trees2ws.py {doNOTAG} --inputConfig {opt.config} --productionMode {process_dict[dir]} --year 2017 {doSystematics} --inputTreeFile {filename}"
                 activate_final_fit(opt.final_fit, command)
-            elif "Data" in dir.lower() and not data_done:
+            elif "data" in dir.lower() and not data_done:
                 if os.listdir(f"{IN_PATH}/root/Data/"):
                     filename = subprocess.check_output(
                         f"find {IN_PATH}/root/Data -name *.root -type f",
@@ -353,7 +383,10 @@ if opt.ws:
                     raise Exception(
                         f"The selected target path: {IN_PATH}/root/{dir} it's empty"
                     )
-                command = f"python trees2ws_data.py --inputConfig {opt.config} --inputTreeFile {filename}"
+                doNOTAG = ""
+                if ("NOTAG" in cat_file.keys()):
+                    doNOTAG = "--doNOTAG"
+                command = f"python trees2ws_data.py {doNOTAG} --inputConfig {opt.config} --inputTreeFile {filename}"
                 activate_final_fit(opt.final_fit, command)
                 data_done = True
     os.chdir(EXEC_PATH)

@@ -73,18 +73,62 @@ outfiles = {
     "ggh": target_path.replace(
         "merged.root", "output_GluGluHToGG_M125_13TeV_amcatnloFXFX_pythia8.root"
     ),
+    "ggh_125": target_path.replace(
+        "merged.root", "output_GluGluHToGG_M125_13TeV_amcatnloFXFX_pythia8.root"
+    ),
+    "ggh_120": target_path.replace(
+        "merged.root", "output_GluGluHToGG_M120_13TeV_amcatnloFXFX_pythia8.root"
+    ),
+    "ggh_130": target_path.replace(
+        "merged.root", "output_GluGluHToGG_M130_13TeV_amcatnloFXFX_pythia8.root"
+    ),
     "vbf": target_path.replace(
         "merged.root", "output_VBFHToGG_M125_13TeV_amcatnlo_pythia8.root"
+    ),
+    "vbf_125": target_path.replace(
+        "merged.root", "output_VBFHToGG_M125_13TeV_amcatnlo_pythia8.root"
+    ),
+    "vbf_120": target_path.replace(
+        "merged.root", "output_VBFHToGG_M120_13TeV_amcatnlo_pythia8.root"
+    ),
+    "vbf_130": target_path.replace(
+        "merged.root", "output_VBFHToGG_M130_13TeV_amcatnlo_pythia8.root"
     ),
     "vh": target_path.replace(
         "merged.root", "output_VHToGG_M125_13TeV_amcatnlo_pythia8.root"
     ),
+    "vh_125": target_path.replace(
+        "merged.root", "output_VHToGG_M125_13TeV_amcatnlo_pythia8.root"
+    ),
+    "vh_120": target_path.replace(
+        "merged.root", "output_VHToGG_M120_13TeV_amcatnlo_pythia8.root"
+    ),
+    "vh_130": target_path.replace(
+        "merged.root", "output_VHToGG_M130_13TeV_amcatnlo_pythia8.root"
+    ),
     "tth": target_path.replace(
         "merged.root", "output_TTHToGG_M125_13TeV_amcatnlo_pythia8.root"
     ),
+    "tth_125": target_path.replace(
+        "merged.root", "output_TTHToGG_M125_13TeV_amcatnlo_pythia8.root"
+    ),
+    "tth_120": target_path.replace(
+        "merged.root", "output_TTHToGG_M120_13TeV_amcatnlo_pythia8.root"
+    ),
+    "tth_130": target_path.replace(
+        "merged.root", "output_TTHToGG_M130_13TeV_amcatnlo_pythia8.root"
+    ),
+    "dy": target_path.replace(
+        "merged.root", "output_DYto2L.root"
+    ),
+    "ggbox": target_path.replace(
+        "merged.root", "output_GG-Box-3Jets_MGG-80.root"
+    ),
+    "gjet": target_path.replace(
+        "merged.root", "output_GJet_DoubleEMEnriched_MGG-80.root"
+    ),
     "data": target_path.replace("merged.root", "allData_2017.root"),
 }
-
 # Loading category informations (used for naming of files to read/write)
 if args.cats_dict != "":
     with open(BASEDIR + args.cats_dict) as pf:
@@ -165,7 +209,7 @@ else:
             f"Successfully created dict from awkward arrays without variation for category: {cat}."
         )
 
-cat_postfix = {"ggh": "GG2H", "vbf": "VBF", "tth": "TTH", "vh": "VH"}
+cat_postfix = {"ggh": "GG2H", "vbf": "VBF", "tth": "TTH", "vh": "VH", "dy": "DY"}
 
 # For MC: {inputTreeDir}/{production-mode}_{mass}_{sqrts}_{category}
 # For data: {inputTreeDir}/Data_{sqrts}_{category}
@@ -173,11 +217,20 @@ labels = {}
 names = {}
 if type == "mc":
     for cat in cat_dict:
-        names[
+        if len(process.split("_"))>1:
+            # If process of the form {process}_{mass}
+            names[
+                cat
+            ] = f"DiphotonTree/{process.split('_')[0]}_{process.split('_')[-1]}_13TeV_{cat}"  # _"+cat_postfix[process]
+        else:
+            names[
             cat
-        ] = f"DiphotonTree/{process}_125_13TeV_{cat}"  # _"+cat_postfix[process]
+            ] = f"DiphotonTree/{process}_125_13TeV_{cat}"  # _"+cat_postfix[process]
         labels[cat] = []
-    name_notag = "DiphotonTree/" + process + "_125_13TeV_NOTAG"
+    if len(process.split("_"))>1:
+        name_notag = "DiphotonTree/" + process.split('_')[0] + f"_{process.split('_')[-1]}_13TeV_NOTAG"
+    else:    
+        name_notag = "DiphotonTree/" + process + "_125_13TeV_NOTAG"
     # flashggFinalFit needs to have each systematic variation in a different branch
     if args.do_syst:
         for var in variation_dict:
@@ -185,39 +238,69 @@ if type == "mc":
                 # for object systematics we have different files storing the variated collections with the nominal weights
                 syst_ = var
                 logger.info("found syst: %s for category: %s" % (syst_, cat))
-                labels[cat].append(
+                if len(process.split("_"))>1:
+                    labels[cat].append(
+                        [
+                            "DiphotonTree/" + process.split('_')[0] + f"_{process.split('_')[-1]}_13TeV_{cat}_" + syst_,
+                            "weight",
+                            syst_,
+                            cat,
+                        ]
+                    )
+                else:
+                    labels[cat].append(
                     [
                         "DiphotonTree/" + process + f"_125_13TeV_{cat}_" + syst_,
                         "weight",
                         syst_,
                         cat,
                     ]
-                )
+                    )
         for cat in cat_dict:
             for field in df_dict["NOMINAL"][cat]:
                 if "weight_" in field:
                     syst_ = field.split("weight_")[1]
                     if ("Up" not in field) and ("Down" not in field): continue
                     logger.info("found weight-based syst: %s for category: %s" % (syst_, cat))
-                    labels[cat].append(
+                    if len(process.split("_"))>1:
+                        labels[cat].append(
+                            [
+                                "DiphotonTree/" + process.split('_')[0] + f"_{process.split('_')[-1]}_13TeV_{cat}_" + syst_,
+                                field,
+                                syst_,
+                                cat,
+                            ]
+                        )
+                    else:
+                        labels[cat].append(
                         [
                             "DiphotonTree/" + process + f"_125_13TeV_{cat}_" + syst_,
                             field,
                             syst_,
                             cat,
                         ]
-                    )
+                        )
     else:
         for cat in cat_dict:
             syst_ = ""
-            labels[cat].append(
+            if len(process.split("_"))>1:
+                labels[cat].append(
+                    [
+                        "DiphotonTree/" + process.split('_')[0] + f"_{process.split('_')[-1]}_13TeV_{cat}_" + syst_,
+                        "weight",
+                        syst_,
+                        cat,
+                    ]
+                )
+            else:
+                labels[cat].append(
                 [
                     "DiphotonTree/" + process + f"_125_13TeV_{cat}_" + syst_,
                     "weight",
                     syst_,
                     cat,
                 ]
-            )
+                )
 
 else:
     for cat in cat_dict:
@@ -260,6 +343,7 @@ with uproot.recreate(outfiles[process]) as file:
                             for key, new_key in (
                                 ["CMS_hgg_mass", "CMS_hgg_mass"],
                                 [weight, "weight"],
+                                ["fiducialGeometricTagger_20", "fiducialGeometricTagger_20"],
                             )
                         }
                         logger.info(f"Adding {syst_name}01sigma to out tree...")
@@ -270,6 +354,7 @@ with uproot.recreate(outfiles[process]) as file:
                             for key, new_key in (
                                 ["CMS_hgg_mass", "CMS_hgg_mass"],
                                 [weight, "weight"],
+                                ["fiducialGeometricTagger_20", "fiducialGeometricTagger_20"],
                             )
                         }
                         logger.info(f"Adding {syst_name}01sigma to out tree...")

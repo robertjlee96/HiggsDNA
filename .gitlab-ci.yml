@@ -2,8 +2,8 @@ image: "python:3.9"
 
 stages:
   - build
-  - build docker
-  - tag docker
+  #- build docker
+  #- tag docker
   - static analysis
   - test
 
@@ -27,25 +27,25 @@ build:
   script:
     - pip install -e .[dev]
 
-build_docker:
-  stage: build docker
-  extends: .build_kaniko
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_REF_NAME == "master"'
-  variables:
-    BUILD_ARGS: "FROM_IMAGE=gitlab-registry.cern.ch/batch-team/dask-lxplus/lxdask-cc7:latest CLUSTER=lxplus"
-    REGISTRY_IMAGE_PATH: ${CI_REGISTRY_IMAGE}:lxplus-${CI_COMMIT_SHORT_SHA}
+#build_docker:
+  #stage: build docker
+  #extends: .build_kaniko
+  #rules:
+    #- if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_REF_NAME == "master"'
+  #variables:
+    #BUILD_ARGS: "FROM_IMAGE=gitlab-registry.cern.ch/batch-team/dask-lxplus/lxdask-cc7:latest CLUSTER=lxplus"
+    #REGISTRY_IMAGE_PATH: ${CI_REGISTRY_IMAGE}:lxplus-${CI_COMMIT_SHORT_SHA}
 
-build_docker_latest:
-  stage: tag docker
-  extends: .tag_skopeo
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_REF_NAME == "master"'
-  variables:
-    IMAGE_ORIGIN_TAG: ${CI_REGISTRY_IMAGE}:lxplus-${CI_COMMIT_SHORT_SHA}
+#build_docker_latest:
+  #stage: tag docker
+  #extends: .tag_skopeo
+  #rules:
+    #- if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_REF_NAME == "master"'
+  #variables:
+    #IMAGE_ORIGIN_TAG: ${CI_REGISTRY_IMAGE}:lxplus-${CI_COMMIT_SHORT_SHA}
     # keep only latest for now as we have only the lxplus one
     # change in the future in case we need more
-    IMAGE_DESTINATION_TAG: ${CI_REGISTRY_IMAGE}:latest
+    #IMAGE_DESTINATION_TAG: ${CI_REGISTRY_IMAGE}:latest
 
 static_analysis:
   stage: static analysis

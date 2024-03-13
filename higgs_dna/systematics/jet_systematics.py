@@ -10,6 +10,19 @@ import os
 # from coffea.nanoevents import NanoEventsFactory, NanoAODSchema
 
 
+# jet dummy
+def jet_pt_scale_dummy(pt, events, year, is_correction=True):
+    _pt = events.Jet.pt
+    if is_correction:
+        events.Jet['pt'] = 1.1 * _pt[:, None]
+        return events
+    else:
+        _pt = ak.flatten(_pt)
+        up_variation = 1.1 * np.ones(len(_pt))
+        down_variation = 0.9 * np.ones(len(_pt))
+        return np.concatenate((up_variation.reshape(-1,1), down_variation.reshape(-1,1)), axis=1) * _pt[:, None]
+
+
 def JERC_jet(pt, events, year="2017", skip_JER=False, skip_JEC=False, is_correction=True):
     ext = extractor()
     metadata_dict = {

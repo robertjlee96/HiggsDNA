@@ -7,12 +7,11 @@ available_years = ['2022']
 available_eras = ['preEE', 'postEE', 'all']
 
 # Setup command-line argument parsing
-parser = argparse.ArgumentParser(description = "Calculate the inclusive fiducial cross section of pp->H(yy)+X process(es) based on processed samples without detector-level selections.")
+parser = argparse.ArgumentParser(description = "Calculate the inclusive fiducial cross section of pp->H(yy)+X process(es) based on processed samples without detector-level selections. ")
 parser.add_argument('path', type = str, help = "Path to the top-level folder containing the different directories.")
 parser.add_argument('--process', type = str, choices = available_processes, default = 'GluGluH', help = "Please specify the process(es) for which you want to calculate the inclusive fiducial xsec.")
 parser.add_argument('--year', type = str, choices = available_years, default = '2022', help = 'Please specify the desired year if you want to combine samples from multiple eras.')
-parser.add_argument('--era', type = str, choices = available_eras, default = 'postEE', help = 'Please specify the era(s) that you want to run over. You do not have to specify all as the eras (corresponding to data-taking conditions) should not change the fiducial cross section, but for consistency, a lumi-weighting of the samples from different eras is implemented.')
-parser.add_argument('--doLumiWeighting', action = 'store_true', help = 'Specify this flag if you want to weight the respective eras with corresponding integrated luminosity during data taking. If not specified, instead do inverse variance weighting by MC stat as the proper statistical combination procedure for point estimators.')
+parser.add_argument('--era', type = str, choices = available_eras, default = 'postEE', help = "Please specify the era(s) that you want to run over. If you specify 'all', an inverse variance weighting is performed to increase the precision.")
 
 args = parser.parse_args()
 
@@ -30,9 +29,6 @@ if args.era == 'all':
     eras.remove('all')
 else:
     eras = [args.era]
-do_lumi_weighting = args.doLumiWeighting
-if not do_lumi_weighting:
-    variances = {}
 
 # See also the following pages (note numbers always in picobarn)
 # 13: for 125
@@ -43,12 +39,7 @@ XS_map = {'13':   {'GluGluH': 48.58, 'VBFH': 3.782, 'VH': 2.2569, 'ttH': 0.5071}
          '14':   {'GluGluH': 54.67, 'VBFH': 4.278, 'VH': 2.4991, 'ttH': 0.6137},}
 
 # c.f. https://twiki.cern.ch/twiki/bin/viewauth/CMS/PdmVRun3Analysis#DATA_AN2
-lumi_map = {'2022': {'preEE': 7.98, 'postEE': 26.67}}
-lumi_map = lumi_map[year]
-
-# Extract the total lumi based on the specified era(s)
-lumi_list = [lumi_map[era] for era in eras]
-total_lumi = np.sum(lumi_list)
+#lumi_map = {'2022': {'preEE': 7.98, 'postEE': 26.67}}
 
 # This depends on how you named your samples in HiggsDNA
 processMap = {'GluGluH': 'GluGluHtoGG_M-125',
@@ -58,18 +49,19 @@ processMap = {'GluGluH': 'GluGluHtoGG_M-125',
 
 BR = 0.2270/100 # SM value for mH close to 125: https://twiki.cern.ch/twiki/bin/view/LHCPhysics/CERNYellowReportPageBR
 
-# Already saving some code snippets 
+# Already saving some code snippets for differentials
 #differential_var = 'HTXS_Higgs_pt' # HTXS_Higgs_y and HTXS_njets30
 #binning = np.array([0., 1., 2., 3., 4., np.infty]) # for njets
 #differential_flag = arr[differential_var] > 15
 #sumwIn = ak.sum(arr.weight[(inFiducialFlag & differential_flag)])
 
-fid_xsecs = []
-for era in eras:
-    print(f'INFO: Now extracting numbers for era: {era} ...')
-    if not do_lumi_weighting: variances_tmp = []
-    for process in processes:
-        print(f'INFO: Now extracting fraction of in-fiducial events for process {process} ...')
+fid_xsecs_per_process = {}
+for process in processes:
+    print(f'INFO: Now extracting fraction of in-fiducial events for process {process} ...')
+    fid_xsecs_per_era = {} # These numbers are already weighted with the inverse of the MC stat variance
+    sumw2_tmp = []
+    for era in eras:
+        print(f'INFO: Now extracting numbers for era: {era} ...')
         # Extract the events
         process_string = processMap[process]
         arr = ak.from_parquet(path_folder + process_string + '_' + era + '/nominal')
@@ -82,23 +74,15 @@ for era in eras:
 
         print(f"INFO: Fraction of in-fiducial events: {in_frac} ...")
 
-        if do_lumi_weighting:
-            rel_fraction = lumi_map[era] / total_lumi
-        else:
-            sumw2 = ak.sum(arr.weight[(inFiducialFlag)]**2)
-            rel_fraction = 1/sumw2 # inverse variance
-            variances_tmp.append(sumw2)
+        sumw2 = ak.sum(arr.weight[(inFiducialFlag)]**2) # This is the MC stat variance
+        sumw2_tmp.append(sumw2)
 
-        fid_xsecs.append(in_frac * XS_map['13p6'][process] * 1000 * BR * rel_fraction) # also converting to femtobarn on the way
+        fid_xsecs_per_era[era] = in_frac * XS_map['13p6'][process] * 1000 * BR * 1/sumw2 # also converting to femtobarn on the way
     
-    if not do_lumi_weighting:
-        variances_tmp = np.asarray(variances_tmp)
-        variances[era] = np.sqrt(np.sum(variances_tmp))
+    sumw2_tmp = np.asarray(sumw2_tmp)
+    result = np.sum(np.asarray([fid_xsecs_per_era[era] for era in eras]))
+    fid_xsecs_per_process[process] = result / np.sum(1/sumw2_tmp)
 
-if do_lumi_weighting:
-    result = np.sum(fid_xsecs)
-else:
-    variances_list = np.asarray([variances[era] for era in eras])
-    result = np.sum(fid_xsecs)/np.sum(1/variances_list)
+final_fid_xsec = np.sum(np.asarray([fid_xsecs_per_process[process] for process in processes]))
 
-print(f"The inclusive fiducial cross section is given by: {result} fb")
+print(f"The inclusive fiducial cross section is given by: {final_fid_xsec} fb")

@@ -484,6 +484,12 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             diphotons["phi"] = diphoton_4mom.phi
             diphotons["mass"] = diphoton_4mom.mass
             diphotons["charge"] = diphoton_4mom.charge
+
+            diphoton_pz = diphoton_4mom.z
+            diphoton_e = diphoton_4mom.energy
+
+            diphotons["rapidity"] = 0.5 * numpy.log((diphoton_e + diphoton_pz) / (diphoton_e - diphoton_pz))
+
             diphotons = awkward.with_name(diphotons, "PtEtaPhiMCandidate")
 
             # sort diphotons by pT

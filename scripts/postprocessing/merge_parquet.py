@@ -49,7 +49,7 @@ target_paths = args.target.split(",")
 
 BASEDIR = os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))
-) + "/higgs_dna/"
+) + "/../higgs_dna/"
 
 logger = setup_logger(level="INFO")
 

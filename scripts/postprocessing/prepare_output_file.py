@@ -50,6 +50,12 @@ parser.add_option(
     help="Do merging of the .parquet files",
 )
 parser.add_option(
+    "--varDict",
+    dest="varDict",
+    default=None,
+    help="Path to JSON that holds dictionary that encodes the mapping of the systematic variation branches (includes nominal and object-based systematics, up/down). If not provided, use only nominal.",
+)
+parser.add_option(
     "--root",
     dest="root",
     action="store_true",
@@ -89,7 +95,13 @@ parser.add_option(
     dest="cats",
     action="store_true",
     default=False,
-    help="Split into categories",
+    help="Split into categories.",
+)
+parser.add_option(
+    "--catDict",
+    dest="catDict",
+    default=None,
+    help="Path to JSON that defines the conditions for splitting into multiple categories. For well-defined statistical analyses in final fits, the categories should be mutually exclusive (it is your job to ensure this!). If not provided, use only one inclusive untagged category with no conditions.",
 )
 parser.add_option(
     "--skip-normalisation",
@@ -110,7 +122,7 @@ parser.add_option(
     dest="verbose",
     type="string",
     default="INFO",
-    help="verbose lefer for the logger: INFO (default), DEBUG",
+    help="Verbosity level for the logger: INFO (default), DEBUG",
 )
 (opt, args) = parser.parse_args()
 
@@ -122,13 +134,6 @@ os.system(
     f"ls -l {opt.input} | tail -n +2 | grep -v .coffea | grep -v merged | grep -v root |"
     + "awk '{print $NF}' > dirlist.txt"
 )
-
-EXEC_PATH = os.getcwd()
-os.chdir(opt.input)
-IN_PATH = os.getcwd()
-SCRIPT_DIR = os.path.dirname(
-    os.path.abspath(__file__)
-)  # script directory
 
 process_dict = {
     "GluGluHtoGG_M-125_preEE": "ggh_125",
@@ -168,40 +173,34 @@ process_dict = {
 # the key of the var_dict entries is also used as a key for the related root tree branch
 # to be consistent with FinalFit naming scheme you shoud use SystNameUp and SystNameDown, 
 # e.g. "FNUFUp": "FNUF_up", "FNUFDown": "FNUF_down" 
-var_dict = {
-    "NOMINAL": "nominal",
-}
+if opt.varDict is None: # If not given in the command line
+    logger.info("You did not specify the path to a variation dictionary JSON, so we will only use the nominal input trees.")
+    var_dict = {
+        "NOMINAL": "nominal",
+    }
+else:
+    with open(opt.varDict, "r") as jf:
+        var_dict = json.load(jf)['var_dict']
+    
 
 # Here we prepare to split the output into categories, in the dictionary are defined the cuts to be applyed by pyarrow.ParquetDataset
 # when reading the data, the variable obviously has to be in the dumped .parquet
 # This can be improved by passing the configuration via json loading
-if opt.cats:
-    cat_dict = {
-        "best_resolution": {
-            "cat_filter": [
-                ("sigma_m_over_m_decorr", "<", 0.005),
-                ("lead_mvaID", ">", 0.43),
-                ("sublead_mvaID", ">", 0.43),
-            ]
-        },
-        "medium_resolution": {
-            "cat_filter": [
-                ("sigma_m_over_m_decorr", ">", 0.005),
-                ("sigma_m_over_m_decorr", "<", 0.008),
-                ("lead_mvaID", ">", 0.43),
-                ("sublead_mvaID", ">", 0.43),
-            ]
-        },
-        "worst_resolution": {
-            "cat_filter": [
-                ("sigma_m_over_m_decorr", ">", 0.008),
-                ("lead_mvaID", ">", 0.43),
-                ("sublead_mvaID", ">", 0.43),
-            ]
-        },
-    }
+if opt.cats and opt.catDict is not None:
+    with open(opt.catDict, "r") as jf:
+        cat_dict = json.load(jf)['cat_dict']
 else:
+    logger.info("You chose to run without cats or you did not specify the path to a categorisation dictionary JSON, so we will only use one inclusive NOTAG category.")
     cat_dict = {"NOTAG": {"cat_filter": [("pt", ">", -1.0)]}}
+
+# Now, after loading the JSONs from possibly relative paths, we can change the directory appropriately to get to work
+EXEC_PATH = os.getcwd()
+os.chdir(opt.input)
+IN_PATH = os.getcwd()
+SCRIPT_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)  # script directory
+
 # I create a dictionary and save it to a temporary json so that this can be shared between the two scripts
 # and then gets deleted to not leave trash around. We have to care for the environment :P.
 # Not super elegant, open for suggestions
@@ -212,8 +211,8 @@ with open("category.json", "w") as file:
 with open("variation.json", "w") as file:
     file.write(json.dumps(var_dict))
 
-os.system(f"mv category.json {SCRIPT_DIR}/../higgs_dna/category.json")
-os.system(f"mv variation.json {SCRIPT_DIR}/../higgs_dna/variation.json")
+os.system(f"mv category.json {SCRIPT_DIR}/../../higgs_dna/category.json")
+os.system(f"mv variation.json {SCRIPT_DIR}/../../higgs_dna/variation.json")
 cat_dict = "category.json"
 
 # Define string if normalisation to be skipped
@@ -241,6 +240,7 @@ if opt.merge:
                         MKDIRP(f"{IN_PATH}/merged/{file}/{var_dict[var]}")
 
                         os.chdir(SCRIPT_DIR)
+                        logger.info(f"python3 merge_parquet.py --source {IN_PATH}/{file}/{var_dict[var]} --target {IN_PATH}/merged/{file}/{var_dict[var]}/ --cats {cat_dict} {skip_normalisation_str}")
                         os.system(
                             f"python3 merge_parquet.py --source {IN_PATH}/{file}/{var_dict[var]} --target {IN_PATH}/merged/{file}/{var_dict[var]}/ --cats {cat_dict} {skip_normalisation_str}"
                         )
@@ -351,7 +351,7 @@ if opt.ws:
             doSystematics = "--doSystematics"
         else:
             doSystematics = ""
-        with open(f"{SCRIPT_DIR}/../higgs_dna/category.json") as f:
+        with open(f"{SCRIPT_DIR}/../../higgs_dna/category.json") as f:
             cat_file = json.load(f)
         for dir in files:
             dir = dir.split("\n")[0]
@@ -394,7 +394,7 @@ if opt.ws:
 # We don't want to leave trash around
 if os.path.exists(f"{EXEC_PATH}/dirlist.txt"):
     os.system(f"rm {EXEC_PATH}/dirlist.txt")
-if os.path.exists(f"{SCRIPT_DIR}/../higgs_dna/category.json"):
-    os.system(f"rm {SCRIPT_DIR}/../higgs_dna/category.json")
-if os.path.exists(f"{SCRIPT_DIR}/../higgs_dna/variation.json"):
-    os.system(f"rm {SCRIPT_DIR}/../higgs_dna/variation.json")
+if os.path.exists(f"{SCRIPT_DIR}/../../higgs_dna/category.json"):
+    os.system(f"rm {SCRIPT_DIR}/../../higgs_dna/category.json")
+if os.path.exists(f"{SCRIPT_DIR}/../../higgs_dna/variation.json"):
+    os.system(f"rm {SCRIPT_DIR}/../../higgs_dna/variation.json")

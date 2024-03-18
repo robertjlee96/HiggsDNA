@@ -1,0 +1,26 @@
+{
+    "cat_dict" : {
+        "best_resolution": {
+            "cat_filter": [
+                ["sigma_m_over_m_smeared_decorr", "<", 0.010],
+                ["lead_mvaID", ">", 0.25],
+                ["sublead_mvaID", ">", 0.25]
+            ]
+        },
+        "medium_resolution": {
+            "cat_filter": [
+                ["sigma_m_over_m_smeared_decorr", ">", 0.010],
+                ["sigma_m_over_m_smeared_decorr", "<", 0.014],
+                ["lead_mvaID", ">", 0.25],
+                ["sublead_mvaID", ">", 0.25]
+            ]
+        },
+        "worst_resolution": {
+            "cat_filter": [
+                ["sigma_m_over_m_smeared_decorr", ">", 0.014],
+                ["lead_mvaID", ">", 0.25],
+                ["sublead_mvaID", ">", 0.25]
+            ]
+        }
+    }
+}

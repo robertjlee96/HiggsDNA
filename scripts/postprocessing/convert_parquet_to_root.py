@@ -58,7 +58,7 @@ logger = setup_logger(level=args.log)
 
 BASEDIR = os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))
-) + "/higgs_dna/"
+) + "/../higgs_dna/"
 
 # Dictionary for renaming variables in ROOT tree output for final fits
 rename_dict = {
@@ -338,25 +338,31 @@ with uproot.recreate(outfiles[process]) as file:
                     # If the name is not in the variation dictionary it is assumed to be a weight systematic
                     if syst_ not in variation_dict:
                         logger.debug(f"found weight syst {syst_}")
-                        red_dict = {
-                            new_key: df_dict["NOMINAL"][cat][key]
-                            for key, new_key in (
-                                ["CMS_hgg_mass", "CMS_hgg_mass"],
-                                [weight, "weight"],
-                                ["fiducialGeometricTagger_20", "fiducialGeometricTagger_20"],
-                            )
-                        }
+                        red_dict = {}
+                        for key, new_key in [
+                            ["CMS_hgg_mass", "CMS_hgg_mass"],
+                            [weight, "weight"],
+                            ["fiducialGeometricTagger_20", "fiducialGeometricTagger_20"],
+                            ["HTXS_Higgs_pt", "HTXS_Higgs_pt"],
+                            ["HTXS_Higgs_y", "HTXS_Higgs_y"]
+                        ]:
+                            if "NOMINAL" in df_dict and cat in df_dict["NOMINAL"] and key in df_dict["NOMINAL"][cat]:
+                                red_dict[new_key] = df_dict["NOMINAL"][cat][key]
+
                         logger.info(f"Adding {syst_name}01sigma to out tree...")
                         file[syst_name + "01sigma"] = red_dict
                     else:
-                        red_dict = {
-                            new_key: ak.flatten(df_dict[syst_][cat][key], 0)
-                            for key, new_key in (
-                                ["CMS_hgg_mass", "CMS_hgg_mass"],
-                                [weight, "weight"],
-                                ["fiducialGeometricTagger_20", "fiducialGeometricTagger_20"],
-                            )
-                        }
+                        red_dict = {}
+                        for key, new_key in [
+                            ["CMS_hgg_mass", "CMS_hgg_mass"],
+                            [weight, "weight"],
+                            ["fiducialGeometricTagger_20", "fiducialGeometricTagger_20"],
+                            ["HTXS_Higgs_pt", "HTXS_Higgs_pt"],
+                            ["HTXS_Higgs_y", "HTXS_Higgs_y"]
+                        ]:
+                            if syst_ in df_dict and cat in df_dict[syst_] and key in df_dict[syst_][cat]:
+                                red_dict[new_key] = ak.flatten(df_dict[syst_][cat][key], 0)
+
                         logger.info(f"Adding {syst_name}01sigma to out tree...")
                         file[syst_name + "01sigma"] = red_dict
             else:

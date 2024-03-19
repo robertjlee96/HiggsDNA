@@ -3,7 +3,7 @@ from higgs_dna.tools.SC_eta import add_photon_SC_eta
 from higgs_dna.tools.EELeak_region import veto_EEleak_flag
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.selections.lepton_selections import select_electrons, select_muons
-from higgs_dna.selections.jet_selections import select_jets, jetvetomap
+from higgs_dna.selections.jet_selections import select_jets, select_fatjets, jetvetomap
 from higgs_dna.selections.lumi_selections import select_lumis
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array, diphoton_list_to_pandas, dump_pandas
 from higgs_dna.utils.misc_utils import choose_jet
@@ -74,6 +74,22 @@ class HHbbggProcessor(HggBaseProcessor):
         )
         self.trigger_group = ".*DoubleEG.*"
         self.analysis = "mainAnalysis"
+
+        self.num_fatjets_to_store = 4
+        self.num_leptons_to_store = 4
+
+        # fatjet selection cuts, same as jets but for photon dR and pT
+        self.fatjet_dipho_min_dr = 0.8
+        self.fatjet_pho_min_dr = 0.8
+        self.fatjet_ele_min_dr = 0.4
+        self.fatjet_muo_min_dr = 0.4
+        self.fatjet_pt_threshold = 250
+        self.fatjet_max_eta = 4.7
+
+        self.clean_fatjet_dipho = False
+        self.clean_fatjet_pho = True
+        self.clean_fatjet_ele = False
+        self.clean_fatjet_muo = False
 
         # Redefine some cuts
         self.jet_max_eta = 4.7
@@ -399,10 +415,19 @@ class HHbbggProcessor(HggBaseProcessor):
                     )
                     muons = awkward.with_name(muons, "PtEtaPhiMCandidate")
 
+                    fatjets = events.FatJet
+                    fatjets["charge"] = awkward.zeros_like(fatjets.pt)
+                    fatjets = awkward.with_name(fatjets, "PtEtaPhiMCandidate")
+
+                    # create PuppiMET objects
+                    puppiMET = events.PuppiMET
+                    puppiMET = awkward.with_name(puppiMET, "PtEtaPhiMCandidate")
+
                     # lepton cleaning
                     sel_electrons = electrons[
                         select_electrons(self, electrons, diphotons)
                     ]
+
                     sel_muons = muons[select_muons(self, muons, diphotons)]
 
                     # jet selection and pt ordering
@@ -410,6 +435,10 @@ class HHbbggProcessor(HggBaseProcessor):
                         select_jets(self, jets, diphotons, sel_muons, sel_electrons)
                     ]
                     jets = jets[awkward.argsort(jets.pt, ascending=False)]
+
+                    # fatjet selection and pt ordering
+                    fatjets = fatjets[select_fatjets(self, fatjets, diphotons, sel_muons, sel_electrons)]  # For now, having the same preselection as jet. Can be changed later
+                    fatjets = fatjets[awkward.argsort(fatjets.particleNetWithMass_HbbvsQCD, ascending=False)]
 
                     # adding selected jets to events to be used in ctagging SF calculation
                     events["sel_jets"] = jets
@@ -452,6 +481,8 @@ class HHbbggProcessor(HggBaseProcessor):
                     # Selection on the dijet
                     dijets = dijets[dijets.mass < 190]
                     dijets = dijets[dijets.mass > 70]
+                    dijets = dijets[dijets.btagPNetB_sum > 0]
+                    dijets = dijets[(numpy.abs(dijets["first_jet"].eta) < 2.5) & (numpy.abs(dijets["second_jet"].eta) < 2.5)]
                     dijets = dijets[awkward.argsort(dijets.btagPNetB_sum, ascending=False)]
 
                     lead_bjet_pt = choose_jet(dijets["first_jet"].pt, 0, -999.0)
@@ -538,6 +569,55 @@ class HHbbggProcessor(HggBaseProcessor):
                         diphotons["sublead_bjet_pt"] > -998
                     ]
 
+                    # Addition of lepton info-> Taken from the top workflow. This part of the code was orignally written by Florain Mausolf
+                    # Adding a 'generation' field to electrons and muons
+                    sel_electrons['generation'] = awkward.ones_like(sel_electrons.pt)
+                    sel_muons['generation'] = 2 * awkward.ones_like(sel_muons.pt)
+
+                    # Combine electrons and muons into a single leptons collection
+                    leptons = awkward.concatenate([sel_electrons, sel_muons], axis=1)
+                    leptons = awkward.with_name(leptons, "PtEtaPhiMCandidate")
+
+                    # Sort leptons by pt in descending order
+                    leptons = leptons[awkward.argsort(leptons.pt, ascending=False)]
+
+                    n_leptons = awkward.num(leptons)
+                    diphotons["n_leptons"] = n_leptons
+
+                    # Annotate diphotons with selected leptons properties
+                    lepton_properties = ["pt", "eta", "phi", "mass", "charge", "generation"]
+                    for i in range(self.num_leptons_to_store):  # Number of leptons to select
+                        for prop in lepton_properties:
+                            key = f"lepton{i+1}_{prop}"
+                            # Retrieve the value using the choose_jet function (which can be used for leptons as well)
+                            value = choose_jet(getattr(leptons, prop), i, -999.0)
+                            # Store the value in the diphotons dictionary
+                            diphotons[key] = value
+
+                    # addition of fatjets info
+                    n_fatjets = awkward.num(fatjets)
+                    diphotons["n_fatjets"] = n_fatjets
+
+                    fatjet_properties = fatjets.fields
+                    for i in range(self.num_fatjets_to_store):  # Number of fatjets to select
+                        for prop in fatjet_properties:
+                            if "Idx" in prop:   # No Idx values are added for now; The Idx values does not make sense if there is preselection of objects as the Idx will change
+                                continue
+                            key = f"fatjet{i+1}_{prop}"
+                            # Retrieve the value using the choose_jet function (which can be used for fatjets as well)
+                            value = choose_jet(fatjets[prop], i, -999.0)
+                            # Store the value in the diphotons dictionary
+                            diphotons[key] = value
+
+                    # adding MET to parquet, adding all variables for now
+                    puppiMET_properties = puppiMET.fields
+                    for prop in puppiMET_properties:
+                        key = f"puppiMET_{prop}"
+                        # Retrieve the value using the choose_jet function (which can be used for puppiMET as well)
+                        value = getattr(puppiMET, prop)
+                        # Store the value in the diphotons dictionary
+                        diphotons[key] = value
+
                     ## ----------  End of the HHTobbgg part ----------
 
                     # run taggers on the events list with added diphotons
@@ -610,7 +690,7 @@ class HHbbggProcessor(HggBaseProcessor):
                             | awkward.is_none(diphotons.best_tag)
                         )
                         diphotons = diphotons[selection_mask]
-                    else:
+                    else:  # drop events without a preselected diphoton candidate
                         selection_mask = ~awkward.is_none(diphotons)
                         diphotons = diphotons[selection_mask]
 

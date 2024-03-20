@@ -7,7 +7,7 @@ dependencies:
   - ipython
   - coffea<2023
   - pyaml
-  - xrootd
+  - xrootd # use 5.6.4 if you experience problems, recommended as of March 2024
   - numba
   - pyarrow
   - pandas

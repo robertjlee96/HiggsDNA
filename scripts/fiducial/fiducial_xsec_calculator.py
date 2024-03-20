@@ -8,7 +8,7 @@ available_eras = ['preEE', 'postEE', 'all']
 
 # Setup command-line argument parsing
 parser = argparse.ArgumentParser(description = "Calculate the inclusive fiducial cross section of pp->H(yy)+X process(es) based on processed samples without detector-level selections. ")
-parser.add_argument('path', type = str, help = "Path to the top-level folder containing the different directories.")
+parser.add_argument('path', type = str, help = "Path to the top-level folder containing the different directories. Please only run this on the output of the ParticleLevelProcessor.")
 parser.add_argument('--process', type = str, choices = available_processes, default = 'GluGluH', help = "Please specify the process(es) for which you want to calculate the inclusive fiducial xsec.")
 parser.add_argument('--year', type = str, choices = available_years, default = '2022', help = 'Please specify the desired year if you want to combine samples from multiple eras.')
 parser.add_argument('--era', type = str, choices = available_eras, default = 'postEE', help = "Please specify the era(s) that you want to run over. If you specify 'all', an inverse variance weighting is performed to increase the precision.")
@@ -64,7 +64,7 @@ for process in processes:
         print(f'INFO: Now extracting numbers for era: {era} ...')
         # Extract the events
         process_string = processMap[process]
-        arr = ak.from_parquet(path_folder + process_string + '_' + era + '/nominal')
+        arr = ak.from_parquet(path_folder + process_string + '_' + era)
         # Calculating the relevant fractions
         inFiducialFlag = arr.fiducialGeometricTagger_20 == 21 # Only for this type of tagger right now, can be customised in the future
         sumwAll = ak.sum(arr.weight)

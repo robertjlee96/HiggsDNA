@@ -181,7 +181,6 @@ class TagAndProbeProcessor(HggBaseProcessor):
             corrected_inputs,var_list = calculate_flow_corrections(original_photons, events, self.meta["flashggPhotons"]["flow_inputs"], self.meta["flashggPhotons"]["Isolation_transform_order"], year=self.year[dataset_name][0])
 
             # Store the raw nanoAOD value and update photon ID MVA value for preselection
-            original_photons["mvaID_run3"] = ak.unflatten(self.add_photonid_mva_run3(original_photons, events), counts)
             original_photons["mvaID_nano"] = original_photons["mvaID"]
 
             # Store the raw values of the inputs and update the input values with the corrections since some variables used in the preselection

@@ -19,10 +19,10 @@ def select_jets(
     pt_cut = jets.pt > self.jet_pt_threshold
     eta_cut = abs(jets.eta) < self.jet_max_eta
     dr_dipho_cut = awkward.ones_like(pt_cut) > 0
-    if self.clean_jet_dipho & (awkward.count(diphotons) > 0):
+    if (self.clean_jet_dipho) & (awkward.num(diphotons.pt, axis=0) > 0):
         dr_dipho_cut = delta_r_mask(jets, diphotons, self.jet_dipho_min_dr)
 
-    if (self.clean_jet_pho) & (awkward.count(diphotons) > 0):
+    if (self.clean_jet_pho) & (awkward.num(diphotons.pt, axis=0) > 0):
         lead = awkward.zip(
             {
                 "pt": diphotons.pho_lead.pt,
@@ -49,12 +49,12 @@ def select_jets(
         dr_pho_lead_cut = jets.pt > -1
         dr_pho_sublead_cut = jets.pt > -1
 
-    if (self.clean_jet_ele) & (awkward.count(electrons) > 0):
+    if (self.clean_jet_ele) & (awkward.num(electrons.pt, axis=0) > 0):
         dr_electrons_cut = delta_r_mask(jets, electrons, self.jet_ele_min_dr)
     else:
         dr_electrons_cut = jets.pt > -1
 
-    if (self.clean_jet_muo) & (awkward.count(muons) > 0):
+    if (self.clean_jet_muo) & (awkward.num(muons.pt, axis=0) > 0):
         dr_muons_cut = delta_r_mask(jets, muons, self.jet_muo_min_dr)
     else:
         dr_muons_cut = jets.pt > -1

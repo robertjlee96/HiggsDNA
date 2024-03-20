@@ -360,6 +360,15 @@ class ZmmyProcessor(HggBaseProcessor):
             ###### Redo store of the photons
             photon_in_mmy_collection = ak.singletons(photon_in_mmy)
             counts = ak.num(photon_in_mmy_collection)
+
+            # Keeping the nano value
+            photon_in_mmy_collection["mvaID_nano"] = photon_in_mmy_collection["mvaID"]
+
+            # Recalculate photon mvaID after the muon pt subtractions
+            photon_in_mmy_collection["mvaID"] = ak.unflatten(
+                self.add_photonid_mva_run3(photon_in_mmy_collection, events), counts
+            )
+
             ## Performing photon corrections using normalizing flows
             if self.data_kind == "mc" and self.doFlow_corrections:
                 # Applyting the Flow corrections to all photons before pre-selection
@@ -373,18 +382,20 @@ class ZmmyProcessor(HggBaseProcessor):
 
                 # adding the corrected values to the tnp_candidates
                 for i in range(len(var_list)):
-                    photon_in_mmy_collection["corr_" + str(var_list[i])] = ak.unflatten(
+
+                    photon_in_mmy_collection["raw_" + str(var_list[i])] = photon_in_mmy_collection[str(var_list[i])]
+                    photon_in_mmy_collection[str(var_list[i])] = ak.unflatten(
                         np.ascontiguousarray(corrected_inputs[:, i]), counts
                     )
-                photon_in_mmy_collection["corr_mvaID_run3"] = ak.unflatten(
-                    self.add_corr_photonid_mva_run3(photon_in_mmy_collection, events),
+
+                # Keeping the mvaID after the subtraction as "mvaID_raw"
+                photon_in_mmy_collection["mvaID_raw"] = photon_in_mmy_collection["mvaID"]
+
+                photon_in_mmy_collection["mvaID"] = ak.unflatten(
+                    self.add_photonid_mva_run3(photon_in_mmy_collection, events),
                     counts,
                 )
 
-            # Recalculate photon mvaID after the pt subtractions
-            photon_in_mmy_collection["mvaID_run3"] = ak.unflatten(
-                self.add_photonid_mva_run3(photon_in_mmy_collection, events), counts
-            )
             photon_in_mmy = ak.flatten(photon_in_mmy_collection)
             ntuple = dress_branches(ntuple, photon_in_mmy, "photon")
             # dimuon
@@ -403,25 +414,6 @@ class ZmmyProcessor(HggBaseProcessor):
 
         photons["trkSumPtSolidConeDR04"] = ntuple["photon_trkSumPtSolidConeDR04"]
         photons["trkSumPtHollowConeDR03"] = ntuple["photon_trkSumPtHollowConeDR03"]
-
-        # Performing per photon corrections using normalizing flows
-        if self.data_kind == "mc" and self.doFlow_corrections:
-
-            # Applyting the Flow corrections to all photons before pre-selection
-            counts = ak.num(photons)
-            corrected_inputs,var_list = calculate_flow_corrections(photons, events, self.meta["flashggPhotons"]["flow_inputs"], self.meta["flashggPhotons"]["Isolation_transform_order"], year=self.year[dataset][0])
-
-            # Store the raw nanoAOD value and update photon ID MVA value for preselection
-            photons["mvaID_run3"] = ak.unflatten(self.add_photonid_mva_run3(photons, events), counts)
-            photons["mvaID_nano"] = photons["mvaID"]
-
-            # Store the raw values of the inputs and update the input values with the corrections since some variables used in the preselection
-            for i in range(len(var_list)):
-                photons["raw_" + str(var_list[i])] = ak.unflatten(np.ascontiguousarray(corrected_inputs[:, i]), counts)
-                photons[str(var_list[i])] = ak.unflatten(corrected_inputs[:,i] , counts)
-
-            # Re-evaluate mvaID after corrections
-            photons["mvaID"] = ak.unflatten(self.add_photonid_mva_run3(photons, events), counts)
 
         if self.data_kind == "mc":
             # annotate diphotons with dZ information (difference between z position of GenVtx and PV) as required by flashggfinalfits

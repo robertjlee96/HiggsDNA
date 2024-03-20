@@ -349,6 +349,24 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
 
         original_photons = events.Photon
         original_jets = events.Jet
+
+        # Computing the normalizing flow correction
+        if self.data_kind == "mc" and self.doFlow_corrections:
+
+            # Applyting the Flow corrections to all photons before pre-selection
+            counts = awkward.num(original_photons)
+            corrected_inputs,var_list = calculate_flow_corrections(original_photons, events, self.meta["flashggPhotons"]["flow_inputs"], self.meta["flashggPhotons"]["Isolation_transform_order"], year=self.year[dataset_name][0])
+
+            # Store the raw nanoAOD value and update photon ID MVA value for preselection
+            original_photons["mvaID_nano"] = original_photons["mvaID"]
+
+            # Store the raw values of the inputs and update the input values with the corrections since some variables used in the preselection
+            for i in range(len(var_list)):
+                original_photons["raw_" + str(var_list[i])] = original_photons[str(var_list[i])]
+                original_photons[str(var_list[i])] = awkward.unflatten(corrected_inputs[:,i] , counts)
+
+            original_photons["mvaID"] = awkward.unflatten(self.add_photonid_mva_run3(original_photons, events), counts)
+
         # systematic object variations
         for systematic_name in systematic_names:
             if systematic_name in available_object_systematics.keys():
@@ -393,24 +411,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     f"Could not process systematic variation {systematic_name}."
                 )
                 continue
-
-        # Computing the normalizing flow correction
-        if self.data_kind == "mc" and self.doFlow_corrections:
-
-            # Applyting the Flow corrections to all photons before pre-selection
-            counts = awkward.num(original_photons)
-            corrected_inputs,var_list = calculate_flow_corrections(original_photons, events, self.meta["flashggPhotons"]["flow_inputs"], self.meta["flashggPhotons"]["Isolation_transform_order"], year=self.year[dataset_name][0])
-
-            # Store the raw nanoAOD value and update photon ID MVA value for preselection
-            original_photons["mvaID_run3"] = awkward.unflatten(self.add_photonid_mva_run3(original_photons, events), counts)
-            original_photons["mvaID_nano"] = original_photons["mvaID"]
-
-            # Store the raw values of the inputs and update the input values with the corrections since some variables used in the preselection
-            for i in range(len(var_list)):
-                original_photons["raw_" + str(var_list[i])] = original_photons[str(var_list[i])]
-                original_photons[str(var_list[i])] = awkward.unflatten(corrected_inputs[:,i] , counts)
-
-            original_photons["mvaID"] = awkward.unflatten(self.add_photonid_mva_run3(original_photons, events), counts)
 
         # Applying systematic variations
         photons_dct = {}
@@ -462,6 +462,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
 
             # photon preselection
             photons = photon_preselection(self, photons, events, year=self.year[dataset_name][0])
+
             # sort photons in each event descending in pt
             # make descending-pt combinations of photons
             photons = photons[awkward.argsort(photons.pt, ascending=False)]
@@ -471,6 +472,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             diphotons = awkward.combinations(
                 photons, 2, fields=["pho_lead", "pho_sublead"]
             )
+
             # the remaining cut is to select the leading photons
             # the previous sort assures the order
             diphotons = diphotons[
@@ -792,7 +794,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             ### Add mass resolution uncertainty
             # Note that pt*cosh(eta) is equal to the energy of a four vector
             # Note that you need to call it slightly different than in the output of HiggsDNA as pho_lead -> lead is only done in dumping utils
-
             if (self.data_kind == "mc" and self.doFlow_corrections):
                 diphotons["sigma_m_over_m"] = 0.5 * numpy.sqrt(
                     (
@@ -882,7 +883,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         ** 2
                     )
 
-                    diphotons["sigma_m_over_m_Smeared_Corr"] = 0.5 * numpy.sqrt(
+                    diphotons["sigma_m_over_m_Smeared_corr"] = 0.5 * numpy.sqrt(
                         (
                             numpy.sqrt((diphotons["pho_lead"].energyErr)**2 + (diphotons["pho_lead"].rho_smear * ((diphotons["pho_lead"].pt * numpy.cosh(diphotons["pho_lead"].eta)))) ** 2)
                             / (

@@ -488,6 +488,10 @@ def TriggerSF(photons, weights, year="2017", is_correction=True, **kwargs):
     elif "2016" in year:
         year = "2016"
 
+    if "2022" in year:
+        print("\n WARNING: We still have to validate the trigger efficiencies for 2022. \nFalling back to 2017 for the moment...")
+        year = "2017"
+
     jsonpog_file_lead = os.path.join(os.path.dirname(__file__), f"JSONs/TriggerSF/{year}/TriggerSF_lead_{year}.json")
     jsonpog_file_sublead = os.path.join(os.path.dirname(__file__), f"JSONs/TriggerSF/{year}/TriggerSF_sublead_{year}.json")
     evaluator_lead = correctionlib.CorrectionSet.from_file(jsonpog_file_lead)["TriggerSF"]

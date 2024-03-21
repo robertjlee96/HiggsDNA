@@ -611,8 +611,9 @@ class HHbbggProcessor(HggBaseProcessor):
                     diphotons["n_fatjets"] = n_fatjets
 
                     fatjet_properties = fatjets.fields
-                    genjetAK8_properties = genjetsAK8.fields
                     subjet_properties = subjets.fields
+                    if self.data_kind == "mc":
+                        genjetAK8_properties = genjetsAK8.fields
 
                     for i in range(self.num_fatjets_to_store):  # Number of fatjets to select
                         for prop in fatjet_properties:

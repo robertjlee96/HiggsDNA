@@ -415,13 +415,25 @@ class HHbbggProcessor(HggBaseProcessor):
                     )
                     muons = awkward.with_name(muons, "PtEtaPhiMCandidate")
 
+                    # create PuppiMET objects
+                    puppiMET = events.PuppiMET
+                    puppiMET = awkward.with_name(puppiMET, "PtEtaPhiMCandidate")
+
+                    # FatJet variables
                     fatjets = events.FatJet
                     fatjets["charge"] = awkward.zeros_like(fatjets.pt)
                     fatjets = awkward.with_name(fatjets, "PtEtaPhiMCandidate")
 
-                    # create PuppiMET objects
-                    puppiMET = events.PuppiMET
-                    puppiMET = awkward.with_name(puppiMET, "PtEtaPhiMCandidate")
+                    # SubJet variables
+                    subjets = events.SubJet
+                    subjets["charge"] = awkward.zeros_like(subjets.pt)
+                    subjets = awkward.with_name(subjets, "PtEtaPhiMCandidate")
+
+                    # GenJetAK8 variables
+                    if self.data_kind == "mc":
+                        genjetsAK8 = events.GenJetAK8
+                        genjetsAK8["charge"] = awkward.zeros_like(genjetsAK8.pt)
+                        genjetsAK8 = awkward.with_name(genjetsAK8, "PtEtaPhiMCandidate")
 
                     # lepton cleaning
                     sel_electrons = electrons[
@@ -594,18 +606,41 @@ class HHbbggProcessor(HggBaseProcessor):
                             # Store the value in the diphotons dictionary
                             diphotons[key] = value
 
-                    # addition of fatjets info
+                    # addition of fatjets and matching subjets, genjet
                     n_fatjets = awkward.num(fatjets)
                     diphotons["n_fatjets"] = n_fatjets
 
                     fatjet_properties = fatjets.fields
+                    genjetAK8_properties = genjetsAK8.fields
+                    subjet_properties = subjets.fields
+
                     for i in range(self.num_fatjets_to_store):  # Number of fatjets to select
                         for prop in fatjet_properties:
-                            if "Idx" in prop:   # No Idx values are added for now; The Idx values does not make sense if there is preselection of objects as the Idx will change
+                            if prop[-1] == "G":  # Few of the Idx variables are repeated with name ending with G (eg: 'subJetIdx1G'). Have to figure out why is this the case
                                 continue
                             key = f"fatjet{i+1}_{prop}"
                             # Retrieve the value using the choose_jet function (which can be used for fatjets as well)
                             value = choose_jet(fatjets[prop], i, -999.0)
+
+                            if prop == "genJetAK8Idx":  # add info of matched GenJetAK8
+                                for prop_genJetAK8 in genjetAK8_properties:
+                                    key_genJetAK8 = f"fatjet{i+1}_genjetAK8_{prop_genJetAK8}"
+                                    # Retrieve the value using the choose_jet function (which can also be used here)
+                                    value_genJetAK8 = choose_jet(genjetsAK8[prop_genJetAK8], value, -999.0)
+                                    # Store the value in the diphotons dictionary
+                                    diphotons[key_genJetAK8] = value_genJetAK8
+                                continue  # not saving the index values
+
+                            if prop in ["subJetIdx1", "subJetIdx2"]:  # add info of matched SubJets
+                                subjet_name = prop.replace("Idx", "").lower()
+                                for prop_subjet in subjet_properties:
+                                    key_subjet = f"fatjet{i+1}_{subjet_name}_{prop_subjet}"
+                                    # Retrieve the value using the choose_jet function (which can also be used here)
+                                    value_subjet = choose_jet(subjets[prop_subjet], value, -999.0)
+                                    # Store the value in the diphotons dictionary
+                                    diphotons[key_subjet] = value_subjet
+                                continue  # not saving the index values
+
                             # Store the value in the diphotons dictionary
                             diphotons[key] = value
 

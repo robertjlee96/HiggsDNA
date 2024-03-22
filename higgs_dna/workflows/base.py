@@ -5,6 +5,7 @@ from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_m
 from higgs_dna.tools.photonid_mva import calculate_photonid_mva_run3, load_photonid_mva_run3
 from higgs_dna.tools.SC_eta import add_photon_SC_eta
 from higgs_dna.tools.EELeak_region import veto_EEleak_flag
+from higgs_dna.tools.gen_helpers import get_fiducial_flag
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.selections.lepton_selections import select_electrons, select_muons
 from higgs_dna.selections.jet_selections import select_jets, jetvetomap
@@ -512,6 +513,10 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
 
             diphotons = diphotons[fid_det_passed]
 
+            # Add the fiducial flags for particle level
+            diphotons['fiducialClassicalFlag'] = get_fiducial_flag(events, flavour='Classical')
+            diphotons['fiducialGeometricFlag'] = get_fiducial_flag(events, flavour='Geometric')
+
             # baseline modifications to diphotons
             if self.diphoton_mva is not None:
                 diphotons = self.add_diphoton_mva(diphotons, events)
@@ -584,6 +589,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             # adding selected jets to events to be used in ctagging SF calculation
             events["sel_jets"] = jets
             n_jets = awkward.num(jets)
+            Njets2p5 = awkward.num(jets[(jets.pt > 30) & (numpy.abs(jets.eta) < 2.5)])
 
             first_jet_pt = choose_jet(jets.pt, 0, -999.0)
             first_jet_eta = choose_jet(jets.eta, 0, -999.0)
@@ -610,6 +616,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             diphotons["second_jet_charge"] = second_jet_charge
 
             diphotons["n_jets"] = n_jets
+            diphotons["Njets2p5"] = Njets2p5
 
             # run taggers on the events list with added diphotons
             # the shape here is ensured to be broadcastable

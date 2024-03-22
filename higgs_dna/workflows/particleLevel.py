@@ -3,6 +3,8 @@ from higgs_dna.systematics import object_corrections as available_object_correct
 from higgs_dna.systematics import weight_corrections as available_weight_corrections
 from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array, diphoton_list_to_pandas, dump_pandas
 
+from higgs_dna.tools.gen_helpers import get_fiducial_flag
+
 from typing import Any, Dict, List, Optional
 import awkward
 import logging
@@ -116,34 +118,8 @@ class ParticleLevelProcessor(HggBaseProcessor):
                 warnings.warn(f"Could not process correction {correction_name}.")
                 continue
 
-        # Even though it is a particle-level processor, we will at least save basic diphoton quantities on reco level for comparison
-        photons = events.Photon
-        photons = photons[awkward.argsort(photons.pt, ascending=False)]
-        photons["charge"] = awkward.zeros_like(
-            photons.pt
-        )
-        diphotons = awkward.combinations(
-            photons, 2, fields=["pho_lead", "pho_sublead"]
-        )
-
-        # now turn the diphotons into candidates with four momenta and such
-        diphoton_4mom = diphotons["pho_lead"] + diphotons["pho_sublead"]
-        diphotons["pt"] = diphoton_4mom.pt
-        diphotons["eta"] = diphoton_4mom.eta
-        diphotons["phi"] = diphoton_4mom.phi
-        diphotons["mass"] = diphoton_4mom.mass
-        diphotons["charge"] = diphoton_4mom.charge
-
-        diphoton_pz = diphoton_4mom.z
-        diphoton_e = diphoton_4mom.energy
-        diphotons["rapidity"] = 0.5 * numpy.log((diphoton_e + diphoton_pz) / (diphoton_e - diphoton_pz))
-
-        diphotons = awkward.with_name(diphotons, "PtEtaPhiMCandidate")
-
-        # sort diphotons by pT
-        diphotons = diphotons[
-            awkward.argsort(diphotons.pt, ascending=False)
-        ]
+        # Filling with some dummy values
+        diphotons = awkward.Array({"pt": numpy.ones(len(events))})
 
         events["GenIsolatedPhoton"] = awkward.pad_none(events["GenIsolatedPhoton"], 2)
 
@@ -155,62 +131,13 @@ class ParticleLevelProcessor(HggBaseProcessor):
         diphotons["subleadingGenIsolatedPhoton_eta"] = events.GenIsolatedPhoton[:,1].eta
         diphotons["subleadingGenIsolatedPhoton_phi"] = events.GenIsolatedPhoton[:,1].phi
 
-        # Determine if event passes fiducial Hgg cuts at detector-level
-        if self.fiducialCuts == 'classical':
-            fid_det_passed = (diphotons.pho_lead.pt / diphotons.mass > 1 / 3) & (diphotons.pho_sublead.pt / diphotons.mass > 1 / 4) & (diphotons.pho_lead.pfRelIso03_all_quadratic * diphotons.pho_lead.pt < 10) & ((diphotons.pho_sublead.pfRelIso03_all_quadratic * diphotons.pho_sublead.pt) < 10) & (numpy.abs(diphotons.pho_lead.eta) < 2.5) & (numpy.abs(diphotons.pho_sublead.eta) < 2.5)
-        elif self.fiducialCuts == 'geometric':
-            fid_det_passed = (numpy.sqrt(diphotons.pho_lead.pt * diphotons.pho_sublead.pt) / diphotons.mass > 1 / 3) & (diphotons.pho_sublead.pt / diphotons.mass > 1 / 4) & (diphotons.pho_lead.pfRelIso03_all_quadratic * diphotons.pho_lead.pt < 10) & (diphotons.pho_sublead.pfRelIso03_all_quadratic * diphotons.pho_sublead.pt < 10) & (numpy.abs(diphotons.pho_lead.eta) < 2.5) & (numpy.abs(diphotons.pho_sublead.eta) < 2.5)
-        elif self.fiducialCuts == 'none':
-            fid_det_passed = diphotons.pho_lead.pt > -10  # This is a very dummy way but I do not know how to make a true array of outer shape of diphotons
-        else:
-            warnings.warn("You chose %s the fiducialCuts mode, but this is currently not supported. You should check your settings. For this run, no fiducial selection at detector level is applied." % self.fiducialCuts)
-            fid_det_passed = diphotons.pho_lead.pt > -10
-
-        diphotons = diphotons[fid_det_passed]
+        diphotons['fiducialClassicalFlag'] = get_fiducial_flag(events, flavour='Classical')
+        diphotons['fiducialGeometricFlag'] = get_fiducial_flag(events, flavour='Geometric')
 
         # workflow specific processing
         events, process_extra = self.process_extra(events)
         histos_etc.update(process_extra)
 
-        # run taggers on the events list with added diphotons
-        # the shape here is ensured to be broadcastable
-        for tagger in self.taggers:
-            (
-                diphotons["_".join([tagger.name, str(tagger.priority)])],
-                tagger_extra,
-            ) = tagger(
-                events, diphotons
-            )  # creates new column in diphotons - tagger priority, or 0, also return list of histrograms here?
-            histos_etc.update(tagger_extra)
-
-        # if there are taggers to run, arbitrate by them first
-        # Deal with order of tagger priorities
-        # Turn from diphoton jagged array to whether or not an event was selected
-        if len(self.taggers):
-            counts = awkward.num(diphotons.pt, axis=1)
-            flat_tags = numpy.stack(
-                (
-                    awkward.flatten(
-                        diphotons[
-                            "_".join([tagger.name, str(tagger.priority)])
-                        ]
-                    )
-                    for tagger in self.taggers
-                ),
-                axis=1,
-            )
-            tags = awkward.from_regular(
-                awkward.unflatten(flat_tags, counts), axis=2
-            )
-            winner = awkward.min(tags[tags != 0], axis=2)
-            diphotons["best_tag"] = winner
-
-            # lowest priority is most important (ascending sort)
-            # leave in order of diphoton pT in case of ties (stable sort)
-            sorted = awkward.argsort(diphotons.best_tag, stable=True)
-            diphotons = diphotons[sorted]
-
-        diphotons = awkward.firsts(diphotons)
         # set diphotons as part of the event record
         events["diphotons"] = diphotons
         # annotate diphotons with event information
@@ -233,7 +160,7 @@ class ParticleLevelProcessor(HggBaseProcessor):
             return histos_etc
 
         # Retain all events
-        selection_mask = diphotons.pho_lead.pt > -10
+        selection_mask = numpy.ones(len(diphotons), dtype=bool)
         # initiate Weight container here, after selection, since event selection cannot easily be applied to weight container afterwards
         event_weights = Weights(size=len(events[selection_mask]))
         # corrections to event weights:
@@ -254,7 +181,8 @@ class ParticleLevelProcessor(HggBaseProcessor):
                     dataset_name=dataset_name,
                     year=self.year[dataset_name][0],
                 )
-        diphotons["weight_central"] = event_weights.weight()
+        diphotons["weight_central"] = event_weights.weight()  # Here, if diphotons none, then also the weight is None.
+        # That is why this should be treated consistently before and filled or so
 
         # Multiply weight by genWeight for normalisation in post-processing chain
         event_weights._weight = (

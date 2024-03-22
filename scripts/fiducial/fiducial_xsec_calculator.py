@@ -66,7 +66,7 @@ for process in processes:
         process_string = processMap[process]
         arr = ak.from_parquet(path_folder + process_string + '_' + era)
         # Calculating the relevant fractions
-        inFiducialFlag = arr.fiducialGeometricTagger_20 == 21 # Only for this type of tagger right now, can be customised in the future
+        inFiducialFlag = arr.fiducialGeometricFlag == True # Only for this type of tagger right now, can be customised in the future
         sumwAll = ak.sum(arr.weight)
 
         sumwIn = ak.sum(arr.weight[(inFiducialFlag)])

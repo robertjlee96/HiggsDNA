@@ -255,31 +255,7 @@ if type == "mc":
                         syst_,
                         cat,
                     ]
-                    )
-        for cat in cat_dict:
-            for field in df_dict["NOMINAL"][cat]:
-                if "weight_" in field:
-                    syst_ = field.split("weight_")[1]
-                    if ("Up" not in field) and ("Down" not in field): continue
-                    logger.info("found weight-based syst: %s for category: %s" % (syst_, cat))
-                    if len(process.split("_"))>1:
-                        labels[cat].append(
-                            [
-                                "DiphotonTree/" + process.split('_')[0] + f"_{process.split('_')[-1]}_13TeV_{cat}_" + syst_,
-                                field,
-                                syst_,
-                                cat,
-                            ]
-                        )
-                    else:
-                        labels[cat].append(
-                        [
-                            "DiphotonTree/" + process + f"_125_13TeV_{cat}_" + syst_,
-                            field,
-                            syst_,
-                            cat,
-                        ]
-                        )
+                )      
     else:
         for cat in cat_dict:
             syst_ = ""

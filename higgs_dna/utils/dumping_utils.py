@@ -202,3 +202,53 @@ def dress_branches(
         if field != "__systematics__":
             main_arr[f"{prefix}_{field}"] = additional_arr[field]
     return main_arr
+
+
+def get_obj_syst_dict(
+    obj_ak: awkward.Array, var_new: Optional[List[str]] = ["pt"]
+) -> [list, dict]:
+    """_summary_
+
+    Args:
+        obj_ak (awkward.Array): objects includes the systematics, e.g., Jet collection with jerc up/down branches
+        var_new (Optional[List[str]], optional): changed variable(s) due to the systematics. Allow multiple variables, e.g., jerc systematics change both pt and mass, please mention all the changed variables here. Defaults to ["pt"].
+
+    Returns:
+        [list, dict]: list of systematics; dictionary of the nominal and variations
+    """
+
+    # NOTE: this function only works if the variations are in such a format:
+    # variable_systematic_up/down
+
+    # find the systematics
+    var_all = obj_ak.fields
+    var_syst = [i for i in var_all if i.endswith("_up") or i.endswith("_down")]
+    # nominal
+    obj_nom = obj_ak[list(set(var_all) - set(var_syst))]
+    # extract systematics
+    syst_list = []
+    for i in var_syst:
+        for j in var_new:
+            if j in i:
+                tmp_syst_name = i.replace(f"{j}_", "")
+                if "_up" in tmp_syst_name:
+                    tmp_syst_name = tmp_syst_name[:-3]
+                else:
+                    tmp_syst_name = tmp_syst_name[:-5]
+                syst_list.append(tmp_syst_name)
+    # remove duplication
+    syst_list = list(set(syst_list))
+    replace_dict = {}
+    for i in syst_list:
+        replace_dict[i] = {
+            "up": {j: f"{j}_{i}_up" for j in var_new},
+            "down": {j: f"{j}_{i}_down" for j in var_new},
+        }
+    obj_syst_dict = {"nominal": obj_nom}
+    for isyst in syst_list:
+        for ivariation in replace_dict[isyst]:
+            obj_tmp = awkward.copy(obj_nom)
+            for ivariable in replace_dict[isyst][ivariation]:
+                obj_tmp[ivariable] = obj_ak[replace_dict[isyst][ivariation][ivariable]]
+            obj_syst_dict.update({f"{isyst}_{ivariation}": obj_tmp})
+    return syst_list, obj_syst_dict

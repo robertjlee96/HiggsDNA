@@ -7,6 +7,9 @@ from copy import deepcopy
 import numpy as np
 from correctionlib.highlevel import model_auto, open_auto
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def select_jets(
@@ -16,6 +19,17 @@ def select_jets(
     muons: awkward.highlevel.Array,
     electrons: awkward.highlevel.Array,
 ) -> awkward.highlevel.Array:
+    # jet id selection: https://twiki.cern.ch/twiki/bin/view/CMS/JetID13p6TeV#nanoAOD_Flags
+    if self.jet_jetId == "tight":
+        jetId_cut = jets.jetId >= 2
+    elif self.jet_jetId == "tightLepVeto":
+        jetId_cut = jets.jetId == 6
+    else:
+        jetId_cut = awkward.ones_like(jets.pt) > 0
+        logger.warning("[ select_jets ] - No JetId applied")
+    logger.debug(
+        f"[ select_jets ] - Total: {len(awkward.flatten(jetId_cut))} - Pass tight jetId: {awkward.sum(awkward.flatten(jetId_cut))}"
+    )
     pt_cut = jets.pt > self.jet_pt_threshold
     eta_cut = abs(jets.eta) < self.jet_max_eta
     dr_dipho_cut = awkward.ones_like(pt_cut) > 0
@@ -60,7 +74,8 @@ def select_jets(
         dr_muons_cut = jets.pt > -1
 
     return (
-        (pt_cut)
+        (jetId_cut)
+        & (pt_cut)
         & (eta_cut)
         & (dr_dipho_cut)
         & (dr_pho_lead_cut)
@@ -156,13 +171,13 @@ def jetvetomap(events, logger, dataset_name, year="2022preEE"):
             os.path.dirname(__file__),
             "../systematics/JSONs/POG/JME/2018_UL/jetvetomaps.json.gz",
         ),
-        "2022postEE": os.path.join(
-            os.path.dirname(__file__),
-            "../systematics/JSONs/POG/JME/2022_Prompt/jetvetomaps.json.gz",
-        ),
         "2022preEE": os.path.join(
             os.path.dirname(__file__),
-            "../systematics/JSONs/POG/JME/2022_Prompt/jetvetomaps.json.gz",
+            "../systematics/JSONs/POG/JME/2022_Summer22/jetvetomaps.json.gz",
+        ),
+        "2022postEE": os.path.join(
+            os.path.dirname(__file__),
+            "../systematics/JSONs/POG/JME/2022_Summer22EE/jetvetomaps.json.gz",
         ),
         "2023": os.path.join(
             os.path.dirname(__file__),
@@ -174,8 +189,8 @@ def jetvetomap(events, logger, dataset_name, year="2022preEE"):
         "2016postVFP": "Summer19UL16_V1",
         "2017": "Summer19UL17_V1",
         "2018": "Summer19UL18_V1",
-        "2022preEE": "Winter22Run3_RunCD_V1",
-        "2022postEE": "Winter22Run3_RunE_V1",
+        "2022preEE": "Summer22_23Sep2023_RunCD_V1",
+        "2022postEE": "Summer22EE_23Sep2023_RunEFG_V1",
         "2023": "Winter22Run3_RunCD_V1",
     }
 
@@ -221,25 +236,21 @@ def jetvetomap(events, logger, dataset_name, year="2022preEE"):
         "eta": jets.eta,
         "phi": np.clip(jets.phi, low_phi, high_phi),
     }
-    if year != "2022postEE":
-        cset = correctionlib.CorrectionSet.from_file(json_dict[year])
-        inputs = [input_dict[input.name] for input in cset[key_map[year]].inputs]
-        vetomap = cset[key_map[year]].evaluate(*(inputs))
+
+    cset = correctionlib.CorrectionSet.from_file(json_dict[year])
+    inputs = [input_dict[input.name] for input in cset[key_map[year]].inputs]
+    vetomap = cset[key_map[year]].evaluate(*(inputs))
+
+    if not year == "2022postEE":
         sel_obj.add("vetomap", np.abs(vetomap) > 0)
     else:
         # ref: https://twiki.cern.ch/twiki/bin/viewauth/CMS/PdmVRun3Analysis#From_JME
         # normal jetvetomap should be applied to all 2022
-        year = "2022preEE"
-        cset = correctionlib.CorrectionSet.from_file(json_dict["2022preEE"])
-        inputs = [input_dict[input.name] for input in cset[key_map["2022preEE"]].inputs]
-        vetomap = cset[key_map["2022preEE"]].evaluate(*(inputs))
 
         # consider the EELeak region
-        year = "2022postEE"
-        cset_eep = correctionlib.CorrectionSet.from_file(json_dict[year])
         input_dict["type"] = "jetvetomap_eep"
-        inputs = [input_dict[input.name] for input in cset_eep[key_map[year]].inputs]
-        vetomap_eep = cset_eep[key_map[year]].evaluate(*(inputs))
+        inputs = [input_dict[input.name] for input in cset[key_map[year]].inputs]
+        vetomap_eep = cset[key_map[year]].evaluate(*(inputs))
         sel_obj.add(
             "vetomap",
             (np.abs(vetomap) > 0) | ((np.abs(vetomap_eep) > 0) & (jets.pt > 30)),
@@ -247,7 +258,7 @@ def jetvetomap(events, logger, dataset_name, year="2022preEE"):
 
     sel_veto_jet = sel_obj.all(*(sel_obj.names))
     sel_good_jet = ~awkward.Array(sel_veto_jet)
-    logger.info(
+    logger.debug(
         f"[{systematic}] total: {len(sel_good_jet)}, pass: {awkward.sum(sel_good_jet)}"
     )
     sel_good_jet_jagged = awkward.unflatten(sel_good_jet, count)

@@ -10,7 +10,13 @@ from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.selections.lepton_selections import select_electrons, select_muons
 from higgs_dna.selections.jet_selections import select_jets, jetvetomap
 from higgs_dna.selections.lumi_selections import select_lumis
-from higgs_dna.utils.dumping_utils import diphoton_ak_array, dump_ak_array, diphoton_list_to_pandas, dump_pandas
+from higgs_dna.utils.dumping_utils import (
+    diphoton_ak_array,
+    dump_ak_array,
+    diphoton_list_to_pandas,
+    dump_pandas,
+    get_obj_syst_dict,
+)
 from higgs_dna.utils.misc_utils import choose_jet
 from higgs_dna.tools.flow_corrections import calculate_flow_corrections
 
@@ -92,6 +98,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
         self.el_iso_wp = "WP80"
 
         # jet selection cuts
+        self.jet_jetId = "tightLepVeto"  # can be "tightLepVeto" or "tight": https://twiki.cern.ch/twiki/bin/view/CMS/JetID13p6TeV#nanoAOD_Flags
         self.jet_dipho_min_dr = 0.4
         self.jet_pho_min_dr = 0.4
         self.jet_ele_min_dr = 0.4
@@ -318,14 +325,20 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             systematic_names = []
 
         # If --Smear_sigma_m == True and no Smearing correction in .json for MC throws an error, since the pt scpectrum need to be smeared in order to properly calculate the smeared sigma_m_m
-        if self.data_kind == "mc" and self.Smear_sigma_m and 'Smearing' not in correction_names:
-            warnings.warn("Smearing should be specified in the corrections field in .json in order to smear the mass!")
+        if (
+            self.data_kind == "mc"
+            and self.Smear_sigma_m
+            and "Smearing" not in correction_names
+        ):
+            warnings.warn(
+                "Smearing should be specified in the corrections field in .json in order to smear the mass!"
+            )
             sys.exit(0)
 
         # Since now we are applying Smearing term to the sigma_m_over_m i added this portion of code
         # specially for the estimation of smearing terms for the data events [data pt/energy] are not smeared!
         if self.data_kind == "data" and self.Smear_sigma_m:
-            correction_name = 'Smearing'
+            correction_name = "Smearing"
 
             logger.info(
                 f"\nApplying correction {correction_name} to dataset {dataset_name}\n"
@@ -339,7 +352,9 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     f"Applying correction {correction_name} to dataset {dataset_name}"
                 )
                 varying_function = available_object_corrections[correction_name]
-                events = varying_function(events=events, year=self.year[dataset_name][0])
+                events = varying_function(
+                    events=events, year=self.year[dataset_name][0]
+                )
             elif correction_name in available_weight_corrections:
                 # event weight corrections will be applied after photon preselection / application of further taggers
                 continue
@@ -349,6 +364,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                 continue
 
         original_photons = events.Photon
+        # NOTE: jet jerc systematics are added in the correction functions and handled later
         original_jets = events.Jet
 
         # Computing the normalizing flow correction
@@ -388,20 +404,6 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                         )
                         # name=systematic_name, **systematic_dct["args"]
                     )
-                elif systematic_dct["object"] == "Jet":
-                    logger.info(
-                        f"Adding systematic {systematic_name} to jets collection of dataset {dataset_name}"
-                    )
-                    original_jets.add_systematic(
-                        # passing the arguments here explicitly since I want to pass the events to the varying function. If there is a more elegant / flexible way, just change it!
-                        name=systematic_name,
-                        kind=systematic_dct["args"]["kind"],
-                        what=systematic_dct["args"]["what"],
-                        varying_function=functools.partial(
-                            systematic_dct["args"]["varying_function"], events=events
-                        )
-                        # name=systematic_name, **systematic_dct["args"]
-                    )
                 # to be implemented for other objects here
             elif systematic_name in available_weight_systematics:
                 # event weight systematics will be applied after photon preselection / application of further taggers
@@ -424,26 +426,23 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     original_photons.systematics[systematic][variation]
                 )
 
-        jets_dct = {}
-        jets_dct["nominal"] = original_jets
-        logger.debug(original_jets.systematics.fields)
-        for systematic in original_jets.systematics.fields:
-            for variation in original_jets.systematics[systematic].fields:
-                # deepcopy to allow for independent calculations on photon variables with CQR
-                jets_dct[f"{systematic}_{variation}"] = original_jets.systematics[
-                    systematic
-                ][variation]
+        # NOTE: jet jerc systematics are added in the corrections, now extract those variations and create the dictionary
+        jerc_syst_list, jets_dct = get_obj_syst_dict(original_jets, ["pt", "mass"])
+        # object systematics dictionary
+        logger.debug(f"[ jerc systematics ] {jerc_syst_list}")
 
         # Build the flattened array of all possible variations
         variations_combined = []
         variations_combined.append(original_photons.systematics.fields)
-        variations_combined.append(original_jets.systematics.fields)
+        # NOTE: jet jerc systematics are not added with add_systematics
+        variations_combined.append(jerc_syst_list)
         # Flatten
         variations_flattened = sum(variations_combined, [])  # Begin with empty list and keep concatenating
         # Attach _down and _up
         variations = [item + suffix for item in variations_flattened for suffix in ['_down', '_up']]
         # Add nominal to the list
         variations.append('nominal')
+        logger.debug(f"[systematics variations] {variations}")
 
         for variation in variations:
             photons, jets = photons_dct["nominal"], events.Jet
@@ -542,6 +541,7 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
                     "btagDeepFlav_CvB": jets.btagDeepFlavCvB,
                     "btagDeepFlav_CvL": jets.btagDeepFlavCvL,
                     "btagDeepFlav_QG": jets.btagDeepFlavQG,
+                    "jetId": jets.jetId,
                 }
             )
             jets = awkward.with_name(jets, "PtEtaPhiMCandidate")

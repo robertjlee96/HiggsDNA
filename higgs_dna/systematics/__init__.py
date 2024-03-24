@@ -5,7 +5,7 @@ from .photon_systematics import (
     energyErrShift,
     FNUF,
     ShowerShape,
-    Material
+    Material,
 )
 from .event_weight_systematics import (
     Pileup,
@@ -24,7 +24,11 @@ from .jet_systematics import (
     jet_pt_scale_dummy,
     JERC_jet,
 )
+from .jet_systematics_json import jerc_jet
 from functools import partial
+import logging
+
+logger = logging.getLogger(__name__)
 
 # using add_systematic function of coffea.nanoevents.methods.nanoaod objects as Photon to store object systematics in addition to nominal objects
 object_systematics = {
@@ -89,7 +93,9 @@ object_systematics = {
         "args": {
             "kind": "UpDownSystematic",
             "what": "pt",
-            "varying_function": partial(jet_pt_scale_dummy, year=None, is_correction=False),
+            "varying_function": partial(
+                jet_pt_scale_dummy, year=None, is_correction=False
+            ),
         },
     },
     "JES": {
@@ -97,7 +103,13 @@ object_systematics = {
         "args": {
             "kind": "UpDownSystematic",
             "what": "pt",
-            "varying_function": partial(JERC_jet, year="2022postEE", skip_JER=False, skip_JEC=False, is_correction=False),
+            "varying_function": partial(
+                JERC_jet,
+                year="2022postEE",
+                skip_JER=False,
+                skip_JEC=False,
+                is_correction=False,
+            ),
         },
     },
 }
@@ -111,8 +123,17 @@ object_corrections = {
     "FNUF": partial(FNUF, pt=None, is_correction=True),
     "ShowerShape": partial(ShowerShape, pt=None, is_correction=True),
     "Material": partial(Material, pt=None, is_correction=True),
-    "JetPtScale_dummy": partial(jet_pt_scale_dummy, pt=None, year=None, is_correction=True),
-    "JES": partial(JERC_jet, pt=None, year="2022postEE", skip_JER=False, skip_JEC=False, is_correction=True),
+    "JetPtScale_dummy": partial(
+        jet_pt_scale_dummy, pt=None, year=None, is_correction=True
+    ),
+    "JES": partial(
+        JERC_jet,
+        pt=None,
+        year="2022postEE",
+        skip_JER=False,
+        skip_JEC=False,
+        is_correction=True,
+    ),
 }
 
 # functions adding systematic variations to event weights to be placed here
@@ -162,9 +183,69 @@ def check_corr_syst_combinations(corrections_dict, systematics_dict, logger):
                 and chosen_syst not in corrections_dict[dataset]
             ):
                 # scale unc. will be applied to MC while the correction is applied to data. Exception.
-                if "scale" in chosen_syst.lower():
+                if (
+                    "scale" in chosen_syst.lower()
+                    or "jec" in chosen_syst.lower()
+                    or "jer" in chosen_syst.lower()
+                ):
                     continue
                 logger.info(
                     f"Requested to evaluate systematic variation {chosen_syst} for dataset {dataset} without applying the corresponding correction. \nThis is not intended.\nExiting."
                 )
                 exit()
+
+
+def add_jme_corr_syst(corrections_dict, systematics_dict, logger):
+    corrections_dict.update(
+        {
+            # jerc for MC
+            "jec_jet": partial(jerc_jet, pt=None, apply_jec=True),
+            "jec_jet_syst": partial(jerc_jet, pt=None, apply_jec=True, jec_syst=True),
+            "jec_jet_regrouped_syst": partial(
+                jerc_jet, pt=None, apply_jec=True, jec_syst=True, split_jec_syst=True
+            ),
+            "jerc_jet": partial(jerc_jet, pt=None, apply_jec=True, apply_jer=True),
+            "jerc_jet_syst": partial(
+                jerc_jet,
+                pt=None,
+                apply_jec=True,
+                jec_syst=True,
+                apply_jer=True,
+                jer_syst=True,
+            ),
+            "jerc_jet_regrouped_syst": partial(
+                jerc_jet,
+                pt=None,
+                apply_jec=True,
+                jec_syst=True,
+                split_jec_syst=True,
+                apply_jer=True,
+                jer_syst=True,
+            ),
+            # jec for data: Usually corrections on Data innecessary
+            # Use jec corrections with Era to re-do jec for data
+            "jec_RunA": partial(jerc_jet, pt=None, era="RunA", level="L1L2L3Res"),
+            "jec_RunB": partial(jerc_jet, pt=None, era="RunB", level="L1L2L3Res"),
+            "jec_RunC": partial(jerc_jet, pt=None, era="RunC", level="L1L2L3Res"),
+            "jec_RunD": partial(jerc_jet, pt=None, era="RunD", level="L1L2L3Res"),
+            "jec_RunE": partial(jerc_jet, pt=None, era="RunE", level="L1L2L3Res"),
+            "jec_RunF": partial(jerc_jet, pt=None, era="RunF", level="L1L2L3Res"),
+            "jec_RunG": partial(jerc_jet, pt=None, era="RunG", level="L1L2L3Res"),
+            "jec_RunH": partial(jerc_jet, pt=None, era="RunH", level="L1L2L3Res"),
+        }
+    )
+    logger.info(
+        f"""_summary_
+
+    Available correction keys:
+    {corrections_dict.keys()}
+    Available systematic keys:
+    {systematics_dict.keys()}
+    """
+    )
+    return corrections_dict, systematics_dict
+
+
+object_corrections, object_systematics = add_jme_corr_syst(
+    object_corrections, object_systematics, logger
+)

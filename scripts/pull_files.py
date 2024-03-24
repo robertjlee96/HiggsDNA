@@ -50,7 +50,7 @@ parser.add_argument(
     "--log_dir",
     type=str,
     default="./json-log/",
-    help="Log file summarising the json will end up here, default: ./json-log/"
+    help="Log file summarising the json will end up here, default: ./json-log/",
 )
 
 args = parser.parse_args()
@@ -60,7 +60,9 @@ args = parser.parse_args()
 def unzip_gz_with_zcat(logger, input_file, output_file):
     try:
         # Check if zcat is available in the system
-        subprocess.check_call(["zcat", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.check_call(
+            ["zcat", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         # Run zcat command to unzip the gz file
         with open(output_file, "wb") as output:
             subprocess.check_call(["zcat", input_file], stdout=output)
@@ -69,8 +71,11 @@ def unzip_gz_with_zcat(logger, input_file, output_file):
         os.remove(input_file)
         logger.info(f"File '{input_file}' deleted.")
     except subprocess.CalledProcessError as e:
-        logger.info(f"Error: {e}")
-        sys.exit(1)
+        logger.error(f"Error: {e}")
+        # exit now blocks downloading other files
+        # sys.exit(1)
+    else:
+        pass
 
 
 def fetch_file(target_name, logger, from_to_dict, type="url"):
@@ -146,7 +151,7 @@ def get_jec_files(logger, target_dir):
         },
     }
     fetch_file("JEC", logger, from_to_dict, type="copy")
-    os.system(f"rename .txt .junc.txt {to_prefix}/*/JEC/*/*Uncertainty*.txt")
+    os.system(f"rename .txt .junc.txt {to_prefix}/*/JEC/*Uncertainty*.txt")
 
 
 def get_jer_files(logger, target_dir):
@@ -168,10 +173,18 @@ def get_jer_files(logger, target_dir):
         },
     }
     fetch_file("JER", logger, from_to_dict, type="copy")
-    os.system(f"rename PtResolution_AK4PFchs.txt PtResolution_AK4PFchs.jr.txt {to_prefix}/*/JER/*/*PtResolution_AK4PFchs.txt")
-    os.system(f"rename PtResolution_AK4PFPuppi.txt PtResolution_AK4PFPuppi.jr.txt {to_prefix}/*/JER/*/*PtResolution_AK4PFPuppi.txt")
-    os.system(f"rename SF_AK4PFchs.txt SF_AK4PFchs.jersf.txt {to_prefix}/*/JER/*/*SF_AK4PFchs.txt")
-    os.system(f"rename SF_AK4PFPuppi.txt SF_AK4PFPuppi.jersf.txt {to_prefix}/*/JER/*/*SF_AK4PFPuppi.txt")
+    os.system(
+        f"rename PtResolution_AK4PFchs.txt PtResolution_AK4PFchs.jr.txt {to_prefix}/*/JER/*PtResolution_AK4PFchs.txt"
+    )
+    os.system(
+        f"rename PtResolution_AK4PFPuppi.txt PtResolution_AK4PFPuppi.jr.txt {to_prefix}/*/JER/*PtResolution_AK4PFPuppi.txt"
+    )
+    os.system(
+        f"rename SF_AK4PFchs.txt SF_AK4PFchs.jersf.txt {to_prefix}/*/JER/*SF_AK4PFchs.txt"
+    )
+    os.system(
+        f"rename SF_AK4PFPuppi.txt SF_AK4PFPuppi.jersf.txt {to_prefix}/*/JER/*SF_AK4PFPuppi.txt"
+    )
 
 
 def get_material_json(logger, target_dir):
@@ -486,17 +499,23 @@ def get_scale_and_smearing(logger, target_dir):
     }
     fetch_file("Scale and Smearing", logger, from_to_dict, type="copy")
     # Now, unpack the gz to have the raw JSONs
-    unzip_gz_with_zcat(logger, f"{to_prefix}/SS_Rereco2022BCD.json.gz", f"{to_prefix}/SS_Rereco2022BCD.json")
-    unzip_gz_with_zcat(logger, f"{to_prefix}/SS_RerecoE_PromptFG_2022.json.gz", f"{to_prefix}/SS_RerecoE_PromptFG_2022.json")
+    unzip_gz_with_zcat(
+        logger,
+        f"{to_prefix}/SS_Rereco2022BCD.json.gz",
+        f"{to_prefix}/SS_Rereco2022BCD.json",
+    )
+    unzip_gz_with_zcat(
+        logger,
+        f"{to_prefix}/SS_RerecoE_PromptFG_2022.json.gz",
+        f"{to_prefix}/SS_RerecoE_PromptFG_2022.json",
+    )
 
 
 def get_mass_decorrelation_CDF(logger, target_dir):
     if target_dir is not None:
         to_prefix = target_dir
     else:
-        to_prefix = os.path.join(
-            os.path.dirname(__file__), "../higgs_dna/tools"
-        )
+        to_prefix = os.path.join(os.path.dirname(__file__), "../higgs_dna/tools")
 
     from_to_dict = {
         "2022FG": {
@@ -511,9 +530,7 @@ def get_Flow_files(logger, target_dir):
     if target_dir is not None:
         to_prefix = target_dir
     else:
-        to_prefix = os.path.join(
-            os.path.dirname(__file__), "../higgs_dna/tools/flows"
-        )
+        to_prefix = os.path.join(os.path.dirname(__file__), "../higgs_dna/tools/flows")
 
     from_to_dict = {
         "2022FG": {
@@ -618,11 +635,18 @@ def get_jetmet_json(logger, target_dir):
                 "../higgs_dna/systematics/JSONs/POG/JME/2018_UL",
             ),
         },
-        "2022Prompt": {
-            "from": os.path.join(base_path, "2022_Prompt"),
+        "2022Summer22": {
+            "from": os.path.join(base_path, "2022_Summer22"),
             "to": os.path.join(
                 to_prefix,
-                "../higgs_dna/systematics/JSONs/POG/JME/2022_Prompt",
+                "../higgs_dna/systematics/JSONs/POG/JME/2022_Summer22",
+            ),
+        },
+        "2022Summer22EE": {
+            "from": os.path.join(base_path, "2022_Summer22EE"),
+            "to": os.path.join(
+                to_prefix,
+                "../higgs_dna/systematics/JSONs/POG/JME/2022_Summer22EE",
             ),
         },
     }

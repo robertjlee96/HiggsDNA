@@ -63,12 +63,14 @@ def get_dataset_dict(
     fdict = {}
 
     for name, dataset in fset:
+        # for private samples, we need to add `instance=prod/phys03`
+        private_appendix = "" if not dataset.endswith("/USER") else " instance=prod/phys03"
         flist = (
             os.popen(
                 # use the cvmfs source for dasgoclient because it works everyone
                 # Both local infrastructures with cvmfs and lxplus!
-                ("/cvmfs/cms.cern.ch/common/dasgoclient -query='instance={} file dataset={}'").format(
-                    dbs_instance, dataset
+                ("/cvmfs/cms.cern.ch/common/dasgoclient -query='instance={} file dataset={}{}'").format(
+                    dbs_instance, dataset, private_appendix
                 )
             )
             .read()

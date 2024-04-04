@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import argparse
 import os
-import sys
 from higgs_dna.utils.logger_utils import setup_logger
 import urllib.request
 import pathlib
@@ -80,8 +79,8 @@ def unzip_gz_with_zcat(logger, input_file, output_file):
 
 def fetch_file(target_name, logger, from_to_dict, type="url"):
     if type == "url":
-        try:
-            for ikey in from_to_dict.keys():
+        for ikey in from_to_dict.keys():
+            try:
                 with urllib.request.urlopen(from_to_dict[ikey]["from"]) as f:
                     json_object = f.read().decode("utf-8")
                 # create the folder
@@ -98,15 +97,15 @@ def fetch_file(target_name, logger, from_to_dict, type="url"):
                         from_to_dict[ikey]["to"],
                     )
                 )
-        except:
-            logger.info(
-                "[ {} ] {}: Can't download from {}".format(
-                    target_name, ikey, from_to_dict[ikey]["from"]
+            except:
+                logger.info(
+                    "[ {} ] {}: Can't download from {}".format(
+                        target_name, ikey, from_to_dict[ikey]["from"]
+                    )
                 )
-            )
     elif type == "copy":
-        try:
-            for ikey in from_to_dict.keys():
+        for ikey in from_to_dict.keys():
+            try:
                 # create the folder
                 p = pathlib.Path(from_to_dict[ikey]["to"])
                 p = pathlib.Path(*p.parts[:-1])  # remove file name
@@ -124,12 +123,12 @@ def fetch_file(target_name, logger, from_to_dict, type="url"):
                         from_to_dict[ikey]["to"],
                     )
                 )
-        except:
-            logger.info(
-                "[ {} ] {}: Can't copy from {}".format(
-                    target_name, ikey, from_to_dict[ikey]["from"]
+            except:
+                logger.info(
+                    "[ {} ] {}: Can't copy from {}".format(
+                        target_name, ikey, from_to_dict[ikey]["from"]
+                    )
                 )
-            )
 
 
 def get_jec_files(logger, target_dir):
@@ -336,7 +335,7 @@ def get_presel_json(logger, target_dir):
 
     from_to_dict = {
         "2016": {
-            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2017/PreselSF_2016.json",
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2016/PreselSF_2016.json",
             "to": f"{to_prefix}/2016/PreselSF_2016.json",
         },
         "2017": {
@@ -356,7 +355,7 @@ def get_presel_json(logger, target_dir):
             "to": f"{to_prefix}/2022/Preselection_2022PostEE.json",
         },
     }
-    
+
     fetch_file("PreselSF", logger, from_to_dict, type="copy")
 
 
@@ -462,7 +461,7 @@ def get_photonid_json(logger, target_dir):
 
 
 def get_scale_and_smearing(logger, target_dir):
-    # see https://twiki.cern.ch/twiki/bin/viewauth/CMS/EgammSFandSSRun3#Scale_And_Smearings_Correctionli for Run 3 
+    # see https://twiki.cern.ch/twiki/bin/viewauth/CMS/EgammSFandSSRun3#Scale_And_Smearings_Correctionli for Run 3
     # see https://cms-talk.web.cern.ch/t/pnoton-energy-corrections-in-nanoaod-v11/34327/2 for Run 2, jsons are from https://github.com/cms-egamma/ScaleFactorsJSON/tree/master
     if target_dir is not None:
         to_prefix = target_dir

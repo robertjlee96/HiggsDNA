@@ -318,7 +318,23 @@ def get_trigger_json(logger, target_dir):
         "2018_sublead": {
             "from": "/eos/cms/store/group/phys_higgs/cmshgg/tbevilac/JSONs/2018/TriggerSF_sublead_2018.json",
             "to": f"{to_prefix}/2018/TriggerSF_sublead_2018.json",
-        }
+        },
+        "2022preEE_lead": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/fmausolf/HiggsDNA_JSONs/TriggerSF_lead_2022_preEE.json",
+            "to": f"{to_prefix}/2022preEE/TriggerSF_lead_2022preEE.json",
+        },
+        "2022preEE_sublead": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/fmausolf/HiggsDNA_JSONs/TriggerSF_sublead_2022_preEE.json",
+            "to": f"{to_prefix}/2022preEE/TriggerSF_sublead_2022preEE.json",
+        },
+        "2022postEE_lead": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/fmausolf/HiggsDNA_JSONs/TriggerSF_lead_2022_postEE.json",
+            "to": f"{to_prefix}/2022postEE/TriggerSF_lead_2022postEE.json",
+        },
+        "2022postEE_sublead": {
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/fmausolf/HiggsDNA_JSONs/TriggerSF_sublead_2022_postEE.json",
+            "to": f"{to_prefix}/2022postEE/TriggerSF_sublead_2022postEE.json",
+        },
     }
     fetch_file("TriggerSF", logger, from_to_dict, type="copy")
 

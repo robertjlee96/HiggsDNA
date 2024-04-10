@@ -27,10 +27,17 @@ def get_fiducial_flag(events: ak.Array, flavour: str = "Geometric") -> ak.Array:
     Note:
     - The function pads GenIsolatedPhoton fields to ensure at least two photons are present per event,
       filling missing values with None.
+    - If the GenPart_iso branch is not included in the NanoAOD, the GenIsolatedPhotons collection is used
     """
-    # Extract and pad the gen isolated photons
-    GenIsolatedPhotons = events.GenIsolatedPhoton
-    GenIsolatedPhotons = ak.pad_none(GenIsolatedPhotons, 2)
+    if 'iso' in events.GenPart.fields:
+        sel_pho = (events.GenPart.pdgId == 22) & (events.GenPart.status == 1) & (events.GenPart.iso * events.GenPart.pt < 10)
+        photons = events.GenPart[sel_pho]
+        photons = photons[ak.argsort(photons.pt, ascending=False)]
+        GenIsolatedPhotons = ak.pad_none(photons, 2)
+    else:
+        # Extract and pad the gen isolated photons
+        GenIsolatedPhotons = events.GenIsolatedPhoton
+        GenIsolatedPhotons = ak.pad_none(GenIsolatedPhotons, 2)
 
     # Separate leading and subleading photons
     lead_pho = GenIsolatedPhotons[:, 0]

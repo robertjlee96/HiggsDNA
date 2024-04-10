@@ -3,23 +3,23 @@
         "best_resolution": {
             "cat_filter": [
                 ["sigma_m_over_m_corr_smeared_decorr", "<", 0.010],
-                ["lead_corr_mvaID_run3", ">", 0.25],
-                ["sublead_corr_mvaID_run3", ">", 0.25]
+                ["lead_mvaID", ">", 0.25],
+                ["sublead_mvaID", ">", 0.25]
             ]
         },
         "medium_resolution": {
             "cat_filter": [
                 ["sigma_m_over_m_corr_smeared_decorr", ">", 0.010],
                 ["sigma_m_over_m_corr_smeared_decorr", "<", 0.014],
-                ["lead_corr_mvaID_run3", ">", 0.25],
-                ["sublead_corr_mvaID_run3", ">", 0.25]
+                ["lead_mvaID", ">", 0.25],
+                ["sublead_mvaID", ">", 0.25]
             ]
         },
         "worst_resolution": {
             "cat_filter": [
                 ["sigma_m_over_m_corr_smeared_decorr", ">", 0.014],
-                ["lead_corr_mvaID_run3", ">", 0.25],
-                ["sublead_corr_mvaID_run3", ">", 0.25]
+                ["lead_mvaID", ">", 0.25],
+                ["sublead_mvaID", ">", 0.25]
             ]
         }
     }

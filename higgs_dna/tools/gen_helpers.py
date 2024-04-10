@@ -75,12 +75,39 @@ def get_fiducial_flag(events: ak.Array, flavour: str = "Geometric") -> ak.Array:
 
 def get_NGenJets(events: ak.Array, pt_cut, eta_cut) -> ak.Array:
     GenJets = events.GenJet
-    # GenParts = events.GenPart
-    # GenPart_is_from_Higgs = events.GenPart[GenParts.genPartIdxMother].pdgId == 25
-    # events.GenPart[events.GenPart.pdgId==22 & ]
-
-    # dr_dipho_cut = delta_r_mask(jets, diphotons, self.jet_dipho_min_dr)
+    GenJets = GenJets[GenJets.partonFlavour != 0]  # Removing GenJets that have not been matched to coloured particles
+    # This is targeted primarly at photons from Higgs decay but also prompt electrons and muons in VH, TTH
     GenJets = GenJets[GenJets.pt > pt_cut]
     GenJets = GenJets[np.abs(GenJets.eta) < eta_cut]
     NGenJets = ak.num(GenJets)
     return NGenJets
+
+
+def get_higgs_gen_attributes(events: ak.Array) -> ak.Array:
+    """
+    Calculate the Higgs pt and y based on photon kinematics at particle level.
+
+    Note:
+    - The function pads GenIsolatedPhoton fields to ensure at least two photons are present per event,
+      filling missing values with None.
+    - If the GenPart_iso branch is not included in the NanoAOD, the GenIsolatedPhotons collection is used, to be consistent with get_fiducial_flag() above.
+    """
+    if 'iso' in events.GenPart.fields:
+        sel_pho = (events.GenPart.pdgId == 22) & (events.GenPart.status == 1)
+        gen_photons = events.GenPart[sel_pho]
+        gen_photons = gen_photons[ak.argsort(gen_photons.pt, ascending=False)]
+        gen_photons = ak.pad_none(gen_photons, 2)
+    else:
+        # Extract and pad the gen isolated photons
+        gen_photons = events.GenIsolatedPhoton
+        gen_photons = ak.pad_none(gen_photons, 2)
+
+    # Separate leading and subleading photons
+    lead_pho = gen_photons[:, 0]
+    sublead_pho = gen_photons[:, 1]
+    gen_diphoton = lead_pho + sublead_pho
+
+    pt = gen_diphoton.pt
+    y = 0.5 * np.log((gen_diphoton.energy + gen_diphoton.pz) / (gen_diphoton.energy - gen_diphoton.pz))
+
+    return (pt, y)

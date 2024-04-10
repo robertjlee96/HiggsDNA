@@ -5,7 +5,7 @@ from higgs_dna.tools.photonid_mva import calculate_photonid_mva, load_photonid_m
 from higgs_dna.tools.photonid_mva import calculate_photonid_mva_run3, load_photonid_mva_run3
 from higgs_dna.tools.SC_eta import add_photon_SC_eta
 from higgs_dna.tools.EELeak_region import veto_EEleak_flag
-from higgs_dna.tools.gen_helpers import get_fiducial_flag
+from higgs_dna.tools.gen_helpers import get_fiducial_flag, get_higgs_gen_attributes
 from higgs_dna.selections.photon_selections import photon_preselection
 from higgs_dna.selections.lepton_selections import select_electrons, select_muons
 from higgs_dna.selections.jet_selections import select_jets, jetvetomap
@@ -515,6 +515,8 @@ class HggBaseProcessor(processor.ProcessorABC):  # type: ignore
             # Add the fiducial flags for particle level
             diphotons['fiducialClassicalFlag'] = get_fiducial_flag(events, flavour='Classical')
             diphotons['fiducialGeometricFlag'] = get_fiducial_flag(events, flavour='Geometric')
+
+            diphotons['PTH'], diphotons['YH'] = get_higgs_gen_attributes(events)
 
             # baseline modifications to diphotons
             if self.diphoton_mva is not None:

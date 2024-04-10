@@ -36,10 +36,19 @@ class fiducialGeometricTagger:
         # This tagger determines if an event passes the fiducial selection at gen level using the geometric cuts proposed in 2106.08329
         # Therefore, we need to protect data events from this tagger as they do not have the relevant field
         if 'GenIsolatedPhoton' in events.fields:  # if we are processind MC
-            selection.add("n_iso_photon", ak.num(events.GenIsolatedPhoton, axis=1) > 1)
-            events = events.mask[selection.all("n_iso_photon")]
-            lead_pho = events.GenIsolatedPhoton[:, 0]
-            sublead_pho = events.GenIsolatedPhoton[:, 1]
+            if 'iso' in events.GenPart.fields:  # Check if the branch GenPart_iso is in the nanoAOD
+                sel_pho = (events.GenPart.pdgId == 22) & (events.GenPart.status == 1) & (events.GenPart.iso * events.GenPart.pt < 10)
+                photons = events.GenPart[sel_pho]
+                selection.add("n_iso_photon", ak.num(photons) > 1)
+                photons = photons.mask[selection.all("n_iso_photon")]
+                photons = photons[ak.argsort(photons.pt, ascending=False)]
+                lead_pho = photons[:, 0]
+                sublead_pho = photons[:, 1]
+            else:
+                selection.add("n_iso_photon", ak.num(events.GenIsolatedPhoton, axis=1) > 1)
+                events = events.mask[selection.all("n_iso_photon")]
+                lead_pho = events.GenIsolatedPhoton[:, 0]
+                sublead_pho = events.GenIsolatedPhoton[:, 1]
             diphoton = (lead_pho) + (sublead_pho)
             selection.add("sqrt_product_scaled_pt", (np.sqrt(lead_pho.pt * sublead_pho.pt) / diphoton.mass > 1 / 3))
             selection.add("sublead_photon_scaled_pt", sublead_pho.pt / diphoton.mass > 1 / 4)

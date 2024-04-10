@@ -347,7 +347,7 @@ def get_presel_json(logger, target_dir):
             os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/Preselection"
         )
     # Old ones with puely restricted probe and non-conservative uncertainties: "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/SFs/preselection/restrictedProbe"
-    path_for_early_Analysis = "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/SFs/preselection/restrictedProbeConservativeUncs"
+    # Old ones with restricted probe and conservative uncertainties: /eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/SFs/preselection/restrictedProbeConservativeUncs
 
     from_to_dict = {
         "2016": {
@@ -363,11 +363,11 @@ def get_presel_json(logger, target_dir):
             "to": f"{to_prefix}/2018/PreselSF_2018.json",
         },
         "2022preEE": {
-            "from": f"{path_for_early_Analysis}/Preselection_2022PreEE.json",
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/fmausolf/HiggsDNA_JSONs/Preselection_2022PreEE.json",  # correct nominal values, prelim. uncertainties due to issues in alt. signal model
             "to": f"{to_prefix}/2022/Preselection_2022PreEE.json",
         },
         "2022postEE": {
-            "from": f"{path_for_early_Analysis}/Preselection_2022PostEE.json",
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/fmausolf/HiggsDNA_JSONs/Preselection_2022PostEE.json",  # correct nominal values, prelim. uncertainties due to issues in alt. signal model
             "to": f"{to_prefix}/2022/Preselection_2022PostEE.json",
         },
     }
@@ -445,8 +445,6 @@ def get_photonid_json(logger, target_dir):
             os.path.dirname(__file__), "../higgs_dna/systematics/JSONs/SF_photon_ID"
         )
 
-    path_for_early_Analysis = "/eos/cms/store/group/phys_higgs/cmshgg/earlyRun3Hgg/SFs/photon_id_mva"
-
     from_to_dict = {
         "2016preVFP": {
             "from": "/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/EGM/2016preVFP_UL/photon.json.gz",
@@ -465,11 +463,11 @@ def get_photonid_json(logger, target_dir):
             "to": f"{to_prefix}/2018/photon.json.gz",
         },
         "2022preEE": {
-            "from": f"{path_for_early_Analysis}/PhotonIDMVA_2022PreEE.json",
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/fmausolf/HiggsDNA_JSONs/PhotonIDMVA_2022PreEE.json",  # correct nominal values, prelim. uncertainties due to issues in alt. signal model
             "to": f"{to_prefix}/2022/PhotonIDMVA_2022PreEE.json",
         },
         "2022postEE": {
-            "from": f"{path_for_early_Analysis}/PhotonIDMVA_2022PostEE.json",
+            "from": "/eos/cms/store/group/phys_higgs/cmshgg/fmausolf/HiggsDNA_JSONs/PhotonIDMVA_2022PostEE.json",  # correct nominal values, prelim. uncertainties due to issues in alt. signal model
             "to": f"{to_prefix}/2022/PhotonIDMVA_2022PostEE.json",
         },
     }

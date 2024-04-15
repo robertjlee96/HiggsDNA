@@ -6,6 +6,10 @@ from optparse import OptionParser
 import json
 from higgs_dna.utils.logger_utils import setup_logger
 
+import os
+import logging
+from concurrent.futures import ThreadPoolExecutor
+
 # ---------------------- A few helping functions  ----------------------
 
 
@@ -218,49 +222,70 @@ cat_dict = "category.json"
 # Define string if normalisation to be skipped
 skip_normalisation_str = "--skip-normalisation" if opt.skip_normalisation else ""
 
+# The process var below is the function that will be executed in parallel for each systematic variation. It substitutes the old loop of the systematics to speed up the process.
+# Paths now must be ABSOLUTE!! - CD while multi thread is not a good idea! 
+def process_var(var, var_dict, IN_PATH, SCRIPT_DIR, file, cat_dict, skip_normalisation_str):
+    target_dir = f"{IN_PATH}/merged/{file}/{var_dict[var]}"
+    # Assuming MKDIRP is a predefined function
+    MKDIRP(target_dir)
+
+    command = f"python3 merge_parquet.py --source {IN_PATH}/{file}/{var_dict[var]} --target {target_dir}/ --cats {cat_dict} {skip_normalisation_str}"
+    logger.info(command)
+
+    # Execute the command using subprocess.run
+    subprocess.run(command, shell=True, cwd=SCRIPT_DIR, check=True)
+
+# Loop to paralelize the loop over the "files", which are the ttH_125_preEE, etc. datasets
+def process_file(file, IN_PATH, SCRIPT_DIR, var_dict, cat_dict, skip_normalisation_str, opt):
+    file = file.strip()  # Removes newline characters and leading/trailing whitespace
+    if "data" not in file.lower():
+        target_path = f"{IN_PATH}/merged/{file}"
+        if os.path.exists(target_path):
+            raise Exception(f"The selected target path: {target_path} already exists")
+        MKDIRP(target_path)
+
+        if opt.syst:
+            # Systematic variations processing
+            with ThreadPoolExecutor(max_workers=7) as executor:
+                futures = [executor.submit(process_var, var, var_dict, IN_PATH, SCRIPT_DIR, file, cat_dict, skip_normalisation_str) for var in var_dict]
+
+            for future in futures:
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error(f"Error processing variable: {e}")
+        else:
+            # Single nominal processing for MC
+            command = f"python3 merge_parquet.py --source {IN_PATH}/{file}/nominal --target {target_path}/ --cats {cat_dict} {skip_normalisation_str}"
+            subprocess.run(command, shell=True, cwd=SCRIPT_DIR, check=True)
+    else:
+        # Data processing
+        merged_target_path = f"{IN_PATH}/merged/{file}/{file}_merged.parquet"
+        data_dir_path = f"{IN_PATH}/merged/Data_{file.split('_')[-1]}"
+        if os.path.exists(merged_target_path):
+            raise Exception(f"The selected target path: {merged_target_path} already exists")
+        if not os.path.exists(data_dir_path):
+            MKDIRP(data_dir_path)
+        command = f'python3 merge_parquet.py --source {IN_PATH}/{file}/nominal --target {data_dir_path}/{file}_ --cats {cat_dict} --is-data'
+        subprocess.run(command, shell=True, cwd=SCRIPT_DIR, check=True)
+
+
 if opt.merge:
     with open(f"{EXEC_PATH}/dirlist.txt") as fl:
         files = fl.readlines()
-        for file in files:
-            file = file.split("\n")[0]
-            # MC dataset are identified as everythingthat does not contain "data" or "Data" in the name.
-            if "data" not in file.lower():
-                if os.path.exists(f"{IN_PATH}/merged/{file}"):
-                    raise Exception(
-                        f"The selected target path: {IN_PATH}/merged/{file} already exists"
-                    )
+        
+        # No more loop over the files, we will use the ThreadPoolExecutor to parallelize the process!
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(process_file, file, IN_PATH, SCRIPT_DIR, var_dict, cat_dict, skip_normalisation_str, opt) for file in files]
 
-                MKDIRP(f"{IN_PATH}/merged/{file}")
-                if opt.syst:
-                    # if we have systematic variations in different files we have to split them in different directories
-                    # otherwise they will be all merged at once in the same output file
-                    for var in var_dict:
-                        os.chdir(IN_PATH)
+        # Optionally, wait for all futures to complete and check for exceptions
+        for future in futures:
+            try:
+                future.result()
+            except Exception as e:
+                # Log file-level exceptions
+                logger.error(f"Error processing file: {e}")
 
-                        MKDIRP(f"{IN_PATH}/merged/{file}/{var_dict[var]}")
-
-                        os.chdir(SCRIPT_DIR)
-                        logger.info(f"python3 merge_parquet.py --source {IN_PATH}/{file}/{var_dict[var]} --target {IN_PATH}/merged/{file}/{var_dict[var]}/ --cats {cat_dict} {skip_normalisation_str}")
-                        os.system(
-                            f"python3 merge_parquet.py --source {IN_PATH}/{file}/{var_dict[var]} --target {IN_PATH}/merged/{file}/{var_dict[var]}/ --cats {cat_dict} {skip_normalisation_str}"
-                        )
-
-                else:
-                    os.chdir(SCRIPT_DIR)
-                    os.system(
-                        f"python3 merge_parquet.py --source {IN_PATH}/{file}/nominal --target {IN_PATH}/merged/{file}/ --cats {cat_dict} {skip_normalisation_str}"
-                    )
-            else:
-                if os.path.exists(f"{IN_PATH}/merged/{file}/{file}_merged.parquet"):
-                    raise Exception(
-                        f"The selected target path: {IN_PATH}/merged/{file}/{file}_merged.parquet already exists"
-                    )
-                if not os.path.exists(f'{IN_PATH}/merged/Data_{file.split("_")[-1]}'):
-                    MKDIRP(f'{IN_PATH}/merged/Data_{file.split("_")[-1]}')
-                os.chdir(SCRIPT_DIR)
-                os.system(
-                    f'python3 merge_parquet.py --source {IN_PATH}/{file}/nominal --target {IN_PATH}/merged/Data_{file.split("_")[-1]}/{file}_ --cats {cat_dict} --is-data'
-                )
 
         # at this point Data will be split in eras if any Data dataset is present, here we merge them again in one allData file to rule them all
         # we also skip this step if there is no Data

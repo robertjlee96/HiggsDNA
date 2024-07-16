@@ -42,5 +42,5 @@ def select_lumis(
         year = "2022"
     else:
         pass
-    logger.info("Year: {} GoldenJson: {}".format(year, goldenJson_dict[year]))
+    lumimask = LumiMask(goldenJson_dict[year])
     return lumimask(events.run, events.luminosityBlock)
